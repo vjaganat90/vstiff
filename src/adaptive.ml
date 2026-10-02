@@ -34,12 +34,21 @@ let attempt ~rhs { t; y; prev; _ } h =
       let* bdf2 = Bdf2.step ~rhs ~t ~dt:h ~dt_prev ~y_prev y in
       Ok (bdf2, Vec.sub bdf2 be)
 
+(* Below this a step can move [t] by only a few units in the last place.
+   Needing one means the solution is singular there, or the right-hand side
+   fails just ahead, and halving further would never get past it. *)
+let dt_min t = 16. *. Float.epsilon *. Float.abs t
+
+(** [integrate ~tol ~rhs ~t0 ~t_end y0] advances [y0] from [t0] to [t_end].
+    [dt0] defaults to [1e-6 (t_end - t0)] and [dt_max] to [(t_end - t0) / 10].
+    A failed Newton solve counts as a rejection. Returns [Error (StepRejected n)]
+    after [n > max_rejects] rejections in a row, or as soon as a halved step
+    falls below [16 eps |t|]; [Error Nan] if [y0] or [rhs t0 y0] is not finite. *)
 let integrate ?dt0 ?dt_max ?(max_rejects = 50) ~tol ~rhs ~t0 ~t_end y0 : (solution, Fail.t) result =
   let span = t_end -. t0 in
   let dt_max = Option.value dt_max ~default:(span /. 10.) in
   let rec go (s : state) =
     if s.t >= t_end then Ok { t = s.t; y = s.y; accepted = s.accepted; rejected = s.rejected }
-    else if s.failures > max_rejects then Error (Fail.StepRejected s.failures)
     else
       let last = s.dt >= t_end -. s.t in
       let h = if last then t_end -. s.t else s.dt in
@@ -58,7 +67,11 @@ let integrate ?dt0 ?dt_max ?(max_rejects = 50) ~tol ~rhs ~t0 ~t_end y0 : (soluti
               failures = 0;
             }
       | Ok _ | Error _ ->
-          go { s with dt = s.dt /. 2.; streak = 0; rejected = s.rejected + 1; failures = s.failures + 1 }
+          (* Halve the step that failed, which is shorter than [s.dt] when it
+             was cut to land on [t_end]. *)
+          let failures = s.failures + 1 and dt = h /. 2. in
+          if failures > max_rejects || dt < dt_min s.t then Error (Fail.StepRejected failures)
+          else go { s with dt; streak = 0; rejected = s.rejected + 1; failures }
   in
   if not (Vec.finite y0 && Vec.finite (rhs t0 y0)) then Error Fail.Nan
   else
