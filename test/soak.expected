@@ -1,0 +1,4 @@
+soak canary x10: passed 10/10, identical: true
+soak logistic order x10: passed 10/10, identical: true
+soak van der Pol x10: passed 10/10, identical: true
+soak robertson x10: passed 10/10, identical: true
