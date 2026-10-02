@@ -23,3 +23,13 @@ module Van_der_pol = struct
   let rhs _t y = [| y.(1); (mu *. (1. -. (y.(0) *. y.(0))) *. y.(1)) -. y.(0) |]
   let y0 = [| 2.; 0. |]
 end
+
+(** Robertson's chemical kinetics: rates spanning nine orders of magnitude,
+    and y1 + y2 + y3 is invariant. *)
+module Robertson = struct
+  let rhs _t y =
+    let a = 0.04 *. y.(0) and b = 1e4 *. y.(1) *. y.(2) and c = 3e7 *. y.(1) *. y.(1) in
+    [| b -. a; a -. b -. c; c |]
+
+  let y0 = [| 1.; 0.; 0. |]
+end

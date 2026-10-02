@@ -69,3 +69,15 @@ let () =
       case "vdp mu=1000 [0,2000] tol=1e-4"
         (Printf.sprintf "Ok at t=%g, rejected >= 1: %b, y finite: %b" s.t (s.rejected >= 1) (Vec.finite s.y))
   | Error e -> case "vdp mu=1000 [0,2000] tol=1e-4" ("Error " ^ Fail.to_string e)
+
+(* Step 6: Robertson to t = 1e4 against the reference, with mass conserved. *)
+let () =
+  let open Problems.Robertson in
+  match Adaptive.integrate ~tol:1e-6 ~rhs ~t0:0. ~t_end:1e4 y0 with
+  | Ok s ->
+      let y1_error = Float.abs (s.y.(0) -. Refs.robertson_y1_at_1e4) in
+      let mass_error = Float.abs (Array.fold_left ( +. ) 0. s.y -. 1.) in
+      case "robertson t=1e4 tol=1e-6"
+        (Printf.sprintf "|y1 - ref| < 1e-3: %b, |y1 + y2 + y3 - 1| < 1e-8: %b" (y1_error < 1e-3)
+           (mass_error < 1e-8))
+  | Error e -> case "robertson t=1e4 tol=1e-6" ("Error " ^ Fail.to_string e)
