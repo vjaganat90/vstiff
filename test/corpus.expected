@@ -1,0 +1,3 @@
+newton linear 2d: Ok [2.000000000000; 3.000000000000]
+newton quadratic x0=1: Ok [1.414213562373]
+newton quadratic x0=0: Error Diverged
