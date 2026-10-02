@@ -47,3 +47,16 @@ let () =
   Bdf1.integrate ~rhs ~t0:0. ~t_end:1. ~dt:2e-6 y0
   |> Result.map (max_error (exact 1.))
   |> show_error "bdf1 canary t=1 dt=2e-6" 1e-6
+
+(* Step 4: BDF2 with a BDF1 startup is second order on the logistic equation. *)
+let () =
+  let open Problems.Logistic in
+  let error dt = Result.map (max_error (exact 5.)) (Bdf2.integrate ~rhs ~t0:0. ~t_end:5. ~dt y0) in
+  match (error 0.01, error 0.005) with
+  | Ok coarse, Ok fine ->
+      let ratio = coarse /. fine in
+      case "bdf2 logistic [0,5]"
+        (Printf.sprintf "error dt=0.01 %.3e, dt=0.005 %.3e, ratio %.2f in [3.5, 4.5]: %b" coarse fine
+           ratio
+           (3.5 <= ratio && ratio <= 4.5))
+  | Error e, _ | _, Error e -> case "bdf2 logistic [0,5]" ("Error " ^ Fail.to_string e)

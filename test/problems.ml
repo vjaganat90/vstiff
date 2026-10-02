@@ -9,3 +9,10 @@ module Canary = struct
   let y0 = [| 1.; 1.; 1. |]
   let exact t = Array.map (fun l -> exp (-.l *. t)) lambda
 end
+
+(** y' = y (1 - y), y(0) = 0.1: smooth, with a closed form. *)
+module Logistic = struct
+  let rhs _t y = [| y.(0) *. (1. -. y.(0)) |]
+  let y0 = [| 0.1 |]
+  let exact t = [| 1. /. (1. +. (((1. /. y0.(0)) -. 1.) *. exp (-.t))) |]
+end
