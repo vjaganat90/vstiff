@@ -4,3 +4,4 @@ newton quadratic x0=0: Error Diverged
 jac canary at origin, max entry error < 1e-6: true
 jac canary at y0, max entry error relative to |J_ij| < 1e-6: true
 bdf1 canary t=1 dt=2e-6: max error 3.68e-07 < 1e-06: true
+bdf2 logistic [0,5]: error dt=0.01 3.116e-06, dt=0.005 7.810e-07, ratio 3.99 in [3.5, 4.5]: true
