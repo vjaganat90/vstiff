@@ -34,3 +34,16 @@ let () =
   let at_y0 = max_abs (relative (entry_errors y0) analytic) in
   case "jac canary at origin, max entry error < 1e-6" (string_of_bool (at_origin < 1e-6));
   case "jac canary at y0, max entry error relative to |J_ij| < 1e-6" (string_of_bool (at_y0 < 1e-6))
+
+let max_error exact y = Vec.norm_inf (Vec.sub y exact)
+
+let show_error name bound = function
+  | Ok e -> case name (Printf.sprintf "max error %.2e < %g: %b" e bound (e < bound))
+  | Error e -> case name ("Error " ^ Fail.to_string e)
+
+(* Step 3: backward Euler, fixed dt, on the canary. *)
+let () =
+  let open Problems.Canary in
+  Bdf1.integrate ~rhs ~t0:0. ~t_end:1. ~dt:2e-6 y0
+  |> Result.map (max_error (exact 1.))
+  |> show_error "bdf1 canary t=1 dt=2e-6" 1e-6
