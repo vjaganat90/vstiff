@@ -3,3 +3,4 @@ newton quadratic x0=1: Ok [1.414213562373]
 newton quadratic x0=0: Error Diverged
 jac canary at origin, max entry error < 1e-6: true
 jac canary at y0, max entry error relative to |J_ij| < 1e-6: true
+bdf1 canary t=1 dt=2e-6: max error 3.68e-07 < 1e-06: true
