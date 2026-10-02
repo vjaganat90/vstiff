@@ -1,3 +1,5 @@
 newton linear 2d: Ok [2.000000000000; 3.000000000000]
 newton quadratic x0=1: Ok [1.414213562373]
 newton quadratic x0=0: Error Diverged
+jac canary at origin, max entry error < 1e-6: true
+jac canary at y0, max entry error relative to |J_ij| < 1e-6: true
