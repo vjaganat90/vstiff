@@ -16,3 +16,10 @@ module Logistic = struct
   let y0 = [| 0.1 |]
   let exact t = [| 1. /. (1. +. (((1. /. y0.(0)) -. 1.) *. exp (-.t))) |]
 end
+
+(** van der Pol, μ = 1000: slow drifts broken by jumps on a 1/μ time scale. *)
+module Van_der_pol = struct
+  let mu = 1000.
+  let rhs _t y = [| y.(1); (mu *. (1. -. (y.(0) *. y.(0))) *. y.(1)) -. y.(0) |]
+  let y0 = [| 2.; 0. |]
+end

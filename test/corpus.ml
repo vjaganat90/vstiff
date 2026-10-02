@@ -60,3 +60,12 @@ let () =
            ratio
            (3.5 <= ratio && ratio <= 4.5))
   | Error e, _ | _, Error e -> case "bdf2 logistic [0,5]" ("Error " ^ Fail.to_string e)
+
+(* Step 5: step rejection on van der Pol. *)
+let () =
+  let open Problems.Van_der_pol in
+  match Adaptive.integrate ~tol:1e-4 ~rhs ~t0:0. ~t_end:2000. y0 with
+  | Ok s ->
+      case "vdp mu=1000 [0,2000] tol=1e-4"
+        (Printf.sprintf "Ok at t=%g, rejected >= 1: %b, y finite: %b" s.t (s.rejected >= 1) (Vec.finite s.y))
+  | Error e -> case "vdp mu=1000 [0,2000] tol=1e-4" ("Error " ^ Fail.to_string e)
