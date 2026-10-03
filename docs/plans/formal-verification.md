@@ -27,7 +27,7 @@ Extraction has its own catch. Rocq's primitive floats have no fused multiply-add
 - `rocq-elpi`, which Hierarchy Builder and therefore MathComp 2.6 depend on, is bounded to `dune < 3.24`.
 - The development switch has dune 3.24.2.
 
-The solver accepts this separate switch: **dune 3.23.1 + Rocq 9.2.0 + MathComp 2.6.0** on OCaml 5.5.0, and also on OCaml 4.14.2, the lower-risk choice (4.3). It also accepts adding MathComp-Analysis 1.18.0, Flocq 4.2.2, Coquelicot 3.4.5 and CoqInterval 4.11.5, and even VCFloat 2.4.2 and LAProof 2.0.1.
+The proof switch is **OCaml 5.5.0 + dune 3.23.1 + Rocq 9.2.0 + MathComp 2.6.0**: the project's own compiler and the newest releases the libraries support together, accepted by the solver (4.3). It also accepts adding MathComp-Analysis 1.18.0, Flocq 4.2.2, Coquelicot 3.4.5 and CoqInterval 4.11.5, and even VCFloat 2.4.2 and LAProof 2.0.1.
 
 **Findings from stating theorems precisely.** All five were confirmed by running the code at `f6d9b4e`; the first three have since been fixed:
 
@@ -622,12 +622,12 @@ Paşca's Kantorovich proof is prior art but predates MathComp 2. Global converge
 
 ### 4.3 Toolchain
 
-Not run. The dry-run solve of this set succeeded (1.2), and a second dry run also solved the 4.14.2 variant used below.
+Not run. The dry-run solve of this set on OCaml 5.5.0 succeeded (1.2).
 
 ```sh
 # Separate switch: MathComp needs dune < 3.24; the dev switch has dune 3.24.2.
-# Compiler: see the first bullet below (5.5.0 and 4.14.2 both solve).
-opam switch create vstiff-proofs ocaml-base-compiler.4.14.2 \
+# Compiler: OCaml 5.5.0, the project's own (see the first bullet below).
+opam switch create vstiff-proofs ocaml-base-compiler.5.5.0 \
   --repos=default,rocq-released=https://rocq-prover.org/opam/released
 opam install --switch=vstiff-proofs dune.3.23.1 rocq-core.9.2.0 rocq-stdlib.9.2.0 \
   rocq-mathcomp-ssreflect.2.6.0 rocq-mathcomp-algebra.2.6.0
@@ -638,8 +638,8 @@ opam install --switch=vstiff-proofs rocq-mathcomp-analysis.1.18.0 coq-flocq.4.2.
 opam install --switch=vstiff-proofs coq-vcfloat.2.4.2 rocq-laproof.2.0.1
 ```
 
-- **Which OCaml for the proof switch.** Choosing 5.5.0 would let one switch parse 5.5 syntax and build vstiff, but that reason does not hold: the tripwire lives in the main workspace and runs in the dev switch or an OCaml 5.5 CI job (4.4), and Rocq-side differential checks run inside Rocq. Against 5.5.0: Rocq's `INSTALL.md` (V9.3.0) calls OCaml 5.x experimental and lists no test of 5.5; the `rocq/rocq-prover` Docker images are tagged `ocaml-4.14.2` (the MathComp images are built on them, unchecked); and on arm64 `native_compute` with OCaml 5 exists only from Rocq 9.3. So the command above uses 4.14.2 (dry runs: pilot set 51 packages, full set 86). 5.5.0 (56 and 91 packages) also solves if one switch matters more than the risk; 5.4.1 is the in-between. Do not add `coq-mathcomp-algebra-tactics`: its newest release requires MathComp < 2.6.
-- **Why Rocq 9.2.0 and not 9.3.0.** 9.2 keeps VCFloat, LAProof and taylor_rocqs available. MathComp 2.6.0's changelog lists Rocq 9.0–9.2; 9.3 is allowed by opam and has a Docker image, but whether it builds was not checked.
+- **Which OCaml for the proof switch.** OCaml 5.5.0, the compiler the project is built with, so that every environment is current (dry runs: pilot set 56 packages, full set 91). Upstream caveats, none of which blocks the pilot: Rocq's `INSTALL.md` (V9.3.0) calls OCaml 5.x experimental and lists no test of 5.5; the `rocq/rocq-prover` Docker images use 4.14.2, which does not matter for pure Rocq proofs; and on arm64, `native_compute` with OCaml 5 needs Rocq 9.3, which the pilot does not use. Do not add `coq-mathcomp-algebra-tactics`: its newest release requires MathComp < 2.6.
+- **Why Rocq 9.2.0 and not 9.3.0.** 9.2.0 is the newest release that MathComp 2.6.0's changelog lists (9.0–9.2), and it keeps VCFloat, LAProof and taylor_rocqs available. Move to 9.3 once MathComp lists it: opam already allows the pair and a Docker image exists, but whether it builds was not checked.
 - Editor: `vsrocq-language-server` 2.5.0 declares support for Rocq 9.0–9.3. Not solver-checked.
 
 ### 4.4 Layout
@@ -683,7 +683,7 @@ vstiff/
 
 Two jobs. Sketch only; the repository has no CI configuration yet.
 
-- **Proofs.** The container `mathcomp/mathcomp:2.6.0-rocq-prover-9.2` exists on Docker Hub (also `-rocq-prover-9.3`). Run `dune build --root verif`, or use [rocq-prover/docker-opam-action](https://github.com/rocq-prover/docker-opam-action) (formerly `coq-community/docker-coq-action`; the old names redirect). The image's OCaml (4.14.2) does not matter for pure Rocq. `(using rocq 0.13)` needs dune ≥ 3.23 in the image; its dune version was not checked.
+- **Proofs.** Use `ocaml/setup-ocaml` with OCaml 5.5.0, install the opam set of 4.3 (the same environment as locally) and run `dune build --root verif`; cache the opam switch. The container `mathcomp/mathcomp:2.6.0-rocq-prover-9.2` on Docker Hub (also `-rocq-prover-9.3`) is a faster alternative with OCaml 4.14.2 inside, which does not change pure Rocq proofs; [rocq-prover/docker-opam-action](https://github.com/rocq-prover/docker-opam-action) (formerly `coq-community/docker-coq-action`) drives it. `(using rocq 0.13)` needs dune ≥ 3.23.
 - **Tripwire.** Use `ocaml/setup-ocaml` with 5.5.0 and run `dune build @runtest` in the main workspace (the same job as the corpus). Takes minutes.
 - **Main build.** The Rocq side is invisible to it (`data_only_dirs`); it gains only `sync/`, which needs `compiler-libs` from the compiler itself.
 
