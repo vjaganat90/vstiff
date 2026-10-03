@@ -8,6 +8,7 @@ In one paragraph: an **implicit** step cannot compute the new state directly, be
 
 ```text
  tests       Corpus  Soak   shared: Problems  Refs   effects: Guard  Report
+ bench       Bench (run by hand)   uses: Problems   effects: Console
  ------------------------------------------------------------------------------
  vstiff      the solver library; Vstiff (src/vstiff.ml) lists the public modules
    drivers     Stepper.fixed (any Method)       Adaptive.integrate (Embedded + Controller)
@@ -192,14 +193,15 @@ The same Newton failure means different things at different levels. In a fixed-s
 
 ## Effects
 
-OCaml does not record effects in types (a function's type does not say whether it raises, mutates or prints), so the discipline is by module ([AGENTS.md](../AGENTS.md), H6): a function outside these four modules neither raises on purpose, nor mutates, nor prints, and a new effect goes into one of them or into a new module that exists for it.
+OCaml does not record effects in types (a function's type does not say whether it raises, mutates or prints), so the discipline is by module ([AGENTS.md](../AGENTS.md), H6): a function outside these modules neither raises on purpose, nor mutates, nor prints, and a new effect goes into one of them or into a new module that exists for it.
 
 | Module | Effect | Why there |
 |---|---|---|
 | `Check` (library, internal) | raises `Invalid_argument` | a bad argument is a programming error, not a numerical failure; every deliberate raise is in one place, called at the start of a driver, before it takes a step |
 | `Instrument` (library) | one `ref`: a call counter | counting needs state; wrapping the `rhs` a method receives keeps the methods pure. Nothing in the library calls it: `Guard.budget`, the `too_small` and `adaptive_canary` cases of the corpus and probes do |
 | `Guard` (tests) | raises `Exhausted`, catches it and `Invalid_argument` | turns a runaway loop or a bad argument into a printed line (`run`), or an exhausted budget into `None` (`bounded`), so that the soak test can count the round as not passed |
-| `Report` (tests) | prints | the only module that writes to standard output |
+| `Report` (tests) | prints | the tests' only module that writes to standard output |
+| `Console` (bench) | reads the command line, prints, reads the CPU clock and exits | the bench's only effects; its other modules, the measurements, the golden table and the gate included, are pure, and `dune runtest` checks them without running the bench ([bench/README.md](../bench/README.md)) |
 
 Everything else is pure: methods, controllers, the whole kernel (`Newton`, `Jac`, `Linalg`, `Vec`, `Fail`: `Fail.to_string` formats a string and prints nothing), and the drivers, which raise on purpose only by calling `Check`. Why:
 

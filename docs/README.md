@@ -43,6 +43,7 @@ dune runtest
 | [ocaml.md](ocaml.md) | OCaml and tooling primer: opam, dune, the commands you will type, and the language features the code uses, libraries and main modules included. |
 | [architecture.md](architecture.md) | The two libraries and the public API, the contracts, the modules, how data flows between them, and where effects live. |
 | [testing.md](testing.md) | How the tests are built and run, how to read a failure, the policy for changing expectations, adding a case, probes. |
+| [bench/README.md](../bench/README.md) | The work-precision bench: how to run it, its golden table and gate, the references and scipy rows, the transcription check. |
 | [numerics/01-odes-and-stiffness.md](numerics/01-odes-and-stiffness.md) | ODEs, explicit and backward Euler, order, stability and stiffness. |
 | [numerics/02-newton.md](numerics/02-newton.md) | Newton's method, damping and the linear solves inside it. |
 | [numerics/03-jacobians-and-floating-point.md](numerics/03-jacobians-and-floating-point.md) | Floating point, finite-difference Jacobians, round-off and NaN. |

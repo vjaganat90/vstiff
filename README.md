@@ -41,7 +41,7 @@ Install the toolchain first ([docs/README.md](docs/README.md), "Before you start
 ```sh
 git clone https://github.com/vjaganat90/vstiff
 cd vstiff
-dune build     # compiles both libraries and the tests, and records what the test programs print
+dune build     # compiles the libraries, the tests and the bench, and records what the test programs print
 dune runtest   # compares that output with the .expected files; silent when every check passes
 ```
 
@@ -103,7 +103,8 @@ to five decimals with the reference in [test/refs.ml](test/refs.ml).
 
 No solver is right on every input, so vstiff aims to state what it promises and to check each
 promise. The checks are *expect tests*: two programs, the corpus and the soak test, print one line
-per case, and `dune runtest` compares what they print with the `.expected` file beside each. The
+per case, and `dune runtest` compares what they print with the `.expected` file beside each. A
+third, small one, [bench/test/check.ml](bench/test/check.ml), checks the pure modules of the bench. The
 corpus ([test/corpus.expected](test/corpus.expected)) has 47 lines, one per case (Newton's method,
 Jacobians, the order of BDF2, the stiff problems above, step control, the named failures); a line
 reads like `max error 3.68e-07 < 1e-06: true`. The soak test ([test/soak.ml](test/soak.ml)) runs
@@ -135,6 +136,8 @@ src/numerics/   kernel library numerics: Fail, Vec, Linalg, Newton, Jac; knows n
 src/            solver library vstiff: ode.mli holds the contracts, vstiff.mli the public API
 test/           corpus.ml and soak.ml with their .expected files, and their helper modules
 test/problems/  library problems: the corpus problems, shared by the tests and the bench
+bench/          the work-precision bench (bench.exe, run by hand), its references and golden table;
+                compare/ holds the Python scripts that run scipy, outside the build
 docs/           README.md is the index; numerics/ explains the mathematics
 ```
 

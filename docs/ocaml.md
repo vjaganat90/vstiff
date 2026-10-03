@@ -31,7 +31,7 @@ These commands are for macOS, Linux and WSL (Windows Subsystem for Linux). The p
 
 ### What dune reads
 
-Five small files configure the build. They are lists in parentheses, and `;` starts a comment (the copies in the repository may carry comments, left out here).
+Five small files configure the build of the solver and its tests (the bench has two more of the same kind, `bench/dune` and `bench/test/dune`). They are lists in parentheses, and `;` starts a comment (the copies in the repository may carry comments, left out here).
 
 ```text
 dune-project       (lang dune 3.0)           the dune language version, not the compiler's
