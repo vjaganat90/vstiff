@@ -67,7 +67,7 @@ let () =
   match Adaptive.integrate ~tol:1e-4 problem with
   | Ok s ->
       case "vdp mu=1000 [0,2000] tol=1e-4"
-        (Printf.sprintf "Ok at t=%g, rejected >= 1: %b, y finite: %b" s.t (s.rejected >= 1) (Vec.finite s.y))
+        (Printf.sprintf "Ok at t=%g, rejected >= 1: %b, y finite: %b" s.t (s.rejected_steps >= 1) (Vec.finite s.y))
   | Error e -> case "vdp mu=1000 [0,2000] tol=1e-4" ("Error " ^ Fail.to_string e)
 
 (* Step 6: Robertson to t = 1e4 against the reference, with mass conserved. *)
@@ -161,13 +161,13 @@ let () =
   case "adaptive logistic [0,5] dt0=0.5 tol=1e-6"
     (match Adaptive.integrate ~dt0:0.5 ~tol:1e-6 problem with
     | Ok s ->
-        Printf.sprintf "accepted %d, rejected %d, max error %.2e" s.accepted s.rejected (max_error (exact 5.) s.y)
+        Printf.sprintf "accepted %d, rejected %d, max error %.2e" s.accepted_steps s.rejected_steps (max_error (exact 5.) s.y)
     | Error e -> "Error " ^ Fail.to_string e);
   (* Accuracy alone would allow steps several times longer than 1e-3 here, so
      the cap is what sets every step once dt has grown to it. *)
   case "adaptive logistic [0,5] dt_max=1e-3 tol=1e-6"
     (match Adaptive.integrate ~dt_max:1e-3 ~tol:1e-6 problem with
-    | Ok s -> Printf.sprintf "accepted %d, rejected %d" s.accepted s.rejected
+    | Ok s -> Printf.sprintf "accepted %d, rejected %d" s.accepted_steps s.rejected_steps
     | Error e -> "Error " ^ Fail.to_string e)
 
 (* Robertson accuracy at tol = 1e-6, far tighter than the 1e-3 acceptance bound. *)
