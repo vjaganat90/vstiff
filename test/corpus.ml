@@ -161,8 +161,8 @@ let give_up =
   in
   [
     (* No way forward: y' = y^2 blows up at t = 1 (exact solution 1 / (1 - t)), and the NaN wall has no values
-       past t = 0.5. The step floor 16 eps |t| in Halving ends both with an Error; without it both end on the
-       budget. Why the wall takes 46 rejections: docs/numerics/05-step-control.md. *)
+       past t = 0.5. The step floor 16 eps |t| in Halving ends both early; without it only max_rejects ends
+       them, with StepRejected 51. Why the wall takes 46 rejections: docs/numerics/05-step-control.md. *)
     ("adaptive blow-up y' = y^2 from y(0)=1 to t=2", Guard.run reached (fun () -> bdf2_halving ~tol:1e-6 (blow_up ())));
     ( "adaptive rhs NaN past t=0.5",
       Guard.run reached (fun () -> bdf2_halving ~dt0:0.25 ~dt_max:1e6 ~tol:1e-3 (nan_wall ())) );

@@ -2,7 +2,7 @@
 
 Chapter 2 of 6 in the numerical-methods track. Previous: [1. ODEs and stiffness](01-odes-and-stiffness.md). Next: [3. Jacobians and floating point](03-jacobians-and-floating-point.md). Index and reading order: [docs/README.md](../README.md). Terms and symbols: [glossary](../glossary.md).
 
-**Summary.** Newton's method solves `G(x) = 0` by replacing `G` with its tangent line again and again. This chapter shows why that finds a square root in five steps and when it fails (a flat tangent), how damping and the Armijo test rescue a step that overshoots, and how the idea carries over to many unknowns, where every step solves a linear system by Gaussian elimination with partial pivoting. It then covers singular matrices, the stopping test (why it looks at the step, not the residual) and failure as `Fail.t` values, never exceptions. Finally it applies all this to the stage equation of every BDF step and explains why a wrong Jacobian makes Newton slower without changing the root it finds.
+**Summary.** Newton's method solves `G(x) = 0` by replacing `G` with its tangent line again and again. This chapter shows why that finds a square root in five steps and when it fails (a flat tangent), how damping and the Armijo test rescue a step that overshoots, and how the idea carries over to many unknowns, where every step solves a linear system by Gaussian elimination with partial pivoting. It then covers singular matrices, the stopping test (why it looks at the step, not the residual, and the overflow it still lets through) and failure as `Fail.t` values, never exceptions. Finally it applies all this to the stage equation of every BDF step and explains why a wrong Jacobian makes Newton slower without changing the root it finds.
 
 You need first-year calculus and a little linear algebra (solving `A x = b`). The snippets run in the probe project (set up on day 1 from Setup in [exercises.md](../exercises.md), the same recipe as "Running the snippets" in [chapter 1](01-odes-and-stiffness.md)); [docs/ocaml.md](../ocaml.md) teaches the language. Reading aids: `[| 1.; 2. |]` is an array of floats and `x.(0)` its first element; a matrix is an array of rows, so `a.(i).(j)` is row `i`, column `j`; float arithmetic has dotted operators (`+.`, `*.`); `Ok v` and `Error e` are the two shapes of a `result`, taken apart with `match`; `ref 0`, `incr c` and `!c` make and use a mutable counter, which the numerical code never does (only `Instrument` has one, see [docs/architecture.md](../architecture.md)) but a throwaway probe may; `Printf.printf` takes a C-style format (`%g` short, `%.17g` with 17 significant digits, enough to tell any two floats apart).
 
@@ -195,10 +195,10 @@ In every iteration `Newton.solve` checks these conditions, in this order (`k` co
 | `norm_inf(G(x))` is exactly `0` | `Ok x` |
 | `k` has reached 50 | `Error Diverged` |
 | the linear solve returns `None`, or the step `dx` contains NaN or infinity | `Error Diverged` |
-| `norm_inf(dx) <= 1e-10 (1 + norm_inf(x))` | `Ok (x + dx)` |
+| `norm_inf(dx) <= 1e-10 (1 + norm_inf(x))` | `Ok (x + dx)`, or `Error Nan` if `x + dx` is not finite |
 | otherwise | damped step (section 2), then iteration `k + 1`; `Error Diverged` if damping gives up |
 
-The converged result is `x + dx`: the tiny step is taken first. The factor `1 + |x|_inf` makes the test absolute when `x` is small and relative when `x` is large. In the code the last two rows are two `match` cases of `iterate`; the first has a guard (`when`), which matches only if its condition holds.
+The converged result is `x + dx`: the tiny step is taken first. The factor `1 + |x|_inf` makes the test absolute when `x` is small and relative when `x` is large, and relative has a limit: next to the largest float, `max_float` (about `1.8e308`), a step of up to about `1.8e298` is tiny, and adding it can overflow. The corpus line `newton step that converges into an overflow` solves `x - max_float = 0` from `max_float - 1e297` with a Jacobian of `0.25` instead of `1`: the step is about `4e297`, the test passes and `x + dx` is infinity. So the sum is checked, and a non-finite one is `Error Nan` (without the check the line would print `Ok [inf]`). In the code the last two rows are two `match` cases of `iterate`; the first has a guard (`when`), which matches only if its condition holds.
 
 Why test the step and not the residual? First, **units**: `dx` is measured in the units of `x`, which is what we want accurate, while the size of `G(x)` depends on how the equation happens to be written (`x² - 2 = 0` and `1e6 (x² - 2) = 0` have the same root and the same Newton steps, with residuals a million times apart). Second, near the root the step estimates the error: since `G(x) ≈ G'(x)(x - r)`, the step `dx = -G'(x)^{-1} G(x)` has about the length of the current error, and taking it leaves an error much smaller. Third, rounding errors in `G` are about `eps` times the size of its terms, so a fixed residual threshold may sit below that noise (never reached) or far above it. The step test also has to come before the line search: close to the root the computed residual stops shrinking (it is rounding noise), so the Armijo test can refuse every damped step and an answer that is already accurate would be reported as `Diverged`.
 
@@ -277,7 +277,7 @@ Two consequences. First, production codes build the Jacobian once and reuse it f
 | Failure values | `Fail.t` in [`src/fail.ml`](../../src/fail.ml): `Diverged` and `Nan` (`StepRejected` belongs to chapter 5) |
 | Vector helpers | `Vec.axpy a x y` is `a x + y`, `Vec.norm_inf` the largest absolute component, `Vec.finite` true when no entry is NaN or infinite ([`src/vec.ml`](../../src/vec.ml)) |
 
-Changing this code needs care because the corpus pins little of it: no line needs Newton to shorten a step, and removing the line search or the NaN check changes nothing ([chapter 6](06-the-corpus.md), "What the corpus does not catch"). Add a case first. The examples of this chapter are candidates: `atan` from 2, `sqrt x - 1` from 9, `x³` from 1 and a start at `nan`.
+Changing this code needs care because the corpus pins little of it: no line needs Newton to shorten a step, and removing the line search or the finiteness checks on the step and on the trial residual changes nothing ([chapter 6](06-the-corpus.md), "What the corpus does not catch"); only the check on a converged `x + dx` has a line, 24. Add a case first. The examples of this chapter are candidates: `atan` from 2, `sqrt x - 1` from 9, `x³` from 1 and a start at `nan`.
 
 ## Check yourself
 
@@ -292,5 +292,8 @@ Changing this code needs care because the corpus pins little of it: no line need
 
 4. **Why can a wrong Jacobian not make Newton settle on a point that is not a root? What can it do instead?**
    The iteration `x ← x - M⁻¹ G(x)` stands still only where `G(x) = 0`. A wrong `M` makes convergence slow or makes the solve fail (`Error Diverged`, through damping or the iteration limit); the adaptive integrator then rejects steps and takes more of them. The one caveat is the stopping test, which trusts small steps (question 3).
+
+5. **The stopping test calls a step of `4e297` tiny when `x` is near `max_float`. What can still go wrong, and what does `Newton.solve` return?**
+   The test is relative, `1e-10 (1 + |x|_inf)`, about `1.8e298` there, so the step passes; but `x + dx` can exceed the largest float and become infinity. `Newton.solve` checks the sum and returns `Error Nan`, not `Ok [inf]`.
 
 Next: [3. Jacobians and floating point](03-jacobians-and-floating-point.md), where the Jacobian that Newton needs comes from, and why a computer cannot compute it exactly.
