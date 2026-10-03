@@ -1,7 +1,8 @@
 open Vstiff
 
 (* The corpus is a table of cases: a name and a thunk computing the text
-   printed after it. dune diffs this executable's output with corpus.expected. *)
+   printed after it. Report prints them, and dune diffs the output with
+   corpus.expected. *)
 
 let pp_vec v = "[" ^ String.concat "; " (Array.to_list (Array.map (Printf.sprintf "%.12f") v)) ^ "]"
 let failure e = "Error " ^ Fail.to_string e
@@ -123,51 +124,33 @@ let pivoting =
     ("linalg tiny leading pivot", fun () -> solved (Linalg.solve [| [| 1e-20; 1. |]; [| 1.; 1. |] |] [| 1.; 2. |]));
   ]
 
-(* Termination and argument checks. Each right-hand side counts its calls and
-   aborts past a budget, so a loop that never ends prints a line instead of
-   hanging the run. *)
-exception Over_budget
-
-let budgeted rhs =
-  let calls = ref 0 in
-  fun t y ->
-    incr calls;
-    if !calls > 5_000_000 then raise Over_budget else rhs t y
-
-let outcome run () =
-  match run () with
-  | Ok (s : _ Adaptive.solution) -> Printf.sprintf "Ok at t=%g" s.t
-  | Error e -> failure e
-  | exception Over_budget -> "no answer within 5e6 rhs calls"
-  | exception Invalid_argument m -> "Invalid_argument " ^ m
-
+(* Termination and argument checks. Each right-hand side runs on a call
+   budget, so a loop that never ends prints a line instead of hanging the run,
+   and an invalid argument prints its message. *)
 let give_up =
-  (* y' = -y from y = 1, on a fresh budget each time. *)
-  let decay ~t0 ~t_end = { Ode.rhs = budgeted (fun _ y -> Vec.scale (-1.) y); t0; t_end; y0 = [| 1. |] } in
-  let blow_up = { Ode.rhs = budgeted (fun _ y -> [| y.(0) *. y.(0) |]); t0 = 0.; t_end = 2.; y0 = [| 1. |] } in
+  let reached (s : _ Adaptive.solution) = Printf.sprintf "Ok at t=%g" s.t in
+  (* y' = -y from y = 1. *)
+  let decay ~t0 ~t_end = { Ode.rhs = Guard.budget (fun _ y -> Vec.scale (-1.) y); t0; t_end; y0 = [| 1. |] } in
+  let blow_up () = { Ode.rhs = Guard.budget (fun _ y -> [| y.(0) *. y.(0) |]); t0 = 0.; t_end = 2.; y0 = [| 1. |] } in
   let nan_wall () =
     {
-      Ode.rhs = budgeted (fun t y -> if t > 0.5 then [| Float.nan |] else Vec.scale (-1.) y);
+      Ode.rhs = Guard.budget (fun t y -> if t > 0.5 then [| Float.nan |] else Vec.scale (-1.) y);
       t0 = 0.;
       t_end = 1.;
       y0 = [| 1. |];
     }
   in
   [
-    ("adaptive blow-up y' = y^2 from y(0)=1 to t=2", outcome (fun () -> bdf2_halving ~tol:1e-6 blow_up));
+    ("adaptive blow-up y' = y^2 from y(0)=1 to t=2", Guard.run reached (fun () -> bdf2_halving ~tol:1e-6 (blow_up ())));
     ( "adaptive rhs NaN past t=0.5",
-      outcome (fun () -> bdf2_halving ~dt0:0.25 ~dt_max:1e6 ~tol:1e-3 (nan_wall ())) );
+      Guard.run reached (fun () -> bdf2_halving ~dt0:0.25 ~dt_max:1e6 ~tol:1e-3 (nan_wall ())) );
     ( "adaptive dt0 = dt_max = 1e30 on [0, 1]",
-      outcome (fun () -> bdf2_halving ~dt0:1e30 ~dt_max:1e30 ~tol:1e-6 (decay ~t0:0. ~t_end:1.)) );
-    ("adaptive empty span", outcome (fun () -> bdf2_halving ~tol:1e-6 (decay ~t0:1. ~t_end:1.)));
-    ("adaptive t_end < t0", outcome (fun () -> bdf2_halving ~tol:1e-6 (decay ~t0:1. ~t_end:0.)));
-    ("adaptive dt0 = 0", outcome (fun () -> bdf2_halving ~dt0:0. ~tol:1e-6 (decay ~t0:0. ~t_end:1.)));
+      Guard.run reached (fun () -> bdf2_halving ~dt0:1e30 ~dt_max:1e30 ~tol:1e-6 (decay ~t0:0. ~t_end:1.)) );
+    ("adaptive empty span", Guard.run reached (fun () -> bdf2_halving ~tol:1e-6 (decay ~t0:1. ~t_end:1.)));
+    ("adaptive t_end < t0", Guard.run reached (fun () -> bdf2_halving ~tol:1e-6 (decay ~t0:1. ~t_end:0.)));
+    ("adaptive dt0 = 0", Guard.run reached (fun () -> bdf2_halving ~dt0:0. ~tol:1e-6 (decay ~t0:0. ~t_end:1.)));
     ( "bdf1 dt = 0",
-      fun () ->
-        match Stepper.fixed (module Bdf1) ~dt:0. (decay ~t0:0. ~t_end:1.) with
-        | Ok y -> "Ok " ^ pp_vec y
-        | Error e -> failure e
-        | exception Invalid_argument m -> "Invalid_argument " ^ m );
+      Guard.run (fun y -> "Ok " ^ pp_vec y) (fun () -> Stepper.fixed (module Bdf1) ~dt:0. (decay ~t0:0. ~t_end:1.)) );
   ]
 
 (* Step control: from dt0 = 0.5, which is also the default dt_max here, the
@@ -219,4 +202,4 @@ let corpus =
       robertson_accuracy;
     ]
 
-let () = List.iter (fun (name, run) -> Printf.printf "%s: %s\n" name (run ())) corpus
+let () = Report.lines corpus
