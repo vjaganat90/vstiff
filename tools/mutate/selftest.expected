@@ -108,3 +108,23 @@ small.ml:2:18:if_swap
 error: no mutant small.ml:2:18:if_swap
 a syntax error is an Error: true
 file_of_id: src/a:b.ml none
+
+== float literals ==
+1e-10: float_x2=2e-10 float_div2=5e-11 float_zero=0. float_x10=1e-9 float_div10=1e-11
+2.: float_x2=4. float_div2=1. float_zero=0. float_x10=20. float_div10=0.2
+0.5: float_x2=1. float_div2=0.25 float_zero=0. float_x10=5. float_div10=0.05
+1_000.: float_x2=2000. float_div2=500. float_zero=0. float_x10=10000. float_div10=100.
+1e-4: float_x2=2e-4 float_div2=5e-5 float_zero=0. float_x10=1e-3 float_div10=1e-5
+16.: float_x2=32. float_div2=8. float_zero=0. float_x10=160. float_div10=1.6
+123456.: float_x2=2.46912e5 float_div2=61728. float_zero=0. float_x10=1.23456e6 float_div10=12345.6
+0.: none
+-1.: float_x2=-2. float_div2=-0.5 float_zero=0. float_x10=-10. float_div10=-0.1
+1e308: float_div2=5e307 float_zero=0. float_div10=1e307
+0x1p3: float_x2=16. float_div2=4. float_zero=0. float_x10=80. float_div10=0.8
+1e-320: float_x2=2e-320 float_div2=5e-321 float_zero=0. float_x10=1e-319 float_div10=1e-321
+
+== int literals ==
+0: int_plus1=1 int_minus1=-1
+0x10: int_plus1=17 int_minus1=15
+1_000: int_plus1=1001 int_minus1=999
+-5: int_plus1=-4 int_minus1=-6

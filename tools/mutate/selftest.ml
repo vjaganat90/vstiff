@@ -1,5 +1,5 @@
 (* The tool's own test; selftest.expected pins its output: the mutants of the fixture, a check that every one of them
-   applies, and a few small applications printed in full. docs/testing.md *)
+   applies, and a few small applications printed in full, and the spelling of some literals. docs/testing.md *)
 
 let print_result = function Ok text -> print_string text | Error message -> print_endline ("error: " ^ message)
 
@@ -27,6 +27,18 @@ let fixture file =
 
 let small = "let f x = if x > 0 then x else -x\nlet g = function Some y -> y | None -> 0\n"
 
+let literals () =
+  let show = function
+    | [] -> "none"
+    | variants -> String.concat " " (List.map (fun (operator, text) -> operator ^ "=" ^ text) variants)
+  in
+  print_endline "\n== float literals ==";
+  List.iter
+    (fun text -> Printf.printf "%s: %s\n" text (show (Literal.floats text)))
+    [ "1e-10"; "2."; "0.5"; "1_000."; "1e-4"; "16."; "123456."; "0."; "-1."; "1e308"; "0x1p3"; "1e-320" ];
+  print_endline "\n== int literals ==";
+  List.iter (fun text -> Printf.printf "%s: %s\n" text (show (Literal.ints text))) [ "0"; "0x10"; "1_000"; "-5" ]
+
 let () =
   fixture Sys.argv.(1);
   List.iter
@@ -37,4 +49,5 @@ let () =
   Printf.printf "a syntax error is an Error: %b\n" (Result.is_error (Mutant.enumerate ~file:"bad.ml" "let f = (\n"));
   Printf.printf "file_of_id: %s %s\n"
     (Option.value (Mutant.file_of_id "src/a:b.ml:3:14:lt_to_le") ~default:"none")
-    (Option.value (Mutant.file_of_id "src/a.ml") ~default:"none")
+    (Option.value (Mutant.file_of_id "src/a.ml") ~default:"none");
+  literals ()
