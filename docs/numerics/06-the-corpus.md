@@ -16,7 +16,7 @@ Newton + Linalg  →  Jac  →  Stage + Bdf1  →  Bdf2  →  Adaptive + Halving
 
 The other 38 are regression pins, each added for a specific mistake (section 9 lists what catches what). The lines are numbered in the order of `corpus.expected`, which is the order of the named lists in `corpus.ml`: `newton` (1 to 3), `jacobian` (4 and 5), `backward_euler` (6), `bdf2_order` (7), `van_der_pol` (8), `robertson` (9), then the pins `stiff_canary` (10), `orientation` (11), `pivoting` (12 and 13), `give_up` (14 to 20), `step_control` (21 and 22), `robertson_accuracy` (23), `newton_overflow` (24), `clock` (25 to 27), `too_small` (28), `fixed_clock` (29 to 31), `zero_floor` (32), `arguments` (33 to 37), `newton_guards` (38 to 40), `jacobian_step` (41), `adaptive_time` (42), `adaptive_canary` (43) and `start_and_limits` (44 to 47). Two rules of thumb: when several lines differ, start with the first, which involves the fewest layers; and a case earns its place by pinning something the others do not.
 
-The problems live in [`test/problems.ml`](../../test/problems.ml). Each module exposes `rhs`, `y0`, a `problem` record and, where the exact solution has a formula, `exact`. None supplies a Jacobian ([AGENTS.md](../../AGENTS.md), H7): the solver must work for any black-box right-hand side. All four right-hand sides ignore their time argument (`rhs _t y`); the cases that need one that depends on $t$ define it inline (lines 15, 29, 30, 32 and 42, section 8). Van der Pol, the two Robertson lines and the canary through the adaptive driver (8, 9, 23 and 43), like the termination and argument cases of section 8 (lines 14 to 20, 25 to 28 and 32 to 37), run on the call budget of `Guard`, so a bug that makes one of them crawl prints a line within seconds instead of stalling the run.
+The problems live in [`test/problems/problems.ml`](../../test/problems/problems.ml). Each module exposes `rhs`, `y0`, a `problem` record and, where the exact solution has a formula, `exact`. None supplies a Jacobian ([AGENTS.md](../../AGENTS.md), H7): the solver must work for any black-box right-hand side. All four right-hand sides ignore their time argument (`rhs _t y`); the cases that need one that depends on $t$ define it inline (lines 15, 29, 30, 32 and 42, section 8). Van der Pol, the two Robertson lines and the canary through the adaptive driver (8, 9, 23 and 43), like the termination and argument cases of section 8 (lines 14 to 20, 25 to 28 and 32 to 37), run on the call budget of `Guard`, so a bug that makes one of them crawl prints a line within seconds instead of stalling the run.
 
 | Problem | Components | Time scales | Corpus interval | Stiff? | Closed form |
 |---------|-----------|-------------|-----------------|--------|-------------|
@@ -170,7 +170,7 @@ robertson t=1e4 tol=1e-6: |y1 - ref| < 1e-3: true, |y1 + y2 + y3 - 1| < 1e-8: tr
 robertson t=1e4 tol=1e-6 accuracy: |y1 - ref| = 7.2e-07 < 1e-5: true
 ```
 
-Robertson's chemical kinetics has three species and rate constants from $0.04$ to $3 \times 10^7$ (a ratio of $7.5 \times 10^8$). With $a = 0.04 y_1$, $b = 10^4 y_2 y_3$ and $c = 3 \times 10^7 y_2^2$ (the names in `test/problems.ml`):
+Robertson's chemical kinetics has three species and rate constants from $0.04$ to $3 \times 10^7$ (a ratio of $7.5 \times 10^8$). With $a = 0.04 y_1$, $b = 10^4 y_2 y_3$ and $c = 3 \times 10^7 y_2^2$ (the names in `test/problems/problems.ml`):
 
 $$
 y_1' = b - a, \qquad y_2' = a - b - c, \qquad y_3' = c, \qquad y(0) = (1, 0, 0)
@@ -322,13 +322,13 @@ let () =
 
 | Idea | Where |
 |------|-------|
-| The four problems: `rhs`, `y0`, `problem`, and `exact` for the first two | `Canary`, `Logistic`, `VanDerPol`, `Robertson` in [`test/problems.ml`](../../test/problems.ml) |
+| The four problems: `rhs`, `y0`, `problem`, and `exact` for the first two | `Canary`, `Logistic`, `VanDerPol`, `Robertson` in [`test/problems/problems.ml`](../../test/problems/problems.ml) |
 | The external Robertson reference | `Refs.robertson_y1_at_1e4` in [`test/refs.ml`](../../test/refs.ml), provenance in its doc comment |
 | The cases | the named lists of [`test/corpus.ml`](../../test/corpus.ml), mapped to line numbers in section 1; `corpus` concatenates them in output order |
 | Test effects | `Guard.budget`, `Guard.run` and `Guard.bounded` in [`test/guard.ml`](../../test/guard.ml); `Report.lines` in [`test/report.ml`](../../test/report.ml) |
 | The expected output | [`test/corpus.expected`](../../test/corpus.expected) (47 lines), [`test/soak.expected`](../../test/soak.expected) (4 lines) |
 | The soak | [`test/soak.ml`](../../test/soak.ml): the module type `Case`, `repeat`, `soak`, `on_budget` and four case modules |
-| How both run | [`test/dune`](../../test/dune): `(tests (names corpus soak) (libraries vstiff numerics))`; `corpus.ml` and `soak.ml` start with `open Vstiff` and `open Numerics` |
+| How both run | [`test/dune`](../../test/dune): `(tests (names corpus soak) (libraries vstiff numerics problems))`; `corpus.ml` and `soak.ml` start with `open Vstiff` and `open Numerics` |
 
 ## Check yourself
 

@@ -11,7 +11,7 @@ REPO=$(pwd)
 mkdir -p ../vstiff-scratch/p && cd ../vstiff-scratch
 printf '(lang dune 3.0)\n' > dune-project
 ln -sfn "$REPO/src" src
-ln -sfn "$REPO/test/problems.ml" p/problems.ml
+ln -sfn "$REPO/test/problems/problems.ml" p/problems.ml
 printf '(executable (name probe) (libraries vstiff))\n' > p/dune
 ```
 

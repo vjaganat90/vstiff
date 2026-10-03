@@ -3,5 +3,5 @@
  ; <name>.expected. The other .ml files here are helpers: an unused top-level value in a main module (generated
  ; empty interface) is a dev-build error. Never dune promote a failure green (AGENTS.md, H2).
  (names corpus soak)
- ; vstiff is the library built from src/.
- (libraries vstiff numerics))
+ ; vstiff is the library built from src/, problems the one built from problems/ (the bench uses it too).
+ (libraries vstiff numerics problems))

@@ -134,6 +134,7 @@ clone.
 src/numerics/   kernel library numerics: Fail, Vec, Linalg, Newton, Jac; knows nothing about ODEs
 src/            solver library vstiff: ode.mli holds the contracts, vstiff.mli the public API
 test/           corpus.ml and soak.ml with their .expected files, and their helper modules
+test/problems/  library problems: the corpus problems, shared by the tests and the bench
 docs/           README.md is the index; numerics/ explains the mathematics
 ```
 

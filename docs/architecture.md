@@ -230,7 +230,7 @@ The conventions are in [AGENTS.md](../AGENTS.md): the hard rules H5 (failures ar
 - **Names.** Module types are CamelCase (`Method`, `Controller`), values snake_case. `dt` is a requested step size (`~dt`, `dt0`, `dt_max`, `Controller.proposal`), `h` a step taken or attempted. Labels go where two arguments of one type could be swapped (`~at ~h`, `~y ~err`), or name a bare literal at a call site (`~dt:2e-6`); other arguments are positional.
 - **Failures and mistakes (H5).** A numerical failure is a `Fail.t` in a `result`; an invalid argument raises `Invalid_argument` from `Check`.
 - **Two libraries, one public API (H10).** The kernel in `src/numerics/` knows nothing about ODEs, the solver offers only what `src/vstiff.ml` and `src/vstiff.mli` list, and a vector is a `float array` in public signatures (above).
-- **Standard library only (H9).** `src/numerics/dune` lists no libraries, `src/dune` only `numerics` and `test/dune` `vstiff` and `numerics`.
+- **Standard library only (H9).** `src/numerics/dune` lists no libraries, `src/dune` only `numerics`, `test/dune` `vstiff`, `numerics` and `problems`, and `test/problems/dune` `vstiff`.
 
 ## Adding things
 
@@ -242,7 +242,7 @@ The checklists are in [AGENTS.md](../AGENTS.md), under "Tests": adding a corpus 
 | add a controller | a module implementing `Ode.Controller` (see below) | list it in `src/vstiff.ml` and `src/vstiff.mli`; pass it to `Adaptive.integrate`; a corpus case |
 | make an internal module public (H10) | [src/vstiff.ml](../src/vstiff.ml) and [src/vstiff.mli](../src/vstiff.mli) | one `module X = X` line in each, with a doc comment in the `.mli`; take the module out of `private_modules` in `src/dune` if it is listed there |
 | add a numerical building block | a module in `src/numerics/`, which must not name `Ode` | an `.mli`; a corpus case (the `newton` and `jacobian` groups call the kernel directly) |
-| add a corpus problem | a module in [test/problems.ml](../test/problems.ml) with `rhs`, `y0`, `problem` and, if a closed form exists, `exact`; no Jacobian (H7) | a case in [test/corpus.ml](../test/corpus.ml) by the steps in [testing.md](testing.md) |
+| add a corpus problem | a module in [test/problems/problems.ml](../test/problems/problems.ml) with `rhs`, `y0`, `problem` and, if a closed form exists, `exact`; no Jacobian (H7) | a case in [test/corpus.ml](../test/corpus.ml) by the steps in [testing.md](testing.md) |
 | add a kind of failure | `Fail.t` and `Fail.to_string` in [src/numerics/fail.ml](../src/numerics/fail.ml) and its `.mli` | every `match` on `Fail.t` without a catch-all stops compiling until it handles the new case, which is the point; `Vstiff.Fail` follows by itself, being a re-export |
 | change Newton's tuning constants | the constants at the top of [src/numerics/newton.ml](../src/numerics/newton.ml) | [testing.md](testing.md) lists what notices each |
 | change how the Jacobian is perturbed | `Jac.step` in [src/numerics/jac.ml](../src/numerics/jac.ml) | [numerics/03-jacobians-and-floating-point.md](numerics/03-jacobians-and-floating-point.md) |
@@ -275,7 +275,7 @@ let () =
 
 Run it as a probe ([testing.md](testing.md)). With `~dt0:0.1` the first estimate, $h^2 / (2(1 + h))$ for this problem, already exceeds $\mathrm{tol}$, and `rejected` ends the run with `Error (StepRejected 1)`.
 
-**A corpus problem.** Add a module to [test/problems.ml](../test/problems.ml) with `rhs`, `y0`, `problem = { Ode.rhs; t0; t_end; y0 }` and, if a closed form exists, `exact`, and a doc comment saying what it is and why the corpus needs it. Give it no Jacobian (H7): the solver must work for any black-box `rhs`. With no closed form, the reference answer is computed outside vstiff and goes into a new module, since [test/refs.ml](../test/refs.ml) is never edited (H4; [testing.md](testing.md), "Reference values"). A problem changes no output until a case in [test/corpus.ml](../test/corpus.ml) uses it ([testing.md](testing.md), "Adding a case, step by step").
+**A corpus problem.** Add a module to [test/problems/problems.ml](../test/problems/problems.ml) with `rhs`, `y0`, `problem = { Ode.rhs; t0; t_end; y0 }` and, if a closed form exists, `exact`, and a doc comment saying what it is and why the corpus needs it. Give it no Jacobian (H7): the solver must work for any black-box `rhs`. With no closed form, the reference answer is computed outside vstiff and goes into a new module, since [test/refs.ml](../test/refs.ml) is never edited (H4; [testing.md](testing.md), "Reference values"). A problem changes no output until a case in [test/corpus.ml](../test/corpus.ml) uses it ([testing.md](testing.md), "Adding a case, step by step").
 
 ## Performance
 

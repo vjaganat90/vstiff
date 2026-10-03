@@ -1,0 +1,5 @@
+(library
+ ; The corpus problems, shared by the test programs and the bench. problems.ml is the main module of the library, so
+ ; outside it is Problems: the tests keep writing Problems.Canary.
+ (name problems)
+ (libraries vstiff))

@@ -71,7 +71,7 @@ dune runtest
 11. [src/clock.mli](../src/clock.mli) and [src/halving.mli](../src/halving.mli): the resolution of time, and the step-size controller.
 12. [src/stepper.mli](../src/stepper.mli), [src/adaptive.mli](../src/adaptive.mli): the two drivers.
 
-Then the tests: [test/problems.ml](../test/problems.ml), [test/refs.ml](../test/refs.ml), [test/guard.ml](../test/guard.ml), [test/report.ml](../test/report.ml), [test/corpus.ml](../test/corpus.ml) with [test/corpus.expected](../test/corpus.expected), and [test/soak.ml](../test/soak.ml) with [test/soak.expected](../test/soak.expected).
+Then the tests: [test/problems/problems.ml](../test/problems/problems.ml), [test/refs.ml](../test/refs.ml), [test/guard.ml](../test/guard.ml), [test/report.ml](../test/report.ml), [test/corpus.ml](../test/corpus.ml) with [test/corpus.expected](../test/corpus.expected), and [test/soak.ml](../test/soak.ml) with [test/soak.expected](../test/soak.expected).
 
 **Where each module is explained.**
 

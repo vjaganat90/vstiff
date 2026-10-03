@@ -32,7 +32,7 @@ $$
 
 At $t = 0$ it gives $1/(1 + 9) = 0.1$, and differentiating gives $y' = 9 e^{-t}/(1 + 9 e^{-t})^2$, which equals $y (1 - y)$. The curve is an S: a slow start, fastest growth around $y = 1/2$ (at $t = \ln 9$, about 2.2), then flattening towards 1.
 
-Most ODEs have no formula like this, which is why numerical methods exist: they compute approximate values of $y(t)$ on a grid of times. The project's tests, called the **corpus** ([`test/corpus.ml`](../../test/corpus.ml)), run the code on four problems defined in [`test/problems.ml`](../../test/problems.ml): `Canary`, `Logistic`, `VanDerPol` and `Robertson`. `Canary` and `Logistic` have an `exact` function that gives the true solution, so the tests can measure the error of the code. For the other two the tests check different properties; [chapter 6](06-the-corpus.md) covers all four.
+Most ODEs have no formula like this, which is why numerical methods exist: they compute approximate values of $y(t)$ on a grid of times. The project's tests, called the **corpus** ([`test/corpus.ml`](../../test/corpus.ml)), run the code on four problems defined in [`test/problems/problems.ml`](../../test/problems/problems.ml): `Canary`, `Logistic`, `VanDerPol` and `Robertson`. `Canary` and `Logistic` have an `exact` function that gives the true solution, so the tests can measure the error of the code. For the other two the tests check different properties; [chapter 6](06-the-corpus.md) covers all four.
 
 **Systems.** In general $y = (y_1, \ldots, y_m)$ is a vector and $f$ returns a vector of the same length. In the code $f$ has the type `Ode.rhs = float -> float array -> float array` ([`src/ode.mli`](../../src/ode.mli)); the numerical kernel calls a vector `Vec.t`, and that is `float array` too ([`src/numerics/vec.mli`](../../src/numerics/vec.mli)), so nothing converts between the two. Read the arrows as: a function that takes a float (the time) and a vector (the state) and returns a vector (the derivative); [docs/ocaml.md](../ocaml.md) explains the notation. A whole problem is one record, `Ode.problem = { rhs; t0; t_end; y0 }`. The *canary* is a system of three independent equations packed into one vector:
 
@@ -205,7 +205,7 @@ REPO=$(pwd)
 mkdir -p ../vstiff-scratch/p && cd ../vstiff-scratch
 printf '(lang dune 3.0)\n' > dune-project
 ln -sfn "$REPO/src" src
-ln -sfn "$REPO/test/problems.ml" p/problems.ml
+ln -sfn "$REPO/test/problems/problems.ml" p/problems.ml
 printf '(executable (name probe) (libraries vstiff numerics))\n' > p/dune
 # then, for each snippet: put it in p/probe.ml, build and run
 dune build --root . ./p/probe.exe && ./_build/default/p/probe.exe
@@ -258,7 +258,7 @@ All three components stay finite. The slow one is off by about $0.184 h \approx 
 |------|-------|
 | The two libraries | The kernel `Numerics` (`Fail`, `Vec`, `Linalg`, `Newton`, `Jac`), declared in [`src/numerics/dune`](../../src/numerics/dune); the solver `Vstiff`, declared in [`src/dune`](../../src/dune), whose public modules [`src/vstiff.mli`](../../src/vstiff.mli) lists |
 | State, right-hand side, problem | `Ode.rhs`, `Ode.problem` and `Ode.point` in [`src/ode.mli`](../../src/ode.mli), all `float array`; `Vec.t` is the same type ([`src/numerics/vec.mli`](../../src/numerics/vec.mli)) |
-| Corpus ODEs with their exact solutions | `Canary` and `Logistic` in [`test/problems.ml`](../../test/problems.ml): `rhs`, `y0`, `exact` and a `problem` record |
+| Corpus ODEs with their exact solutions | `Canary` and `Logistic` in [`test/problems/problems.ml`](../../test/problems/problems.ml): `rhs`, `y0`, `exact` and a `problem` record |
 | What a method must provide | `Ode.Method` in [`src/ode.mli`](../../src/ode.mli): `history`, `start` and `step rhs h history at`, which returns the new state and the next history, or a `Fail.t` |
 | Time stepping with a constant step | `Stepper.fixed (module M) ~dt problem` in [`src/stepper.ml`](../../src/stepper.ml): $n = \operatorname{round}\bigl((t_{\mathrm{end}} - t_0)/\mathtt{dt}\bigr)$ steps (at least one for a non-empty span) of $h = (t_{\mathrm{end}} - t_0)/n$, which equals `dt` only when `dt` divides the span: step $k$ ends at $t_0 + k h$, the last at $t_{\mathrm{end}}$, and the method is given the difference of the end times; it returns the final state or the first failure |
 | One backward Euler step | `Bdf1.step` in [`src/bdf1.ml`](../../src/bdf1.ml), a `Method` whose history is `unit` inside the module (the interface keeps it abstract) |

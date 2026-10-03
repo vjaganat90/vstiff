@@ -31,7 +31,7 @@ These commands are for macOS, Linux and WSL (Windows Subsystem for Linux). The p
 
 ### What dune reads
 
-Four small files configure the build. They are lists in parentheses, and `;` starts a comment (the copies in the repository may carry comments, left out here).
+Five small files configure the build. They are lists in parentheses, and `;` starts a comment (the copies in the repository may carry comments, left out here).
 
 ```text
 dune-project       (lang dune 3.0)           the dune language version, not the compiler's
@@ -45,10 +45,13 @@ src/dune           (library
                     (modules_without_implementation ode))
 test/dune          (tests
                     (names corpus soak)
-                    (libraries vstiff numerics))
+                    (libraries vstiff numerics problems))
+test/problems/dune (library
+                    (name problems)
+                    (libraries vstiff))
 ```
 
-`(lang dune 3.0)` has to be the first line of `dune-project`: dune rejects the file if a comment comes before it. Every `.ml` and `.mli` in `src/` becomes a module of one library called `vstiff`; there is no list of files, and dune orders the compilation from the module names each file mentions. The subdirectory `src/numerics/` has a `dune` file of its own, so its files form a second library, `numerics`, and are not modules of `vstiff`; `(libraries numerics)` lets the solver name them. `test/dune` declares two test programs, `corpus` and `soak` (their main modules are `test/corpus.ml` and `test/soak.ml`), linked against both libraries because they name modules of both; the other `.ml` files in `test/` are ordinary modules both can use. Each program has an `.expected` file next to it. "Libraries, main modules, aliases and re-exports" below explains `(libraries ...)`, `private_modules` and how the two libraries meet.
+`(lang dune 3.0)` has to be the first line of `dune-project`: dune rejects the file if a comment comes before it. Every `.ml` and `.mli` in `src/` becomes a module of one library called `vstiff`; there is no list of files, and dune orders the compilation from the module names each file mentions. The subdirectory `src/numerics/` has a `dune` file of its own, so its files form a second library, `numerics`, and are not modules of `vstiff`; `(libraries numerics)` lets the solver name them. `test/dune` declares two test programs, `corpus` and `soak` (their main modules are `test/corpus.ml` and `test/soak.ml`), linked against both libraries because they name modules of both, and against `problems`, a small library of its own in `test/problems/` that holds the corpus problems (the bench links it too); the other `.ml` files in `test/` are ordinary modules both can use. Each program has an `.expected` file next to it. "Libraries, main modules, aliases and re-exports" below explains `(libraries ...)`, `private_modules` and how the two libraries meet.
 
 ### Everyday commands
 
@@ -188,7 +191,7 @@ let b = { t = 1.; gamma = 2. }             (* the other field, gamma, selects eq
 let time_of (p : point) = p.t              (* the annotation selects point.t *)
 ```
 
-The compiler uses an annotation, the expected type or the other fields, and otherwise takes the latest definition. That is why [src/bdf1.ml](../src/bdf1.ml) writes `{ Stage.t = at.t +. h; gamma = h; psi = at.y }`: naming the module on one field names the type, and `open Ode` at the top of the file makes `at.t` mean `Ode.point`'s `t`. [test/problems.ml](../test/problems.ml) builds `{ Ode.rhs; t0 = 0.; t_end = 1.; y0 }` the same way.
+The compiler uses an annotation, the expected type or the other fields, and otherwise takes the latest definition. That is why [src/bdf1.ml](../src/bdf1.ml) writes `{ Stage.t = at.t +. h; gamma = h; psi = at.y }`: naming the module on one field names the type, and `open Ode` at the top of the file makes `at.t` mean `Ode.point`'s `t`. [test/problems/problems.ml](../test/problems/problems.ml) builds `{ Ode.rhs; t0 = 0.; t_end = 1.; y0 }` the same way.
 
 ### Variants, pattern matching and inline records
 
@@ -471,7 +474,7 @@ This code has no `for` or `while` loops (OCaml has them): repetition is recursio
 
 In the dev profile most compiler warnings stop the build. The ones you will meet:
 
-- **26, 27: unused variable.** `Error (warning 27 [unused-var-strict]): unused variable y.` Remove it, or start its name with an underscore (`_t` in `let rhs _t y = ...`, [test/problems.ml](../test/problems.ml)).
+- **26, 27: unused variable.** `Error (warning 27 [unused-var-strict]): unused variable y.` Remove it, or start its name with an underscore (`_t` in `let rhs _t y = ...`, [test/problems/problems.ml](../test/problems/problems.ml)).
 - **8: a `match` that misses a case**: `Error (warning 8 [partial-match]): this pattern-matching is not exhaustive.` followed by an example of the missing case.
 - **32: unused top-level value**, in a module that has an `.mli` and in the main module of a test or probe program (dune gives those an empty interface).
 - **33, 39, 11, 16**: unused `open`, unused `rec`, an unused match case, an optional argument that can never be defaulted.

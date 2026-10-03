@@ -6,19 +6,19 @@ vstiff is tested by two programs that print text and a file of expected text nex
 
 | File | What it is |
 |---|---|
-| [test/dune](../test/dune) | declares the two test programs, `corpus` and `soak`, linked against both libraries |
+| [test/dune](../test/dune) | declares the two test programs, `corpus` and `soak`, linked against both libraries and the problems library |
 | [test/corpus.ml](../test/corpus.ml), [test/corpus.expected](../test/corpus.expected) | the **corpus**: a table of cases, one printed line each, and the text it must print |
 | [test/soak.ml](../test/soak.ml), [test/soak.expected](../test/soak.expected) | the **soak** test: four cases, ten rounds each, and its expected text |
-| [test/problems.ml](../test/problems.ml) | the corpus problems: `Canary` (three independent decays at very different rates), `Logistic`, `VanDerPol`, `Robertson` |
+| [test/problems/problems.ml](../test/problems/problems.ml), [test/problems/dune](../test/problems/dune) | the library `problems`, shared with the bench: the corpus problems `Canary` (three independent decays at very different rates), `Logistic`, `VanDerPol`, `Robertson` |
 | [test/refs.ml](../test/refs.ml) | a reference value computed outside vstiff; the file is never edited, and a new reference goes into a new module (H4) |
 | [test/guard.ml](../test/guard.ml) | `Guard.run`, `Guard.budget` and `Guard.bounded`: the only test module that raises or catches |
 | [test/report.ml](../test/report.ml) | `Report.lines`: the only module that prints |
 
-`problems.ml`, `refs.ml`, `guard.ml` and `report.ml` are ordinary modules, not tests: dune compiles each once and links it into the programs that use it, so editing one can change an output. `corpus.ml` and `soak.ml` are main modules and cannot use each other (dune gives each an empty interface), which is why `soak.ml` carries its own copies of three small helpers (`max_error`, `bdf2_halving` and `on_budget`). Both start with `open Vstiff` and then `open Numerics`, because the cases call the solver and the kernel (`Newton`, `Jac`, `Linalg`, `Vec`) directly.
+`refs.ml`, `guard.ml` and `report.ml` are ordinary modules, not tests, and `problems.ml` is the only module of a small library of its own: dune compiles each once and links it into the programs that use it, so editing one can change an output. `corpus.ml` and `soak.ml` are main modules and cannot use each other (dune gives each an empty interface), which is why `soak.ml` carries its own copies of three small helpers (`max_error`, `bdf2_halving` and `on_budget`). Both start with `open Vstiff` and then `open Numerics`, because the cases call the solver and the kernel (`Newton`, `Jac`, `Linalg`, `Vec`) directly.
 
 ## How an expect test works
 
-`test/dune` declares `(tests (names corpus soak) (libraries vstiff numerics))`. For each name dune builds `NAME.exe` from `NAME.ml`, runs it, captures standard output and compares it with `NAME.expected`. There are no assertions: a check fails by printing something other than the expected file says. The point of text: a failing check does not stop the run, so one run reports every line that changed, with the new value next to the old. The price is that the comparison is exact, so a line must print only what its check needs ("The rules behind the expected files", below).
+`test/dune` declares `(tests (names corpus soak) (libraries vstiff numerics problems))`. For each name dune builds `NAME.exe` from `NAME.ml`, runs it, captures standard output and compares it with `NAME.expected`. There are no assertions: a check fails by printing something other than the expected file says. The point of text: a failing check does not stop the run, so one run reports every line that changed, with the new value next to the old. The price is that the comparison is exact, so a line must print only what its check needs ("The rules behind the expected files", below).
 
 - **Everything matches:** `dune runtest` is silent and exits with status 0. Dune remembers a pass, so a repeat with nothing changed does nothing; a failing comparison is reported again every time.
 - **Output differs:** a diff and exit status 1 (next section).
@@ -123,7 +123,7 @@ Where reference values come from (H4) is under "Reference values", and adding a 
 
 **1. State the purpose in one sentence.** "Pin the order of backward Euler." Which mistake would this case catch that no existing line catches? If you cannot say, do not add the case: it would cost run time and reading time and protect nothing new.
 
-**2. Add the problem** to `test/problems.ml` unless one fits (here `Problems.Logistic` does): a module with `rhs`, `y0`, `problem` and, when a closed form exists, `exact`; no Jacobian (H7). A reference value is computed outside vstiff and goes into a new module first (H4; see "Reference values").
+**2. Add the problem** to `test/problems/problems.ml` unless one fits (here `Problems.Logistic` does): a module with `rhs`, `y0`, `problem` and, when a closed form exists, `exact`; no Jacobian (H7). A reference value is computed outside vstiff and goes into a new module first (H4; see "Reference values").
 
 **3. Add a group to `test/corpus.ml`**, with a comment stating the purpose, above the `corpus` table, and append it to the table. The table's order is the order of the lines in `corpus.expected`, and a new line at the end leaves the line numbers that [numerics/06-the-corpus.md](numerics/06-the-corpus.md) cites for the existing ones unchanged:
 
@@ -197,7 +197,7 @@ REPO=$(pwd)
 mkdir -p ../vstiff-scratch/p && cd ../vstiff-scratch
 printf '(lang dune 3.0)\n' > dune-project
 ln -sfn "$REPO/src" src
-ln -sfn "$REPO/test/problems.ml" p/problems.ml
+ln -sfn "$REPO/test/problems/problems.ml" p/problems.ml
 printf '(executable (name probe) (libraries vstiff))\n' > p/dune
 ```
 

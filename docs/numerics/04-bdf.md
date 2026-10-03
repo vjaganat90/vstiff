@@ -276,7 +276,7 @@ OCaml notes: `module Spy : Ode.Embedded = struct ... end` is a module that satis
 | The history | `Bdf2.start` is `Start`; every step returns `After { h_prev; y_prev }` (constructors internal to [`src/bdf2.ml`](../../src/bdf2.ml)) |
 | The shared stage equation | `Stage.solve rhs { Stage.t; gamma; psi } guess` in [`src/stage.ml`](../../src/stage.ml) |
 | Step ratios in the adaptive integrator | `Adaptive.integrate` ([`src/adaptive.ml`](../../src/adaptive.ml)) hands the next history back only after an accept; the halve and double rules are in `Halving` ([`src/halving.ml`](../../src/halving.ml)) |
-| The order test | The `bdf2 logistic` line of [`test/corpus.ml`](../../test/corpus.ml); the logistic problem in [`test/problems.ml`](../../test/problems.ml); the expected line in [`test/corpus.expected`](../../test/corpus.expected) |
+| The order test | The `bdf2 logistic` line of [`test/corpus.ml`](../../test/corpus.ml); the logistic problem in [`test/problems/problems.ml`](../../test/problems/problems.ml); the expected line in [`test/corpus.expected`](../../test/corpus.expected) |
 | The same test, rerun ten times | `LogisticOrder` in [`test/soak.ml`](../../test/soak.ml) |
 
 ## Check yourself
