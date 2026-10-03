@@ -26,7 +26,7 @@ let soak (module C : Case) =
     fun () ->
       let results = repeat (module C) in
       let passed = List.length (List.filter (function Ok r -> C.pass r | Error _ -> false) results) in
-      let identical = List.for_all (( = ) (List.hd results)) results in
+      let identical = match results with [] -> true | first :: _ -> List.for_all (( = ) first) results in
       Printf.sprintf "passed %d/%d, identical: %b" passed rounds identical )
 
 (* Copied from corpus.ml: a main module exports nothing to share. *)
