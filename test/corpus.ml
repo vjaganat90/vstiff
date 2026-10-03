@@ -282,6 +282,19 @@ let fixed_clock =
       Guard.run (fun y -> "Ok " ^ pp_vec y) (fun () -> Stepper.fixed (module Bdf1) ~dt:1e-7 decay_at_1e10) );
   ]
 
+(* At t = 0 the step floor 16 eps |t| is 0: a step that always fails halves
+   until it underflows to 0, and that ends the run, long before a large
+   max_rejects would. *)
+let zero_floor =
+  let wall_at_0 () =
+    { Ode.rhs = Guard.budget (fun t y -> if t > 0. then [| Float.nan |] else Vec.scale (-1.) y); t0 = 0.; t_end = 1.; y0 = [| 1. |] }
+  in
+  [
+    ( "adaptive rhs NaN past t=0, max_rejects = 5000",
+      Guard.run (fun (s : _ Adaptive.solution) -> Printf.sprintf "Ok at t=%g" s.t) (fun () ->
+          bdf2_halving ~max_rejects:5000 ~tol:1e-6 (wall_at_0 ())) );
+  ]
+
 (* Table order is output order, the order of the lines in corpus.expected. *)
 let corpus =
   List.concat
@@ -302,6 +315,7 @@ let corpus =
       clock;
       too_small;
       fixed_clock;
+      zero_floor;
     ]
 
 let () = Report.lines corpus

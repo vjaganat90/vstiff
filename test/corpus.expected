@@ -29,3 +29,4 @@ adaptive step that cannot move t never reaches the method: Error StepRejected 1,
 bdf1 y' = sqrt(1 - t) on [0, 1], dt = 1/9: Ok [0.603925945409]
 bdf2 y' = 2t on [0, 1]: error dt=0.1 1.500e-02, dt=0.05 3.750e-03, ratio 4.00 in [3.5, 4.5]: true
 bdf1 dt = 1e-7 at t=1e10, below t's resolution: Invalid_argument Stepper.fixed: dt is below the resolution of t
+adaptive rhs NaN past t=0, max_rejects = 5000: Error StepRejected 1055
