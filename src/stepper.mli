@@ -1,8 +1,8 @@
-(** Fixed-step driving for one-step methods. *)
+(** Fixed-step integration. *)
 
-(** [fixed ~dt problem advance start] applies [advance h] to [start] once per
-    step, [round ((t_end - t0) / dt)] times (at least once when
-    [t_end > t0]), with [h] chosen so the last step lands on [t_end]. Stops at
-    the first failure.
+(** [fixed (module M) ~dt problem] is the state at [t_end] after
+    [round ((t_end - t0) / dt)] equal steps of method [M] (at least one when
+    [t_end > t0]), sized so the last one lands exactly on [t_end]; or the
+    first failure.
     @raise Invalid_argument unless [dt > 0] and [t_end >= t0]. *)
-val fixed : dt:float -> Ode.problem -> (float -> 's -> ('s, Fail.t) result) -> 's -> ('s, Fail.t) result
+val fixed : (module M : Ode.Method) -> dt:float -> Ode.problem -> (Vec.t, Fail.t) result

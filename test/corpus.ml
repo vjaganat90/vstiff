@@ -9,6 +9,10 @@ let show = function Ok x -> "Ok " ^ pp_vec x | Error e -> failure e
 let max_abs m = Array.fold_left (fun acc row -> Float.max acc (Vec.norm_inf row)) 0. m
 let max_error exact y = Vec.norm_inf (Vec.sub y exact)
 
+(* The adaptive integrator as the corpus runs it: BDF2 with its backward
+   Euler error estimate, under the halve/double step-size policy. *)
+let bdf2_halving = Adaptive.integrate (module Bdf2) (module Halving)
+
 let error_below bound = function
   | Ok e -> Printf.sprintf "max error %.2e < %g: %b" e bound (e < bound)
   | Error e -> failure e
@@ -45,13 +49,13 @@ let backward_euler =
   let open Problems.Canary in
   [
     ( "bdf1 canary t=1 dt=2e-6",
-      fun () -> error_below 1e-6 (Result.map (max_error (exact 1.)) (Bdf1.integrate ~dt:2e-6 problem)) );
+      fun () -> error_below 1e-6 (Result.map (max_error (exact 1.)) (Stepper.fixed (module Bdf1) ~dt:2e-6 problem)) );
   ]
 
 (* Step 4: BDF2 with a BDF1 startup is second order on the logistic equation. *)
 let bdf2_order =
   let open Problems.Logistic in
-  let error dt = Result.map (max_error (exact 5.)) (Bdf2.integrate ~dt problem) in
+  let error dt = Result.map (max_error (exact 5.)) (Stepper.fixed (module Bdf2) ~dt problem) in
   [
     ( "bdf2 logistic [0,5]",
       fun () ->
@@ -68,9 +72,9 @@ let van_der_pol =
   [
     ( "vdp mu=1000 [0,2000] tol=1e-4",
       fun () ->
-        match Adaptive.integrate ~tol:1e-4 Problems.Van_der_pol.problem with
+        match bdf2_halving ~tol:1e-4 Problems.VanDerPol.problem with
         | Ok s ->
-            Printf.sprintf "Ok at t=%g, rejected >= 1: %b, y finite: %b" s.t (s.rejected_steps >= 1) (Vec.finite s.y)
+            Printf.sprintf "Ok at t=%g, rejected >= 1: %b, y finite: %b" s.t (s.stats.rejected_steps >= 1) (Vec.finite s.y)
         | Error e -> failure e );
   ]
 
@@ -79,7 +83,7 @@ let robertson =
   [
     ( "robertson t=1e4 tol=1e-6",
       fun () ->
-        match Adaptive.integrate ~tol:1e-6 Problems.Robertson.problem with
+        match bdf2_halving ~tol:1e-6 Problems.Robertson.problem with
         | Ok s ->
             let y1_error = Float.abs (s.y.(0) -. Refs.robertson_y1_at_1e4) in
             let mass_error = Float.abs (Array.fold_left ( +. ) 0. s.y -. 1.) in
@@ -95,7 +99,7 @@ let stiff_canary =
   let open Problems.Canary in
   [
     ( "bdf2 canary t=1 dt=1e-3 (h lambda = 10)",
-      fun () -> error_below 1e-6 (Result.map (max_error (exact 1.)) (Bdf2.integrate ~dt:1e-3 problem)) );
+      fun () -> error_below 1e-6 (Result.map (max_error (exact 1.)) (Stepper.fixed (module Bdf2) ~dt:1e-3 problem)) );
   ]
 
 (* Jacobian orientation: J is not symmetric here, so a transposed J fails. *)
@@ -132,7 +136,7 @@ let budgeted rhs =
 
 let outcome run () =
   match run () with
-  | Ok (s : Adaptive.solution) -> Printf.sprintf "Ok at t=%g" s.t
+  | Ok (s : _ Adaptive.solution) -> Printf.sprintf "Ok at t=%g" s.t
   | Error e -> failure e
   | exception Over_budget -> "no answer within 5e6 rhs calls"
   | exception Invalid_argument m -> "Invalid_argument " ^ m
@@ -150,17 +154,17 @@ let give_up =
     }
   in
   [
-    ("adaptive blow-up y' = y^2 from y(0)=1 to t=2", outcome (fun () -> Adaptive.integrate ~tol:1e-6 blow_up));
+    ("adaptive blow-up y' = y^2 from y(0)=1 to t=2", outcome (fun () -> bdf2_halving ~tol:1e-6 blow_up));
     ( "adaptive rhs NaN past t=0.5",
-      outcome (fun () -> Adaptive.integrate ~dt0:0.25 ~dt_max:1e6 ~tol:1e-3 (nan_wall ())) );
+      outcome (fun () -> bdf2_halving ~dt0:0.25 ~dt_max:1e6 ~tol:1e-3 (nan_wall ())) );
     ( "adaptive dt0 = dt_max = 1e30 on [0, 1]",
-      outcome (fun () -> Adaptive.integrate ~dt0:1e30 ~dt_max:1e30 ~tol:1e-6 (decay ~t0:0. ~t_end:1.)) );
-    ("adaptive empty span", outcome (fun () -> Adaptive.integrate ~tol:1e-6 (decay ~t0:1. ~t_end:1.)));
-    ("adaptive t_end < t0", outcome (fun () -> Adaptive.integrate ~tol:1e-6 (decay ~t0:1. ~t_end:0.)));
-    ("adaptive dt0 = 0", outcome (fun () -> Adaptive.integrate ~dt0:0. ~tol:1e-6 (decay ~t0:0. ~t_end:1.)));
+      outcome (fun () -> bdf2_halving ~dt0:1e30 ~dt_max:1e30 ~tol:1e-6 (decay ~t0:0. ~t_end:1.)) );
+    ("adaptive empty span", outcome (fun () -> bdf2_halving ~tol:1e-6 (decay ~t0:1. ~t_end:1.)));
+    ("adaptive t_end < t0", outcome (fun () -> bdf2_halving ~tol:1e-6 (decay ~t0:1. ~t_end:0.)));
+    ("adaptive dt0 = 0", outcome (fun () -> bdf2_halving ~dt0:0. ~tol:1e-6 (decay ~t0:0. ~t_end:1.)));
     ( "bdf1 dt = 0",
       fun () ->
-        match Bdf1.integrate ~dt:0. (decay ~t0:0. ~t_end:1.) with
+        match Stepper.fixed (module Bdf1) ~dt:0. (decay ~t0:0. ~t_end:1.) with
         | Ok y -> "Ok " ^ pp_vec y
         | Error e -> failure e
         | exception Invalid_argument m -> "Invalid_argument " ^ m );
@@ -173,15 +177,17 @@ let give_up =
    every step once dt has grown to it. *)
 let step_control =
   let open Problems.Logistic in
-  let counts (s : Adaptive.solution) = Printf.sprintf "accepted %d, rejected %d" s.accepted_steps s.rejected_steps in
+  let counts (s : Halving.stats Adaptive.solution) =
+    Printf.sprintf "accepted %d, rejected %d" s.stats.accepted_steps s.stats.rejected_steps
+  in
   [
     ( "adaptive logistic [0,5] dt0=0.5 tol=1e-6",
       fun () ->
-        match Adaptive.integrate ~dt0:0.5 ~tol:1e-6 problem with
+        match bdf2_halving ~dt0:0.5 ~tol:1e-6 problem with
         | Ok s -> Printf.sprintf "%s, max error %.2e" (counts s) (max_error (exact 5.) s.y)
         | Error e -> failure e );
     ( "adaptive logistic [0,5] dt_max=1e-3 tol=1e-6",
-      fun () -> match Adaptive.integrate ~dt_max:1e-3 ~tol:1e-6 problem with Ok s -> counts s | Error e -> failure e );
+      fun () -> match bdf2_halving ~dt_max:1e-3 ~tol:1e-6 problem with Ok s -> counts s | Error e -> failure e );
   ]
 
 (* Robertson accuracy at tol = 1e-6, far tighter than the 1e-3 acceptance bound. *)
@@ -189,7 +195,7 @@ let robertson_accuracy =
   [
     ( "robertson t=1e4 tol=1e-6 accuracy",
       fun () ->
-        match Adaptive.integrate ~tol:1e-6 Problems.Robertson.problem with
+        match bdf2_halving ~tol:1e-6 Problems.Robertson.problem with
         | Ok s ->
             let e = Float.abs (s.y.(0) -. Refs.robertson_y1_at_1e4) in
             Printf.sprintf "|y1 - ref| = %.1e < 1e-5: %b" e (e < 1e-5)

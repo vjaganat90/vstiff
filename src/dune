@@ -1,2 +1,3 @@
 (library
- (name vstiff))
+ (name vstiff)
+ (modules_without_implementation ode))
