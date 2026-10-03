@@ -219,7 +219,7 @@ With variable steps the coefficients change at every step, so the picture with f
 
 - After an accepted step it keeps its proposal or doubles it (at most once per three accepts). The step just taken was the previous proposal, so the next attempt is at most twice as long. (The one exception is the final step, which takes whatever is left to reach `t_end`, and then the run ends.)
 - After a rejection it halves the step that failed, and the history stays what it was. The failed step was at most twice the last accepted step, so the retry is at most as long as that: `ω <= 1`.
-- A fixed-step run, `Stepper.fixed (module Bdf2)`, has `ω = 1` on every BDF2 step (its first step is backward Euler).
+- A fixed-step run, `Stepper.fixed (module Bdf2)`, has `ω = 1` on every BDF2 step up to rounding: each step is the difference of two grid times, which is `h` to within an ulp of `t` (its first step is backward Euler).
 
 So every ratio of proposals is at most 2, safely below `1 + √2 ≈ 2.414`. (The driver also snaps each step to the floats, which moves it by at most an ulp of `t`; [chapter 5](05-step-control.md), section 9, shows that `ω` then stays below 2.2 for steps of 16 ulps or more, and that only shorter steps can pass the limit.) Any change to step control that lets the ratio exceed 2 must re-check it against `1 + √2` first, and the check belongs with the controller, because a different `Ode.Controller` can propose anything. Very small ratios are harmless: as `ω → 0` BDF2 approaches backward Euler (exercise 3).
 

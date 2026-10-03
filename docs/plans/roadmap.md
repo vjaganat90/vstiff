@@ -5,10 +5,14 @@ otherwise (OCaml 5.5.0, dune 3.24.2, standard library only, no flambda, flat flo
 later commits fixed defects found by running the code: 052fdc7 (`Newton.solve` reports a
 converged step that overflows as `Error Nan`) and dc3bb67 (`Adaptive.integrate` snaps steps to
 the clock and rejects steps that cannot move `t`; the floor 16 eps |t| is now held by
-[`Clock.resolution`](../../src/clock.ml)). The text states the current behaviour where they
-matter and the baseline behaviour where a measurement predates them. The companion
-[formal verification report](formal-verification.md), called the FV report here, covers Rocq and
-MathComp.
+[`Clock.resolution`](../../src/clock.ml)). Three further fixes followed: 9d23f27
+(`Stepper.fixed` ends step k at t0 + k h and the last one at `t_end` itself), 47a8119 (`Halving`
+also gives up once a halved step underflows to 0, which matters at t = 0, where the floor is 0)
+and d709e81 (both drivers reject a non-positive `tol` and a right-hand side of the wrong length
+at their start, and `Stepper.fixed` returns `Error Nan` for a start that is not finite). The text
+states the current behaviour where they matter and the baseline behaviour where a measurement
+predates them. The companion [formal verification report](formal-verification.md), called the FV
+report here, covers Rocq and MathComp.
 
 How claims are marked:
 
@@ -124,7 +128,10 @@ Robust means, for every problem of the corpus in Section 4.1 and every rtol in
    is judged by the error test alone, however short, so the floor binds only on rejections.
    Termination follows from two facts: every accepted non-final step strictly increases `t`, and the
    controller ends any run of rejections (FV report, T4); a new controller has to keep the second.
-   Corpus lines 25 to 27 pin the three cases;
+   Corpus lines 25 to 27 pin the three cases. `Stepper.fixed` keeps the same rule on its grid
+   (step k ends at t0 + k h, the last at `t_end`, and the method gets the difference of the end
+   times; lines 29 to 31), and `Halving` also ends a run whose halved step is 0, which is how a
+   run at t = 0, where the floor is 0, stops short of `max_rejects` (line 32).
    [numerics/05-step-control.md](../numerics/05-step-control.md) explains the rules.
 5. Work-precision: at equal achieved error, right-hand-side calls are within 2x of scipy's BDF
    with a finite-difference Jacobian (its Jacobian evaluations counted, see 2.0), and within
@@ -149,7 +156,7 @@ precision, Fortran-level throughput.
 
 Corpus test: 1.4 s CPU; soak test: 12.4 s CPU on an idle machine (direct runs of the test
 executables; 1.8 s and 16.6 s were measured earlier) **[R]**. The corpus then had 23 lines (the
-9 original cases and 14 regression pins); it has 27 now, 18 of them regression pins, and the
+9 original cases and 14 regression pins); it has 42 now, 33 of them regression pins, and the
 soak test has 4. CPU times on the measuring machine vary by up to 2.5x with load (Apple
 silicon, other jobs running): ratios between runs made back to back are reliable, absolute
 times are not, so acceptance criteria below are stated in counts.
@@ -364,7 +371,8 @@ rejected as `Too_small` without calling the method, and the controller decides.
 [`Halving`](../../src/halving.ml) halves it, which is below its floor
 [`Clock.resolution t`](../../src/clock.ml) = 16 eps |t| (the same rule as before, now defined once
 in `Clock`), so it gives up with `StepRejected`. A new controller has to end every run of rejections
-in the same way (FV report, T4).
+in the same way (FV report, T4); at t = 0 the floor is 0, so it also has to give up on a halved
+step of 0, as `Halving` does since 47a8119 (corpus line 32).
 
 **PI and digital filters.** Soderlind's filters, with coefficients verified in PETSc's
 `adaptdsp.c` **[D]**: step ratio rho = (1/r_n)^(b1/kappa) (1/r_{n-1})^(b2/kappa)
@@ -940,7 +948,7 @@ order of plausibility:
    for the last), so it cannot read OCaml 5.5 modular explicits, and per the FV report it models
    floats as integers. The FV report recommends a hand-written Rocq mirror tested against the
    OCaml (its Option A) and advises against extraction (its Option B: Rocq's primitive floats have
-   no `fma` while `ocamlopt` fuses five vstiff expressions on arm64, so extracted kernels would
+   no `fma` while `ocamlopt` fuses six vstiff expressions on arm64, so extracted kernels would
    not be bit-identical). `gospel` 0.3.1 requires `ocaml <= 5.3.0` and `ortac-core` 0.8.0 pins
    `gospel = 0.3.1`, so neither installs on OCaml 5.5: specifications in `.mli` comments cost
    nothing, but nothing checks them yet.
