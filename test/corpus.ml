@@ -108,3 +108,41 @@ let () =
   case "linalg zero leading pivot"
     (solved (Linalg.solve [| [| 0.; 1.; 1. |]; [| 2.; 1.; 0. |]; [| 1.; 0.; 3. |] |] [| 5.; 4.; 10. |]));
   case "linalg tiny leading pivot" (solved (Linalg.solve [| [| 1e-20; 1. |]; [| 1.; 1. |] |] [| 1.; 2. |]))
+
+(* Termination and argument checks. Each right-hand side counts its calls and
+   aborts past a budget, so a loop that never ends prints a line instead of
+   hanging the run. *)
+exception Over_budget
+
+let budgeted rhs =
+  let calls = ref 0 in
+  fun t y ->
+    incr calls;
+    if !calls > 5_000_000 then raise Over_budget else rhs t y
+
+let show_run name run =
+  case name
+    (match run () with
+    | Ok (s : Adaptive.solution) -> Printf.sprintf "Ok at t=%g" s.t
+    | Error e -> "Error " ^ Fail.to_string e
+    | exception Over_budget -> "no answer within 5e6 rhs calls"
+    | exception Invalid_argument m -> "Invalid_argument " ^ m)
+
+let () =
+  let decay _ y = Vec.scale (-1.) y in
+  show_run "adaptive blow-up y' = y^2 from y(0)=1 to t=2" (fun () ->
+      Adaptive.integrate ~tol:1e-6 ~rhs:(budgeted (fun _ y -> [| y.(0) *. y.(0) |])) ~t0:0. ~t_end:2. [| 1. |]);
+  show_run "adaptive rhs NaN past t=0.5" (fun () ->
+      Adaptive.integrate ~dt0:0.25 ~dt_max:1e6 ~tol:1e-3
+        ~rhs:(budgeted (fun t y -> if t > 0.5 then [| Float.nan |] else Vec.scale (-1.) y))
+        ~t0:0. ~t_end:1. [| 1. |]);
+  show_run "adaptive dt0 = dt_max = 1e30 on [0, 1]" (fun () ->
+      Adaptive.integrate ~dt0:1e30 ~dt_max:1e30 ~tol:1e-6 ~rhs:(budgeted decay) ~t0:0. ~t_end:1. [| 1. |]);
+  show_run "adaptive empty span" (fun () -> Adaptive.integrate ~tol:1e-6 ~rhs:(budgeted decay) ~t0:1. ~t_end:1. [| 1. |]);
+  show_run "adaptive t_end < t0" (fun () -> Adaptive.integrate ~tol:1e-6 ~rhs:(budgeted decay) ~t0:1. ~t_end:0. [| 1. |]);
+  show_run "adaptive dt0 = 0" (fun () -> Adaptive.integrate ~dt0:0. ~tol:1e-6 ~rhs:(budgeted decay) ~t0:0. ~t_end:1. [| 1. |]);
+  case "bdf1 dt = 0"
+    (match Bdf1.integrate ~dt:0. ~rhs:(budgeted decay) ~t0:0. ~t_end:1. [| 1. |] with
+    | Ok y -> "Ok " ^ pp_vec y
+    | Error e -> "Error " ^ Fail.to_string e
+    | exception Invalid_argument m -> "Invalid_argument " ^ m)
