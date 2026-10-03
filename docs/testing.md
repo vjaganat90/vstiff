@@ -113,7 +113,7 @@ These keep the expected files worth trusting. Each has a reason.
 6. **Corpus problems never supply an analytic Jacobian.** The solver must work for any black-box right-hand side and the corpus must keep exercising `Jac`. (The `newton` cases hand `Newton.solve` its own Jacobians, and the Jacobian cases compare `Jac.forward` with analytic ones; no integrator is ever given one.)
 7. **Print stable lines.** No times, no counts that are not part of the contract, and no more digits than the check needs: a few (`%.3e`) or a boolean for a bound. The Newton lines print 12 decimals on purpose; that is still short of the 16 or 17 digits where results can differ between machines. Say in the line what is checked, as in `max error 3.68e-07 < 1e-06: true`.
 8. **Effects are quarantined.** In the tests only `Guard` raises or catches and only `Report` prints; a case itself stays pure.
-9. **A change that must not alter results leaves both expected files byte-identical.** Mind the floating-point trap in [architecture.md](architecture.md): moving a product into or out of a sum can change the last bits.
+9. **Check correctness, not bits.** A refactor may change the last bits of a result: fused multiply-add, another order of summation, another platform ([architecture.md](architecture.md), "Performance"). The same expected files pass on every platform the CI runs. A line that moves under such a change prints more than its check needs: make it print the check, and say so in the commit message. A line that moves for any other reason is a change of behaviour.
 
 ## Adding a case, step by step
 

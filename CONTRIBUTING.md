@@ -45,7 +45,7 @@ Each rule comes with its reason, because a rule you understand is one you can ap
 
 **Jacobians are always forward differences inside the solver.** `Jac.forward` approximates the Jacobian from function values, and a corpus problem never supplies an analytic one (`corpus.ml` writes analytic Jacobians only as the reference for `Jac.forward` and to drive `Newton` alone). *Why:* the solver has to work for any black-box right-hand side, and the corpus has to keep exercising `Jac`.
 
-**Expect files are the contract.** Never weaken an expectation or edit one to get green. A deliberate change of algorithm (a new controller, estimate or method) re-pins the lines it moves, such as step counts and digits, in the same commit, and the commit message gives the old and the new values; the bounds that define correctness (`< 1e-6`, `< 1e-3`, `< 1e-8`, the order window `[3.5, 4.5]`) are never loosened. `dune promote` only records a newly added case, such a deliberate re-pin, or a reviewed change of format. A refactor must leave both expected files byte-identical, which needs care with fused multiply-add (see the glossary): moving a product into or out of a sum can change the last bits. *Why:* the expected files are the project's memory of what correct output looks like; a wrong answer that was promoted stays silent forever.
+**Expect files are the contract.** Never weaken an expectation or edit one to get green. A deliberate change of algorithm (a new controller, estimate or method) re-pins the lines it moves, such as step counts and digits, in the same commit, and the commit message gives the old and the new values; the bounds that define correctness (`< 1e-6`, `< 1e-3`, `< 1e-8`, the order window `[3.5, 4.5]`) are never loosened. `dune promote` only records a newly added case, such a deliberate re-pin, or a reviewed change of format. Checks are about correctness, not bits. A refactor may change the last bits of a result (fused multiply-add, another order of summation, another platform), and the expected files print only the digits their checks need, so they do not move. A change that moves a line either changed behaviour, or exposed a line printed more precisely than its check needs; the commit message says which. *Why:* the expected files are the project's memory of what correct output looks like; a wrong answer that was promoted stays silent forever.
 
 **References come from outside.** The values in [test/refs.ml](test/refs.ml) are computed outside vstiff and never edited; record how a new one was computed. *Why:* a reference computed by vstiff agrees with vstiff whatever it does.
 
@@ -108,7 +108,7 @@ Run through this before you ask for review.
 
 - [ ] `dune build @check`, `dune build` and `dune runtest` pass: no warnings, no diff.
 - [ ] No expected file changed except by the lines of a new case that was discussed first, and no existing expectation was weakened: no looser bound, no rewritten line, no removed case.
-- [ ] A refactor leaves both expected files byte-identical.
+- [ ] A refactor leaves both expected files unchanged, or its commit message says why a line moved.
 - [ ] Effects are still quarantined; numerical failures are `Fail.t` values and only `Check` raises.
 - [ ] No corpus problem supplies an analytic Jacobian, and no new dependency was added.
 - [ ] The public API is deliberate: a module users should see is listed in `src/vstiff.ml` and `src/vstiff.mli`, an internal one is not, public signatures say `float array`, and nothing in `src/numerics/` names `Ode`.

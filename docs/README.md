@@ -86,13 +86,14 @@ Keep the [glossary](glossary.md) open for the terms you meet. To carry on, start
 | Add a method or a controller | [CONTRIBUTING.md](../CONTRIBUTING.md) and [architecture.md](architecture.md) |
 | Find something small to work on | the starter contributions in [exercises.md](exercises.md) |
 | Fix or add documentation | the documentation rules in [CONTRIBUTING.md](../CONTRIBUTING.md) |
-| See where the project is meant to go, or how parts of it could be proved correct | [plans/roadmap.md](plans/roadmap.md), [plans/formal-verification.md](plans/formal-verification.md) |
+| See where the project is meant to go, or how parts of it could be proved correct | [plans/plan.md](plans/plan.md), [plans/roadmap.md](plans/roadmap.md), [plans/formal-verification.md](plans/formal-verification.md) |
 
 ## Plans
 
-Two documents look ahead instead of describing the code as it is:
+Three documents look ahead instead of describing the code as it is:
 
 | Document | What it is |
 |---|---|
+| [plans/plan.md](plans/plan.md) | The top-level plan: what done means, and the order of the solver, property-testing, proof and benchmark work. |
 | [plans/roadmap.md](plans/roadmap.md) | The roadmap from today's small BDF2 integrator to a general stiff solver, with milestones and decisions. |
 | [plans/formal-verification.md](plans/formal-verification.md) | How parts of vstiff could be verified in Rocq with MathComp, with a ranked list of theorems and a pilot plan. |
