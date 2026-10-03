@@ -4,7 +4,7 @@
 let step yj = 1e-8 *. (1. +. Float.abs yj)
 
 (** [forward f y] is the matrix [J] with [J.(i).(j)] ≈ ∂f_i/∂y_j at [y]. *)
-let forward (f : Vec.t -> Vec.t) (y : Vec.t) : float array array =
+let forward (f : Vec.t -> Vec.t) (y : Vec.t) : Linalg.matrix =
   let fy = f y in
   let column j =
     let yp = Array.mapi (fun k yk -> if k = j then yk +. step yk else yk) y in

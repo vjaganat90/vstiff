@@ -10,7 +10,9 @@ let swap p i = if i = 0 then p else if i = p then 0 else i
 
 (** [solve a b] is [Some x] with [a x = b], or [None] when elimination meets
     an exactly zero pivot. *)
-let rec solve (a : float array array) (b : Vec.t) : Vec.t option =
+type matrix = float array array
+
+let rec solve (a : matrix) (b : Vec.t) : Vec.t option =
   match Array.length b with
   | 0 -> Some [||]
   | n ->
