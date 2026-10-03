@@ -12,8 +12,12 @@ module type CASE = sig
   val pass : t -> bool
 end
 
+(* Every round's result. The result type depends on the module passed in, which
+   takes a modular explicit: (module C : CASE) -> (C.t, Fail.t) result list. *)
+let repeat (module C : CASE) : (C.t, Fail.t) result list = List.init rounds (fun _ -> C.run ())
+
 let soak (module C : CASE) =
-  let results = List.init rounds (fun _ -> C.run ()) in
+  let results = repeat (module C) in
   let passed = List.length (List.filter (function Ok r -> C.pass r | Error _ -> false) results) in
   let identical = List.for_all (( = ) (List.hd results)) results in
   Printf.printf "soak %s x%d: passed %d/%d, identical: %b\n" C.name rounds passed rounds identical
