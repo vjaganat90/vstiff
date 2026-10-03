@@ -3,8 +3,9 @@
     there is no ode.ml (src/dune says modules_without_implementation). Who calls
     what: docs/architecture.md; terms: docs/glossary.md. *)
 
-(** The right-hand side [f] of [y' = f(t, y)]. [rhs t y] returns a vector as
-    long as [y] and does not modify [y]. *)
+(** The right-hand side [f] of [y' = f(t, y)]. [rhs t y] returns a fresh vector as
+    long as [y] on every call and does not modify [y]: the library keeps earlier
+    results while it calls [rhs] again. *)
 type rhs = float -> Vec.t -> Vec.t
 
 (** Integrate [y' = rhs t y] from [y(t0) = y0] up to [t_end]. *)
