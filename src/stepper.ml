@@ -9,10 +9,15 @@ let fixed (module M : Ode.Method) ~dt (p : Ode.problem) =
   else
     let n = max 1 (Float.to_int (Float.round (span /. dt))) in
     let h = span /. float_of_int n in
-    let rec go left history (at : Ode.point) =
-      if left = 0 then Ok at.y
+    (* Step k ends at t0 + k h, the last one at t_end itself, and each step is
+       the difference of its end times: the clock cannot drift, and the state
+       advances by exactly what the clock does. *)
+    let time k = if k = n then p.t_end else p.t0 +. (float_of_int k *. h) in
+    let rec go k history (at : Ode.point) =
+      if k = n then Ok at.y
       else
-        let* y, history = M.step p.rhs h history at in
-        go (left - 1) history { t = at.t +. h; y }
+        let t_next = time (k + 1) in
+        let* y, history = M.step p.rhs (t_next -. at.t) history at in
+        go (k + 1) history { t = t_next; y }
     in
-    go n M.start { t = p.t0; y = p.y0 }
+    go 0 M.start { t = p.t0; y = p.y0 }

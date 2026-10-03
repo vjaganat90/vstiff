@@ -258,6 +258,30 @@ let too_small =
         Printf.sprintf "%s, rhs calls: %d" outcome (calls ()) );
   ]
 
+(* The fixed-step clock: step k ends at t0 + k h and the last one at t_end
+   itself, so a right-hand side undefined past t_end is never evaluated there.
+   The stage is evaluated at the new time, which only a time-dependent problem
+   can see: on y' = 2t (y(1) = 1) BDF2 is second order only if it is. *)
+let fixed_clock =
+  let sqrt_rest = { Ode.rhs = (fun t _ -> [| Float.sqrt (1. -. t) |]); t0 = 0.; t_end = 1.; y0 = [| 0. |] } in
+  let ramp = { Ode.rhs = (fun t _ -> [| 2. *. t |]); t0 = 0.; t_end = 1.; y0 = [| 0. |] } in
+  let decay_at_1e10 = { Ode.rhs = (fun _ y -> Vec.scale (-1.) y); t0 = 1e10; t_end = 1e10 +. 1.; y0 = [| 1. |] } in
+  [
+    ( "bdf1 y' = sqrt(1 - t) on [0, 1], dt = 1/9",
+      Guard.run (fun y -> "Ok " ^ pp_vec y) (fun () -> Stepper.fixed (module Bdf1) ~dt:(1. /. 9.) sqrt_rest) );
+    ( "bdf2 y' = 2t on [0, 1]",
+      fun () ->
+        let error dt = Result.map (max_error [| 1. |]) (Stepper.fixed (module Bdf2) ~dt ramp) in
+        match (error 0.1, error 0.05) with
+        | Ok coarse, Ok fine ->
+            let ratio = coarse /. fine in
+            Printf.sprintf "error dt=0.1 %.3e, dt=0.05 %.3e, ratio %.2f in [3.5, 4.5]: %b" coarse fine ratio
+              (3.5 <= ratio && ratio <= 4.5)
+        | Error e, _ | _, Error e -> failure e );
+    ( "bdf1 dt = 1e-7 at t=1e10, below t's resolution",
+      Guard.run (fun y -> "Ok " ^ pp_vec y) (fun () -> Stepper.fixed (module Bdf1) ~dt:1e-7 decay_at_1e10) );
+  ]
+
 (* Table order is output order, the order of the lines in corpus.expected. *)
 let corpus =
   List.concat
@@ -277,6 +301,7 @@ let corpus =
       newton_overflow;
       clock;
       too_small;
+      fixed_clock;
     ]
 
 let () = Report.lines corpus
