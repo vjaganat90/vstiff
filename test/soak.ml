@@ -16,11 +16,14 @@ end
    takes a modular explicit: (module C : Case) -> (C.t, Fail.t) result list. *)
 let repeat (module C : Case) : (C.t, Fail.t) result list = List.init rounds (fun _ -> C.run ())
 
+(* The report line for a case, computed when Report prints it. *)
 let soak (module C : Case) =
-  let results = repeat (module C) in
-  let passed = List.length (List.filter (function Ok r -> C.pass r | Error _ -> false) results) in
-  let identical = List.for_all (( = ) (List.hd results)) results in
-  Printf.printf "soak %s x%d: passed %d/%d, identical: %b\n" C.name rounds passed rounds identical
+  ( Printf.sprintf "soak %s x%d" C.name rounds,
+    fun () ->
+      let results = repeat (module C) in
+      let passed = List.length (List.filter (function Ok r -> C.pass r | Error _ -> false) results) in
+      let identical = List.for_all (( = ) (List.hd results)) results in
+      Printf.sprintf "passed %d/%d, identical: %b" passed rounds identical )
 
 let max_error exact y = Vec.norm_inf (Vec.sub y exact)
 let bdf2_halving = Adaptive.integrate (module Bdf2) (module Halving)
@@ -66,8 +69,4 @@ module Robertson = struct
     Float.abs (s.y.(0) -. Refs.robertson_y1_at_1e4) < 1e-3 && Float.abs (Array.fold_left ( +. ) 0. s.y -. 1.) < 1e-8
 end
 
-let () =
-  soak (module Canary);
-  soak (module LogisticOrder);
-  soak (module VanDerPol);
-  soak (module Robertson)
+let () = Report.lines [ soak (module Canary); soak (module LogisticOrder); soak (module VanDerPol); soak (module Robertson) ]
