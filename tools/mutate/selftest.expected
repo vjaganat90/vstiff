@@ -128,3 +128,93 @@ file_of_id: src/a:b.ml none
 0x10: int_plus1=17 int_minus1=15
 1_000: int_plus1=1001 int_minus1=999
 -5: int_plus1=-4 int_minus1=-6
+
+== results file ==
+fixture.ml	3	18	fmul_to_fdiv	survived		w *. h	w /. h
+every line reads back as the entry it came from: true
+another line is skipped: true
+
+== build logs ==
+killed: test/corpus.expected
+killed: exception Invalid_argument("index out of bounds")
+killed: failed
+stillborn: Error: Unbound value n
+stillborn: does not compile
+
+== equivalent list ==
+fixture.ml:3:18:fmul_to_fdiv -> "w is 1 in every test"
+fixture.ml:4:21:int_plus1 -> ""
+
+== windows ==
+x +. y | x -. y
+...aaaaaaaaaaaaaaaaaaaaaaa +. bbbbbbbbbbbbbbbbbbbbbb... | ...aaaaaaaaaaaaaaaaaaaaaaa -. bbbbbbbbbbbbbbbbbbbbbb...
+if c then xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx... | if c then y else xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx...
+
+== report ==
+# Mutation report
+
+4 workers, baseline 6.9 s, timeout 20.8 s, wall time 14 min 12 s. Mutants are built in dune's release profile, so a warning does not make one stillborn.
+
+| Module | Mutants | Killed | Survived | Stillborn | Equivalent |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| fixture.ml | 48 | 27 | 7 | 7 | 7 |
+| src/other.ml | 47 | 26 | 7 | 7 | 7 |
+| src/poly.ml | 2 | 0 | 1 | 0 | 1 |
+| **Total** | 97 | 53 | 15 | 14 | 15 |
+
+Of the 53 killed mutants, 14 were killed by the timeout.
+
+## Survivors
+
+### fixture.ml
+
+- `fixture.ml:3:18:fmul_to_fdiv`: `w *. h` -> `w /. h`
+- `fixture.ml:4:34:div_to_mul`: `k / 3` -> `k * 3`
+- `fixture.ml:7:32:float_x2`: `2.` -> `4.`
+- `fixture.ml:9:26:lt_to_le`: `x < lo` -> `x <= lo`
+- `fixture.ml:10:49:or_to_and`: `... x) && (not (x >= hi))) || (lo = hi)` -> `... x) && (not (x >= hi))) && (lo = hi)`
+- `fixture.ml:20:56:gt_to_le`: `c > 0` -> `c <= 0`
+- `fixture.ml:23:16:not_remove`: `not (Float.is_nan x)` -> `Float.is_nan x`
+
+### src/other.ml
+
+- `src/other.ml:4:19:add_to_sub`: `k + 1` -> `k - 1`
+- `src/other.ml:5:19:float_x2`: `(-1.)` -> `(-2.)`
+- `src/other.ml:8:28:if_swap`: `...loat.abs x) <= eps then 0. else x` -> `...loat.abs x) <= eps then x else 0.`
+- `src/other.ml:10:31:and_to_or`: `(lo <= x) && (not (x >= hi))` -> `(lo <= x) || (not (x >= hi))`
+- `src/other.ml:15:14:int_plus1`: `0` -> `1`
+- `src/other.ml:20:72:int_plus1`: `0` -> `1`
+- `src/other.ml:24:52:arm_body_from_1`: `0` -> `x`
+
+### src/poly.ml
+
+- `src/poly.ml:3:18:fmul_to_fdiv`: `` `A x `` -> `` `B x ``
+
+## Equivalent
+
+- `fixture.ml:4:24:mul_to_div`: same result on every input
+- `fixture.ml:7:25:fmul_to_fdiv`: same result on every input
+- `fixture.ml:8:43:le_to_lt`: same result on every input
+- `fixture.ml:10:41:ge_to_gt`: same result on every input
+- `fixture.ml:20:43:int_plus1`: same result on every input
+- `fixture.ml:22:26:div_to_mul`: same result on every input
+- `fixture.ml:25:17:fsub_to_fadd`: same result on every input
+- `src/other.ml:3:26:float_div2`: same result on every input
+- `src/other.ml:5:16:fmul_to_fdiv`: same result on every input
+- `src/other.ml:8:18:float_div2`: same result on every input
+- `src/other.ml:9:49:gt_to_ge`: same result on every input
+- `src/other.ml:15:3:not_add`: same result on every input
+- `src/other.ml:20:63:int_minus1`: same result on every input
+- `src/other.ml:24:40:lt_to_ge`: same result on every input
+- `src/poly.ml:3:18:int_plus1`
+
+== report of nothing ==
+# Mutation report
+
+| Module | Mutants | Killed | Survived | Stillborn |
+| --- | ---: | ---: | ---: | ---: |
+| **Total** | 0 | 0 | 0 | 0 |
+
+## Survivors
+
+No mutant survived.
