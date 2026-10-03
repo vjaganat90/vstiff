@@ -93,3 +93,18 @@ fixture.ml:24:52:arm_body_from_1	0	x
 fixture.ml:24:57:int_minus1	0	(-1)
 fixture.ml:24:57:int_plus1	0	1
 fixture.ml:25:17:fsub_to_fadd	a -. b	a +. b
+95 mutants, ids distinct: true, each applies to a different module that parses: true
+printing the fixture unchanged keeps its mutants: true
+small.ml:1:11:if_swap
+let f x = if x > 0 then - x else x
+let g = function | Some y -> y | None -> 0
+small.ml:1:16:gt_to_le
+let f x = if x <= 0 then x else - x
+let g = function | Some y -> y | None -> 0
+small.ml:2:18:arm_body_from_2
+let f x = if x > 0 then x else - x
+let g = function | Some y -> 0 | None -> 0
+small.ml:2:18:if_swap
+error: no mutant small.ml:2:18:if_swap
+a syntax error is an Error: true
+file_of_id: src/a:b.ml none

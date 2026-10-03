@@ -18,6 +18,9 @@ type t = { file : string; line : int; col : int; operator : string; original : s
 (** [file:line:col:operator]: unique within a file, and stable while the source is unchanged. *)
 val id : t -> string
 
+(** The file part of an id, or [None] if the string is not an id. *)
+val file_of_id : string -> string option
+
 (** [id], [original] and [mutated], tab-separated. *)
 val to_string : t -> string
 
@@ -25,3 +28,11 @@ val to_string : t -> string
     names the mutants. A mutant whose print equals the original's is not listed, nor is a second one that makes the
     same change at the same position. *)
 val enumerate : file:string -> string -> (t list, string) result
+
+(** [apply ~file source ~id] is [source] with the mutant [id] applied, printed by the compiler's printer, so comments
+    and layout are lost. [Error] for a syntax error, or when [source] has no such mutant. *)
+val apply : file:string -> string -> id:string -> (string, string) result
+
+(** [reprint ~file source] is [source] printed the same way with no change, to check that printing alone does not
+    change what the code does. *)
+val reprint : file:string -> string -> (string, string) result

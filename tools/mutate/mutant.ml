@@ -4,8 +4,16 @@ open Parsetree
 
 type t = { file : string; line : int; col : int; operator : string; original : string; mutated : string }
 
-let id m = Printf.sprintf "%s:%d:%d:%s" m.file m.line m.col m.operator
+let format_id ~file ~line ~col ~operator = Printf.sprintf "%s:%d:%d:%s" file line col operator
+let id m = format_id ~file:m.file ~line:m.line ~col:m.col ~operator:m.operator
 let to_string m = String.concat "\t" [ id m; m.original; m.mutated ]
+
+(* The operator and the position have no colon, so the file is what is left once the last three fields are gone. *)
+let file_of_id id =
+  match List.rev (String.split_on_char ':' id) with
+  | _operator :: col :: line :: (_ :: _ as file) when int_of_string_opt line <> None && int_of_string_opt col <> None ->
+      Some (String.concat ":" (List.rev file))
+  | _ -> None
 
 (* [edited] replaces the node, [before] and [after] are the smaller expressions a report shows. The anchor gives the
    position of the id: the operator for a swap and for the operands of a connective, the keyword of an if or a while,
@@ -212,3 +220,31 @@ let enumerate ~file source =
       iterator.structure iterator structure;
       mutants ~file !found)
     (parse ~file source)
+
+(* A trailing newline, which Pprintast leaves out. *)
+let print structure = Pprintast.string_of_structure structure ^ "\n"
+let reprint ~file source = Result.map print (parse ~file source)
+
+(* The mapper stops at the node it replaces, so the rest of the module is the original's, and it skips the head of
+   an application for the same reason as [enumerate]. *)
+let apply ~file source ~id:wanted =
+  Result.bind (parse ~file source) (fun structure ->
+      let found = ref false in
+      let expr (self : Ast_mapper.mapper) e =
+        let wanted_here s =
+          let line, col = position s.anchor in
+          format_id ~file ~line ~col ~operator:s.operator = wanted
+        in
+        match List.find_opt wanted_here (sites e) with
+        | Some s ->
+            found := true;
+            s.edited
+        | None -> (
+            match e.pexp_desc with
+            | Pexp_apply (({ pexp_desc = Pexp_ident _; _ } as head), args) ->
+                { e with pexp_desc = Pexp_apply (head, List.map (fun (label, a) -> (label, self.expr self a)) args) }
+            | _ -> Ast_mapper.default_mapper.expr self e)
+      in
+      let mapper = { Ast_mapper.default_mapper with expr } in
+      let mutated = mapper.structure mapper structure in
+      if !found then Ok (print mutated) else Error ("no mutant " ^ wanted))
