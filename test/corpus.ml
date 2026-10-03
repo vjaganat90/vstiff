@@ -344,6 +344,42 @@ let adaptive_time =
         | Error e -> failure e );
   ]
 
+(* The canary through the adaptive driver, with the right-hand-side calls
+   counted: any swap of two Jacobian rows slows or breaks Newton on some step,
+   so the count moves even where the final error does not. *)
+let adaptive_canary =
+  let open Problems.Canary in
+  [
+    ( "adaptive canary t=1 tol=1e-6",
+      fun () ->
+        let rhs, calls = Instrument.count (Guard.budget rhs) in
+        Guard.run
+          (fun (s : _ Adaptive.solution) ->
+            let e = max_error (exact 1.) s.y in
+            Printf.sprintf "max error %.2e < 1e-6: %b, rhs calls %d" e (e < 1e-6) (calls ()))
+          (fun () -> bdf2_halving ~tol:1e-6 { problem with rhs })
+          () );
+  ]
+
+(* The adaptive driver's own start check, and three more of Newton's limits:
+   the depth of its line search (from 1e-3 the full step to x^2 = 2 overshoots
+   by a factor of about 1000 and needs lambda = 1/512), its 50 iterations (x^3
+   converges only linearly and needs 55), and a full step out of the domain of
+   log, which the line search must refuse. *)
+let start_and_limits =
+  [
+    ( "adaptive y0 = nan",
+      Guard.run
+        (fun (s : _ Adaptive.solution) -> Printf.sprintf "Ok at t=%g" s.t)
+        (fun () -> bdf2_halving ~tol:1e-6 { Ode.rhs = (fun _ y -> Vec.scale (-1.) y); t0 = 0.; t_end = 1.; y0 = [| Float.nan |] }) );
+    ( "newton x^2 = 2 from x0=1e-3 (deep line search)",
+      fun () -> show (Newton.solve (fun x -> [| (x.(0) *. x.(0)) -. 2. |]) (fun x -> [| [| 2. *. x.(0) |] |]) [| 1e-3 |]) );
+    ( "newton x^3 = 0 from x0=1 (needs more than 50 iterations)",
+      fun () -> show (Newton.solve (fun x -> [| x.(0) *. x.(0) *. x.(0) |]) (fun x -> [| [| 3. *. x.(0) *. x.(0) |] |]) [| 1. |]) );
+    ( "newton log x = 0 from x0=3 (full step leaves the domain)",
+      fun () -> show (Newton.solve (fun x -> [| Float.log x.(0) |]) (fun x -> [| [| 1. /. x.(0) |] |]) [| 3. |]) );
+  ]
+
 (* Table order is output order, the order of the lines in corpus.expected. *)
 let corpus =
   List.concat
@@ -369,6 +405,8 @@ let corpus =
       newton_guards;
       jacobian_step;
       adaptive_time;
+      adaptive_canary;
+      start_and_limits;
     ]
 
 let () = Report.lines corpus
