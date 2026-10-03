@@ -1,0 +1,95 @@
+fixture.ml:3:18:fmul_to_fdiv	w *. h	w /. h
+fixture.ml:3:23:fdiv_to_fmul	(w *. h) /. 2.	(w *. h) *. 2.
+fixture.ml:3:26:float_div10	2.	0.2
+fixture.ml:3:26:float_div2	2.	1.
+fixture.ml:3:26:float_x10	2.	20.
+fixture.ml:3:26:float_x2	2.	4.
+fixture.ml:3:26:float_zero	2.	0.
+fixture.ml:4:19:add_to_sub	k + 1	k - 1
+fixture.ml:4:21:int_minus1	1	0
+fixture.ml:4:21:int_plus1	1	2
+fixture.ml:4:24:mul_to_div	(k + 1) * 2	(k + 1) / 2
+fixture.ml:4:26:int_minus1	2	1
+fixture.ml:4:26:int_plus1	2	3
+fixture.ml:4:29:sub_to_add	((k + 1) * 2) - (k / 3)	((k + 1) * 2) + (k / 3)
+fixture.ml:4:34:div_to_mul	k / 3	k * 3
+fixture.ml:4:36:int_minus1	3	2
+fixture.ml:4:36:int_plus1	3	4
+fixture.ml:5:16:fmul_to_fdiv	x *. (-1.)	x /. (-1.)
+fixture.ml:5:19:float_div10	(-1.)	(-0.1)
+fixture.ml:5:19:float_div2	(-1.)	(-0.5)
+fixture.ml:5:19:float_x10	(-1.)	(-10.)
+fixture.ml:5:19:float_x2	(-1.)	(-2.)
+fixture.ml:5:19:float_zero	(-1.)	0.
+fixture.ml:6:29:fadd_to_fsub	(+.)	(-.)
+fixture.ml:7:25:fmul_to_fdiv	( *. ) 2.	(/.) 2.
+fixture.ml:7:32:float_div10	2.	0.2
+fixture.ml:7:32:float_div2	2.	1.
+fixture.ml:7:32:float_x10	2.	20.
+fixture.ml:7:32:float_x2	2.	4.
+fixture.ml:7:32:float_zero	2.	0.
+fixture.ml:8:18:float_div10	1e-8	1e-9
+fixture.ml:8:18:float_div2	1e-8	5e-9
+fixture.ml:8:18:float_x10	1e-8	1e-7
+fixture.ml:8:18:float_x2	1e-8	2e-8
+fixture.ml:8:18:float_zero	1e-8	0.
+fixture.ml:8:28:if_swap	if (Float.abs x) <= eps then 0. else x	if (Float.abs x) <= eps then x else 0.
+fixture.ml:8:28:not_add	(Float.abs x) <= eps	not ((Float.abs x) <= eps)
+fixture.ml:8:43:le_to_gt	(Float.abs x) <= eps	(Float.abs x) > eps
+fixture.ml:8:43:le_to_lt	(Float.abs x) <= eps	(Float.abs x) < eps
+fixture.ml:9:21:if_swap	if x < lo then lo else if x > hi then hi else x	if x < lo then (if x > hi then hi else x) else lo
+fixture.ml:9:21:not_add	x < lo	not (x < lo)
+fixture.ml:9:26:lt_to_ge	x < lo	x >= lo
+fixture.ml:9:26:lt_to_le	x < lo	x <= lo
+fixture.ml:9:44:if_swap	if x > hi then hi else x	if x > hi then x else hi
+fixture.ml:9:44:not_add	x > hi	not (x > hi)
+fixture.ml:9:49:gt_to_ge	x > hi	x >= hi
+fixture.ml:9:49:gt_to_le	x > hi	x <= hi
+fixture.ml:10:26:le_to_gt	lo <= x	lo > x
+fixture.ml:10:26:le_to_lt	lo <= x	lo < x
+fixture.ml:10:31:and_to_or	(lo <= x) && (not (x >= hi))	(lo <= x) || (not (x >= hi))
+fixture.ml:10:31:not_add_lhs	lo <= x	not (lo <= x)
+fixture.ml:10:31:not_remove_rhs	not (x >= hi)	x >= hi
+fixture.ml:10:41:ge_to_gt	x >= hi	x > hi
+fixture.ml:10:41:ge_to_lt	x >= hi	x < hi
+fixture.ml:10:49:not_add_lhs	(lo <= x) && (not (x >= hi))	not ((lo <= x) && (not (x >= hi)))
+fixture.ml:10:49:not_add_rhs	lo = hi	not (lo = hi)
+fixture.ml:10:49:or_to_and	((lo <= x) && (not (x >= hi))) || (lo = hi)	((lo <= x) && (not (x >= hi))) && (lo = hi)
+fixture.ml:10:55:eq_to_ne	lo = hi	lo <> hi
+fixture.ml:11:21:ne_to_eq	a <> b	a = b
+fixture.ml:15:3:not_add	(!r) > 0	not ((!r) > 0)
+fixture.ml:15:12:gt_to_ge	(!r) > 0	(!r) >= 0
+fixture.ml:15:12:gt_to_le	(!r) > 0	(!r) <= 0
+fixture.ml:15:14:int_minus1	0	(-1)
+fixture.ml:15:14:int_plus1	0	1
+fixture.ml:20:38:arm_body_from_2	0	1
+fixture.ml:20:43:int_minus1	0	(-1)
+fixture.ml:20:43:int_plus1	0	1
+fixture.ml:20:47:arm_body_from_1	1	0
+fixture.ml:20:54:guard_not_add	c > 0	not (c > 0)
+fixture.ml:20:56:gt_to_ge	c > 0	c >= 0
+fixture.ml:20:56:gt_to_le	c > 0	c <= 0
+fixture.ml:20:58:int_minus1	0	(-1)
+fixture.ml:20:58:int_plus1	0	1
+fixture.ml:20:63:int_minus1	1	0
+fixture.ml:20:63:int_plus1	1	2
+fixture.ml:20:67:arm_body_from_2	0	1
+fixture.ml:20:72:int_minus1	0	(-1)
+fixture.ml:20:72:int_plus1	0	1
+fixture.ml:21:21:arm_body_from_2	None	Some x
+fixture.ml:21:34:arm_body_from_1	Some x	None
+fixture.ml:22:26:div_to_mul	a / b	a * b
+fixture.ml:22:55:int_minus1	0	(-1)
+fixture.ml:22:55:int_plus1	0	1
+fixture.ml:23:16:if_swap	if not (Float.is_nan x) then x else 0.	if not (Float.is_nan x) then 0. else x
+fixture.ml:23:16:not_remove	not (Float.is_nan x)	Float.is_nan x
+fixture.ml:24:21:arm_body_from_2	x	0
+fixture.ml:24:33:guard_not_remove	not (x < 0)	x < 0
+fixture.ml:24:40:lt_to_ge	x < 0	x >= 0
+fixture.ml:24:40:lt_to_le	x < 0	x <= 0
+fixture.ml:24:42:int_minus1	0	(-1)
+fixture.ml:24:42:int_plus1	0	1
+fixture.ml:24:52:arm_body_from_1	0	x
+fixture.ml:24:57:int_minus1	0	(-1)
+fixture.ml:24:57:int_plus1	0	1
+fixture.ml:25:17:fsub_to_fadd	a -. b	a +. b

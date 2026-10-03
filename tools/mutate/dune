@@ -1,0 +1,17 @@
+; The mutation-testing tool of docs/plans/plan.md, section 3.4. compiler-libs ships with the compiler, so the project
+; still depends on nothing outside the standard distribution; neither library is linked into src/ or test/.
+(executables
+ (names mutate selftest)
+ (libraries compiler-libs.common))
+
+; Part of dune runtest, like the corpus: selftest prints the mutants of fixture.ml and dune diffs them with the file.
+; The runner that applies mutants (mutate run) is not part of it.
+(rule
+ (alias runtest)
+ (deps fixture.ml)
+ (action
+  (progn
+   (with-stdout-to
+    selftest.output
+    (run %{exe:selftest.exe} fixture.ml))
+   (diff selftest.expected selftest.output))))
