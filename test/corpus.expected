@@ -21,3 +21,4 @@ bdf1 dt = 0: Invalid_argument Stepper.fixed: need dt > 0 and t_end >= t0
 adaptive logistic [0,5] dt0=0.5 tol=1e-6: accepted 1109, rejected 374, max error 8.96e-08
 adaptive logistic [0,5] dt_max=1e-3 tol=1e-6: accepted 5021, rejected 0
 robertson t=1e4 tol=1e-6 accuracy: |y1 - ref| = 7.2e-07 < 1e-5: true
+newton step that converges into an overflow: Error Nan
