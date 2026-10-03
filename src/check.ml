@@ -1,5 +1,7 @@
 let fixed ~dt (p : Ode.problem) =
   if not (dt > 0. && p.t_end -. p.t0 >= 0.) then invalid_arg "Stepper.fixed: need dt > 0 and t_end >= t0"
+  else if p.t_end > p.t0 && dt < Clock.resolution (Float.max (Float.abs p.t0) (Float.abs p.t_end)) then
+    invalid_arg "Stepper.fixed: dt is below the resolution of t"
 
 let adaptive ~dt0 (p : Ode.problem) =
   let span = p.t_end -. p.t0 in
