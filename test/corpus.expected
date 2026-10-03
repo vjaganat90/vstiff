@@ -40,3 +40,8 @@ newton residual nan at the start: Error Nan
 newton step that overflows in the linear solve: Error Diverged
 jac forward difference of y^3 at y = -2 (exact 12): 11.9999998224
 adaptive y' = 2t on [0, 1] tol=1e-6: max error 1.57e-12
+adaptive canary t=1 tol=1e-6: max error 4.66e-07 < 1e-6: true, rhs calls 106445
+adaptive y0 = nan: Error Nan
+newton x^2 = 2 from x0=1e-3 (deep line search): Ok [1.414213562373]
+newton x^3 = 0 from x0=1 (needs more than 50 iterations): Error Diverged
+newton log x = 0 from x0=3 (full step leaves the domain): Ok [1.000000000000]
