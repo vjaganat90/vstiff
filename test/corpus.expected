@@ -11,3 +11,10 @@ bdf2 canary t=1 dt=1e-3 (h lambda = 10): max error 1.53e-07 < 1e-06: true
 jac non-symmetric at (1, 2, 3), max entry error relative to |J_ij| < 1e-6: true
 linalg zero leading pivot: [1.000000000000; 2.000000000000; 3.000000000000]
 linalg tiny leading pivot: [1.000000000000; 1.000000000000]
+adaptive blow-up y' = y^2 from y(0)=1 to t=2: Error StepRejected 1
+adaptive rhs NaN past t=0.5: Error StepRejected 46
+adaptive dt0 = dt_max = 1e30 on [0, 1]: Ok at t=1
+adaptive empty span: Ok at t=1
+adaptive t_end < t0: Invalid_argument Adaptive.integrate: t_end is before t0
+adaptive dt0 = 0: Invalid_argument Adaptive.integrate: dt0 and dt_max must be positive
+bdf1 dt = 0: Invalid_argument Stepper.fixed: need dt > 0 and t_end >= t0
