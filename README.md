@@ -11,8 +11,8 @@ An ordinary differential equation (ODE) `y' = f(t, y)` says how fast a state `y`
 - **Contracts** (OCaml module types) in [src/ode.mli](src/ode.mli): `Ode.Method` (one step), `Ode.Embedded` (a step plus an error estimate) and `Ode.Controller` (a step-size policy), with the types `Ode.problem`, `Ode.point` and `Ode.rhs`. Methods and controllers are modules that implement them.
 - **Methods:** `Bdf1` (backward Euler, an `Ode.Method`) and `Bdf2` (variable-step BDF2, an `Ode.Embedded` whose first step is backward Euler).
 - **Controller:** `Halving` rejects a step whose scaled error estimate exceeds `tol` (or whose solve fails, or that is too short to move `t`), halves the step that failed, and doubles the step after three accepts in a row, up to `dt_max`.
-- **Drivers:** `Stepper.fixed` takes equal steps with any `Ode.Method`; `Adaptive.integrate` takes adaptive steps with any `Ode.Embedded` and `Ode.Controller`, lands exactly on `t_end` and snaps every other step to the floats, `h = (t + dt) - t`, so that the state advances by exactly what the clock does.
-- **Named failures:** numerical trouble comes back as `Error` of `Fail.t` (`Diverged`, `StepRejected n` or `Nan`), never as an exception. Only `Check` raises on purpose: `Invalid_argument`, for arguments that make no sense.
+- **Drivers:** `Stepper.fixed` takes about `(t_end - t0) / dt` steps of one length `h` with any `Ode.Method`, step `k` ending at `t0 + k h` and the last one at `t_end` itself; `Adaptive.integrate` takes adaptive steps with any `Ode.Embedded` and `Ode.Controller`, lands exactly on `t_end` and snaps every other step to the floats, `h = (t + dt) - t`. Both hand the method the difference of a step's end times, so that the state advances by exactly what the clock does.
+- **Named failures:** numerical trouble comes back as `Error` of `Fail.t` (`Diverged`, `StepRejected n` or `Nan`, which both drivers also return for a start that is not finite), never as an exception. Only `Check` raises on purpose: `Invalid_argument`, for arguments that make no sense (`dt`, `dt0`, `dt_max` or `tol` not positive, `t_end < t0`, a `dt` below the resolution of `t`, an `rhs t0 y0` of the wrong length).
 - **Building blocks:** `Newton`, `Jac` (forward-difference Jacobians), `Linalg`, `Stage`, `Vec`, `Clock` (how short a step `t` can still resolve) and `Instrument` to count right-hand-side calls.
 
 ## A first program
@@ -37,7 +37,7 @@ let () =
   | Error e -> Printf.printf "failed: %s\n" (Fail.to_string e)
 ```
 
-`Adaptive.integrate` takes a method and a controller as modules, then `~tol` and the problem, and returns `Ok solution` or `Error failure`; the solution holds the final `t`, `y` and the controller's `stats`. Optional `?dt0`, `?dt_max` and `?max_rejects` have defaults ([src/adaptive.mli](src/adaptive.mli)). Only the final state comes back, not the path. If the syntax is new, [docs/ocaml.md](docs/ocaml.md) explains each construct.
+`Adaptive.integrate` takes a method and a controller as modules, then `~tol` and the problem, and returns `Ok solution` or `Error failure`; the solution holds the final `t`, `y` and the controller's `stats`. Optional `?dt0`, `?dt_max` and `?max_rejects` have defaults ([src/adaptive.mli](src/adaptive.mli)); `~tol` must be positive. `rhs t y` must return a new array on every call and leave `y` alone, because the library keeps earlier results while it calls `rhs` again ([src/ode.mli](src/ode.mli)). Only the final state comes back, not the path. If the syntax is new, [docs/ocaml.md](docs/ocaml.md) explains each construct.
 
 To run it, create the probe project: a throwaway dune project outside the repository that links the library's `src/` and the corpus problems, with your program saved as `p/probe.ml`. From the repository root, with your opam switch active:
 
@@ -98,7 +98,7 @@ vstiff is a work in progress. The known gaps double as starter contributions ([d
 - One mixed absolute and relative weight `1 / (1 + |y_i|)`, no separate `rtol` and `atol`: tiny components such as Robertson's `y2` are controlled only loosely.
 - `Halving` counts every rejection together, whatever its reason; `Instrument` counts right-hand-side calls only, so Newton iterations per step are invisible from outside.
 - No dense output: the drivers return only the final state. `Linalg.solve` is dense Gaussian elimination, meant for small systems.
-- Tests: the backward Euler canary takes 500,000 steps and dominates the test time; van der Pol accuracy is not checked against a reference; a transposed Jacobian stalls the corpus run instead of failing one line; the soak test is a tripwire, not extra coverage.
+- Tests: the backward Euler canary takes 500,000 steps and dominates the test time; van der Pol accuracy is not checked against a reference; the soak test is a tripwire, not extra coverage, and unlike the corpus it has no call budget, so a transposed Jacobian fails the corpus within seconds but still stalls the soak test.
 
 ## License
 

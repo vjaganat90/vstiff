@@ -21,7 +21,7 @@ Throughout, `t` is time, `y` the state vector, `f` the right-hand side (called `
 | [numerics/02-newton.md](numerics/02-newton.md) | Newton's method, damping and the linear solves inside it. |
 | [numerics/03-jacobians-and-floating-point.md](numerics/03-jacobians-and-floating-point.md) | Floating point, finite-difference Jacobians, round-off and NaN. |
 | [numerics/04-bdf.md](numerics/04-bdf.md) | BDF1, BDF2, variable steps, the stage equation and stability. |
-| [numerics/05-step-control.md](numerics/05-step-control.md) | Error estimates, step-size control, the clock that steps are snapped to, and why every run ends. |
+| [numerics/05-step-control.md](numerics/05-step-control.md) | Error estimates, step-size control, the clock that steps are snapped to (and the grid of the fixed-step driver), and why every run ends. |
 | [numerics/06-the-corpus.md](numerics/06-the-corpus.md) | The test problems and what each one proves. |
 
 ## Reading orders

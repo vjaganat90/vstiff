@@ -22,7 +22,7 @@ In one paragraph: an **implicit** step cannot compute the new state directly, be
  support     Fail (failures, let*, let+)   Check (argument checks)   Instrument (counting)
 ```
 
-Read it upwards from the numerics row: `Vec` and `Linalg` do arithmetic on arrays, `Newton` solves nonlinear equations with them and `Jac` supplies its Jacobians, `Stage` turns a BDF step into such an equation, `Clock` tells the controller and the adaptive driver how short a step `t` can still resolve, the methods set up the equation for their formula, and the drivers decide how steps are chained. The drivers never name a method or a controller: the caller passes them in as modules.
+Read it upwards from the numerics row: `Vec` and `Linalg` do arithmetic on arrays, `Newton` solves nonlinear equations with them and `Jac` supplies its Jacobians, `Stage` turns a BDF step into such an equation, `Clock` tells the controller, the adaptive driver and `Check` how short a step `t` can still resolve, the methods set up the equation for their formula, and the drivers decide how steps are chained. The drivers never name a method or a controller: the caller passes them in as modules.
 
 ## The contracts in `Ode`
 
@@ -30,7 +30,7 @@ Read it upwards from the numerics row: `Vec` and `Linalg` do arithmetic on array
 
 | Item | What it is |
 |---|---|
-| `Ode.rhs` | `float -> Vec.t -> Vec.t`: `rhs t y` is f(t, y) as a new vector |
+| `Ode.rhs` | `float -> Vec.t -> Vec.t`: `rhs t y` is f(t, y) as a fresh vector on every call, and does not modify `y` |
 | `Ode.problem` | `{ rhs; t0; t_end; y0 }` |
 | `Ode.point` | `{ t; y }`, a point on a solution |
 | `Ode.rejection` | `Too_large` (the error estimate was over tolerance), `Solver of Fail.t` (the method could not take the step) or `Too_small` (the step cannot move `t`, so the method was not called) |
@@ -56,7 +56,7 @@ The project modules each file needs, from `dune describe workspace --with-deps` 
 | `Jac` | forward-difference Jacobian | `Linalg` `Vec` | [numerics/03-jacobians-and-floating-point.md](numerics/03-jacobians-and-floating-point.md) |
 | `Ode` | the contracts above (interface only) | `Fail` `Vec` | this page |
 | `Stage` | the stage equation, solved by Newton | `Fail` `Jac` `Newton` `Ode` `Vec` | [numerics/04-bdf.md](numerics/04-bdf.md) |
-| `Check` | argument checks for the drivers | `Ode` | this page |
+| `Check` | argument checks for the drivers | `Clock` `Ode` `Vec` | this page |
 | `Instrument` | counts calls of an `rhs` | `Ode` | this page |
 | `Bdf1` | backward Euler, a `Method` | `Ode` `Stage` | [numerics/04-bdf.md](numerics/04-bdf.md) |
 | `Bdf2` | variable-step BDF2, an `Embedded` | `Bdf1` `Fail` `Ode` `Stage` `Vec` | [numerics/04-bdf.md](numerics/04-bdf.md) |
@@ -65,13 +65,13 @@ The project modules each file needs, from `dune describe workspace --with-deps` 
 | `Stepper` | the fixed-step driver | `Check` `Fail` `Ode` `Vec` | this page |
 | `Adaptive` | the adaptive driver | `Check` `Clock` `Fail` `Ode` `Vec` | [numerics/05-step-control.md](numerics/05-step-control.md) |
 
-The tests use `Problems` (`Ode`), `Refs` and `Report` (nothing), `Guard` (`Fail`, `Instrument`), and the two programs: `Corpus` uses `Adaptive`, `Bdf1`, `Bdf2`, `Fail`, `Guard`, `Halving`, `Jac`, `Linalg`, `Newton`, `Ode`, `Problems`, `Refs`, `Report`, `Stepper`, `Vec`; `Soak` the same minus `Guard`, `Jac`, `Linalg`, `Newton` and `Ode`. Nothing in the library uses a test module.
+The tests use `Problems` (`Ode`), `Refs` and `Report` (nothing), `Guard` (`Fail`, `Instrument`), and the two programs: `Corpus` uses `Adaptive`, `Bdf1`, `Bdf2`, `Fail`, `Guard`, `Halving`, `Instrument`, `Jac`, `Linalg`, `Newton`, `Ode`, `Problems`, `Refs`, `Report`, `Stepper`, `Vec`; `Soak` the same minus `Guard`, `Instrument`, `Jac`, `Linalg`, `Newton` and `Ode`. Nothing in the library uses a test module.
 
-What the graph shows: `Stepper` depends only on `Ode`, `Check`, `Fail` and `Vec`, and `Adaptive` also on `Clock`, so they reach no method, no controller and no Newton code except through the modules they are given. `Clock` depends on nothing; `Halving` and `Adaptive` both use it, so they share one floor for the shortest step. `Bdf2` uses `Bdf1` for its first step and for its error estimate. Only `Stage` connects the methods to `Newton`, `Jac` and `Linalg`.
+What the graph shows: `Stepper` depends only on `Ode`, `Check`, `Fail` and `Vec`, and `Adaptive` also on `Clock`, so they reach no method, no controller and no Newton code except through the modules they are given. `Clock` depends on nothing; `Halving`, `Adaptive` and `Check` use it, so the floor of the controller, the remainder rule of the adaptive driver and the shortest `dt` that `Stepper.fixed` accepts are one rule for the shortest step. `Bdf2` uses `Bdf1` for its first step and for its error estimate. Only `Stage` connects the methods to `Newton`, `Jac` and `Linalg`.
 
 ## The life of one adaptive step
 
-`Adaptive.integrate (module M) (module C) ?dt0 ?dt_max ?max_rejects ~tol problem` first computes `span = t_end - t0`, takes `dt_max` (default `span / 10`) and `dt0` (default `1e-6 span`, capped at `dt_max`), calls `Check.adaptive` (it raises `Invalid_argument` if `t_end < t0`, or if the span is not empty and `dt0` is not positive), returns `Error Nan` if `y0` or `rhs t0 y0` is not finite, and starts the loop `go (C.init ~tol ~dt0 ~dt_max ~max_rejects) M.start { t = t0; y = y0 }`. One trip through `go c history at`:
+`Adaptive.integrate (module M) (module C) ?dt0 ?dt_max ?max_rejects ~tol problem` first computes `span = t_end - t0`, takes `dt_max` (default `span / 10`) and `dt0` (default `1e-6 span`, capped at `dt_max`; a default that underflows to 0 on a denormal span becomes the span), calls `Check.adaptive` (it raises `Invalid_argument` if `t_end < t0`, if the span is not empty and `dt0` is not positive, or if `tol` is not positive, `nan` included), evaluates `rhs t0 y0` once and passes it to `Check.output` (it raises if the vector is not as long as `y0`), returns `Error Nan` if `y0` or that vector is not finite, and starts the loop `go (C.init ~tol ~dt0 ~dt_max ~max_rejects) M.start { t = t0; y = y0 }`. One trip through `go c history at`:
 
 1. **Done?** If `at.t >= t_end`, return `Ok { t; y; stats = C.stats c }`.
 2. **Choose the step.** `dt = C.proposal c` and `remaining = t_end - at.t`. If `dt >= remaining`, or `remaining <= Clock.resolution at.t`, this is the last step: `h = remaining` and the new time is `t_end`. Otherwise the new time is `t_next = at.t + dt` and the step is snapped to the floats, `h = t_next - at.t`, so that the state advances by exactly the step the clock took.
@@ -83,7 +83,7 @@ What the graph shows: `Stepper` depends only on `Ode`, `Check`, `Fail` and `Vec`
    - Either way the new history is `After { h_prev = h; y_prev = at.y }`.
 5. **Judge it.** `C.acceptable c ~y ~err`; `Halving` accepts if max_i |err_i| / (1 + |y_i|) is at most `tol`.
 6. **Accepted:** `go (C.accepted c) next { t = t_next; y }`, where `t_next` is `t_end` on the last step. `Halving` counts it, resets the failure count, and doubles `dt` (up to `dt_max`) at every third accept in a row.
-7. **Rejected** (`Ode.Too_small` from item 3, `acceptable` said no, giving `Ode.Too_large`, or `step_with_error` returned `Error e`, giving `Ode.Solver e`): `C.rejected c reason ~at:at.t ~h`. `Halving` sets `dt = h / 2` and counts the failure, or gives up with `Error (StepRejected n)` when more than `max_rejects` rejections came in a row or the halved step is below `Clock.resolution at`, which is 16 eps |t| (eps is `Float.epsilon`, about 2.2e-16). Otherwise `go` retries from the **same** `at` and `history`.
+7. **Rejected** (`Ode.Too_small` from item 3, `acceptable` said no, giving `Ode.Too_large`, or `step_with_error` returned `Error e`, giving `Ode.Solver e`): `C.rejected c reason ~at:at.t ~h`. `Halving` sets `dt = h / 2` and counts the failure, or gives up with `Error (StepRejected n)` when more than `max_rejects` rejections came in a row or the halved step is below `Clock.resolution at`, which is 16 eps |t| (eps is `Float.epsilon`, about 2.2e-16), or is 0 (the floor is 0 at `t = 0`). Otherwise `go` retries from the **same** `at` and `history`.
 
 `go` calls itself last in every branch, so the number of steps is not limited by the stack. The calls, indented by who calls whom:
 
@@ -139,7 +139,7 @@ let () =
 
 For y' = -y the first step has no history, and its scaled estimate works out to h² / (2 (2 + h)): 2.4e-3 for h = 0.1, above `tol`, so the first attempt ends in `rejected` and the retry has h = 0.05. After the third `accepted` in a row the proposal doubles, and the driver cuts the last step to land on `t_end`, so the proposal printed for it is longer than the step taken.
 
-`Stepper.fixed (module M) ~dt problem` is the simpler loop: `Check.fixed` raises unless `dt > 0` and `t_end >= t0`; an empty span returns `y0`, and otherwise it takes `n = max 1 (round (span / dt))` equal steps of `h = span / n` with `M.step`, stops at the first `Error`, and returns the final state. `dt` is only a target, and the method never sees it; `dt` must not be so small that `(t_end - t0) / dt` exceeds `max_int`, where the conversion to an integer is unspecified.
+`Stepper.fixed (module M) ~dt problem` is the simpler loop. `Check.fixed` raises unless `dt > 0` and `t_end >= t0`, and when the span is not empty it also raises if `dt` is below `Clock.resolution` of the larger of `|t0|` and `|t_end|`: a step that short cannot be told apart on the clock, and the same check keeps the number of steps at most `1 / (8 eps) = 2^49`, so the conversion to an integer is safe. The driver then evaluates `rhs t0 y0` once, passes it to `Check.output` (it raises unless the vector is as long as `y0`) and returns `Error Nan` if `y0` or that vector is not finite. An empty span returns `y0`; otherwise it takes `n = max 1 (round (span / dt))` steps with `M.step`, stops at the first `Error`, and returns the final state. `dt` is only a target, and the method never sees it. Step `k` ends at the time `t0 + k h` with `h = span / n`, and the last one at `t_end` itself; the step handed to the method is the difference of its two end times, as in the snapping of the adaptive driver, so no running sum can drift off `t_end` and the state advances by exactly what the clock does.
 
 ## How errors flow
 
@@ -153,11 +153,11 @@ Numerical failures are `Fail.t` values in a `result`; they enter at the bottom a
 | `Stage.solve`, `Bdf1.step`, `Bdf2.step_with_error` | pass it through | the same `Error` |
 | `Stepper.fixed` | any step fails | the first `Error`; no further step is taken |
 | `Adaptive.integrate` | a step fails, its estimate is not acceptable, or it is too short to move `t` (`h <= 0`; the method is not called) | a rejection handed to `C.rejected` |
-| `Halving.rejected` | too many in a row, or the step floor | `Error (StepRejected n)`, which `Adaptive.integrate` returns |
-| `Adaptive.integrate` | `y0` or `rhs t0 y0` is not finite | `Error Nan` |
-| `Check` | arguments that make no sense | raises `Invalid_argument` |
+| `Halving.rejected` | too many in a row, the step floor, or a halved step of 0 | `Error (StepRejected n)`, which `Adaptive.integrate` returns |
+| `Stepper.fixed`, `Adaptive.integrate` | `y0` or `rhs t0 y0` is not finite | `Error Nan` |
+| `Check` | arguments that make no sense: `dt`, `dt0`, `dt_max` or `tol` not positive, `dt` below the resolution of `t`, `t_end < t0`, an `rhs t0 y0` of the wrong length | raises `Invalid_argument` |
 
-The same Newton failure means different things at different levels. In a fixed-step run it ends the run; in `Adaptive` a smaller step usually fixes it, so it is a routine rejection. The `n` in `StepRejected n` is the length of the final run of rejections: `max_rejects + 1` when that limit stopped the run, less when the step floor did. The three corpus lines that end this way are all floor stops: `StepRejected 1` for a blow-up (the attempt before that rejection was accepted), `StepRejected 46` for a right-hand side that turns into `nan`, and `StepRejected 1` for steps too short to move `t`, where the first `Too_small` rejection halves a step of 0 ([test/corpus.expected](../test/corpus.expected)). [numerics/05-step-control.md](numerics/05-step-control.md) (section 9) derives the counts and has a probe that ends on the limit.
+The same Newton failure means different things at different levels. In a fixed-step run it ends the run; in `Adaptive` a smaller step usually fixes it, so it is a routine rejection. The `n` in `StepRejected n` is the length of the final run of rejections: `max_rejects + 1` when that limit stopped the run, less when the step floor or a step of 0 did. Five corpus lines end with `StepRejected`, none of them on the limit: `StepRejected 1` for a blow-up (the attempt before that rejection was accepted), `StepRejected 46` for a right-hand side that turns into `nan`, `StepRejected 1` twice for steps too short to move `t`, where the first `Too_small` rejection halves a step of 0, and `StepRejected 1055` for a right-hand side that is `nan` after a start at `t = 0`, where the floor is 0 and only the underflow of the halved step to 0 ends the run ([test/corpus.expected](../test/corpus.expected)). [numerics/05-step-control.md](numerics/05-step-control.md) (section 9) derives the counts and has a probe that ends on the limit.
 
 ## Effects
 
@@ -165,8 +165,8 @@ OCaml does not record effects in types (a function's type does not say whether i
 
 | Module | Effect | Why there |
 |---|---|---|
-| `Check` (library) | raises `Invalid_argument` | a bad argument is a programming error, not a numerical failure; every deliberate raise is in one place, called before the drivers do any work |
-| `Instrument` (library) | one `ref`: a call counter | counting needs state; wrapping the `rhs` a method receives keeps the methods pure. Nothing in the library calls it: `Guard.budget` and probes do |
+| `Check` (library) | raises `Invalid_argument` | a bad argument is a programming error, not a numerical failure; every deliberate raise is in one place, called at the start of a driver, before it takes a step |
+| `Instrument` (library) | one `ref`: a call counter | counting needs state; wrapping the `rhs` a method receives keeps the methods pure. Nothing in the library calls it: `Guard.budget`, the `too_small` case of the corpus and probes do |
 | `Guard` (tests) | raises `Exhausted`, catches it and `Invalid_argument` | turns a runaway loop or a bad argument into a printed line |
 | `Report` (tests) | prints | the only module that writes to standard output |
 
@@ -183,12 +183,12 @@ New effects go into these modules or into a new dedicated one, never into a meth
 
 A change that breaks one is a bug even if every corpus line still passes.
 
-1. **Arrays are never mutated after creation** (above).
+1. **Arrays are never mutated after creation** (above), and `rhs` returns a fresh one on every call. `Jac.forward` keeps `f y` while it evaluates `f` at the perturbed points, so a right-hand side that wrote every result into one buffer would make every difference zero.
 2. **Jacobian orientation.** `J.(i).(j)` is ∂f_i/∂y_j: the row is the output, the column the input. `Jac.forward` builds the columns first and then reads rows from them, `Stage.solve` forms `I - γJ` entry by entry with the same indices, and `Linalg.solve a b` treats `a.(i)` as equation `i`. A transposed matrix still type-checks, and the canary's diagonal Jacobian is its own transpose. The root Newton converges to does not depend on the Jacobian, only the speed does, so a wrong Jacobian costs speed, not correctness: Newton converges slowly or not at all, `Adaptive` counts the failure as a rejection, and the run crawls ([testing.md](testing.md)).
-3. **`Adaptive` lands exactly on `t_end`.** The last step is cut to `t_end - at.t` and the new time is assigned `t_end` rather than computed as `at.t + h`, which could miss it by rounding. The fixed-step driver uses `h = span / n` and a running sum for `t`, which may differ from `t_end` in the last bits; `Stepper.fixed` returns only `y`, so that is not observable.
-4. **The state advances by exactly the clock's step.** A step that is not the last is snapped: the new time is `t_next = t + dt` and `h = t_next - t`, the difference of the two clock readings (computed without rounding when they are within a factor of 2 of each other, as they are for any step much shorter than `|t|`), and the method moves the state by `h`. An unsnapped `h = dt` would move the state by `dt` and the clock by `t_next - t`, which differs from `dt` by up to half an ulp of `t_next` (an ulp of `t` at most): at `t = 1e15` a step of `0.19` moves the clock by `0.25`. The price is that a snapped step may exceed `dt_max` by that much. A step with `h <= 0` never reaches a method.
+3. **Both drivers land exactly on `t_end`.** `Adaptive` cuts the last step to `t_end - at.t` and assigns the new time `t_end` rather than computing `at.t + h`, which could miss it by rounding. `Stepper.fixed` ends step `k` at `t0 + k h` and the last one at `t_end` itself, with no running sum of steps: nine additions of `1/9` give `1.0000000000000002`, and a right-hand side that is undefined past `t_end` (corpus line 29) returned `nan` at the last stage.
+4. **The state advances by exactly the clock's step.** A step that is not the last is snapped: the new time is `t_next = t + dt` and `h = t_next - t`, the difference of the two clock readings (computed without rounding when they are within a factor of 2 of each other, as they are for any step much shorter than `|t|`), and the method moves the state by `h`. An unsnapped `h = dt` would move the state by `dt` and the clock by `t_next - t`, which differs from `dt` by up to half an ulp of `t_next` (an ulp of `t` at most): at `t = 1e15` a step of `0.19` moves the clock by `0.25`. The price is that a snapped step may exceed `dt_max` by that much. A step with `h <= 0` never reaches a method. `Stepper.fixed` keeps the invariant with its grid: the step handed to the method is the difference of the two grid times, not `h`.
 5. **Determinism.** No randomness, hidden state or parallelism: the same arguments give identical results in the same build ([test/soak.ml](../test/soak.ml) checks it). Results may differ in the last bits between machines (see "Performance"), so the expected files print few digits.
-6. **Vector lengths agree.** `Vec.add`, `sub`, `axpy` and `dot` index by the length of their first vector argument: a shorter second argument raises `Invalid_argument` (index out of bounds), a longer one is ignored past that length. `Halving.acceptable` uses `Array.map2`, which raises if `y` and `err` differ in length. These are caller bugs, not numerical failures.
+6. **Vector lengths agree.** `Vec.add`, `sub`, `axpy` and `dot` index by the length of their first vector argument: a shorter second argument raises `Invalid_argument` (index out of bounds), a longer one is ignored past that length. `Halving.acceptable` uses `Array.map2`, which raises if `y` and `err` differ in length. These are caller bugs, not numerical failures. The drivers check one length, that of `rhs t0 y0` against `y0`, with `Invalid_argument` naming the driver; a right-hand side whose length changes later is not checked.
 7. **History convention.** `After { h_prev; y_prev }` pairs the step just taken with the state it started from. A rejection leaves the history alone, so ω = h / h_prev shrinks when `h` does.
 8. **Step ratios stay below the stability limit.** Variable-step BDF2 is zero-stable (earlier errors stay bounded) for ω < 1 + √2, about 2.414 ([numerics/04-bdf.md](numerics/04-bdf.md)). `Bdf2` does not check it; the controller must. `Halving` proposes at most twice the last accepted step, so ω stays at most 2 for the proposals; snapping them to the floats keeps ω below 2.2 for steps of 16 ulps or more ([numerics/05-step-control.md](numerics/05-step-control.md), section 9). A new controller must keep it below the limit.
 9. **The solver sees f as a black box.** Jacobians are always forward differences inside `Stage.solve`, and corpus problems never supply analytic ones.

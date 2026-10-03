@@ -126,7 +126,7 @@ let capped ?limit x =                        (* with no default, limit arrives a
   match limit with None -> x | Some l -> Float.min x l
 ```
 
-**The labels rule.** A label appears only where two arguments of one type could be swapped, or to name a bare literal at a call site: `~y ~err` (two vectors) and `~at ~h` (two floats) in `Ode.Controller`, `~dt:2e-6` and `~tol:1e-6` at call sites. An optional parameter needs an unlabelled one after it, so that the call can settle it: `Adaptive.integrate ?dt0 ?dt_max ?max_rejects ~tol problem` ends with `problem`. Partial application keeps the optional parameters, which is how the corpus calls `bdf2_halving ~dt0:0.5 ~tol:1e-6 problem`. Without a default, an optional parameter is an option inside the function: `Option.value dt_max ~default:(span /. 10.)` in [src/adaptive.ml](../src/adaptive.ml).
+**The labels rule.** A label appears only where two arguments of one type could be swapped, or to name a bare literal at a call site: `~y ~err` (two vectors) and `~at ~h` (two floats) in `Ode.Controller`, `~dt:2e-6` and `~tol:1e-6` at call sites. An optional parameter needs an unlabelled one after it, so that the call can settle it: `Adaptive.integrate ?dt0 ?dt_max ?max_rejects ~tol problem` ends with `problem`. Partial application keeps the optional parameters, which is how the corpus calls `bdf2_halving ~dt0:0.5 ~tol:1e-6 problem`. Without a default, an optional parameter is an option inside the function: `Option.value dt_max ~default:(positive (span /. 10.))` in [src/adaptive.ml](../src/adaptive.ml).
 
 ### Floats, equality and `Printf`
 
