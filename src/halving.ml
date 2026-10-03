@@ -38,10 +38,6 @@ let accepted c =
     stats = { c.stats with accepted_steps = c.stats.accepted_steps + 1 };
   }
 
-(* 16 eps |t| is 16 to 32 ulp of t (eps = Float.epsilon; ulp = gap between floats
-   near t): about the shortest step that t + h still resolves to a few percent. *)
-let dt_min t = 16. *. Float.epsilon *. Float.abs t
-
 (* Either reason halves the step that failed, not the proposal: the driver may
    have cut the last step, and halving the proposal could retry the same one.
    A shorter step also eases a failed solve, as I - gamma J nears I. *)
@@ -49,7 +45,7 @@ let rejected c (_ : Ode.rejection) ~at ~h =
   let failures = c.failures + 1 and dt = h /. 2. in
   (* An accept resets failures, so a run closing in on a blow-up or a failing rhs
      may never reach max_rejects: the floor ends it. *)
-  if failures > c.max_rejects || dt < dt_min at then Error (Fail.StepRejected failures)
+  if failures > c.max_rejects || dt < Clock.resolution at then Error (Fail.StepRejected failures)
   else Ok { c with dt; streak = 0; failures; stats = { c.stats with rejected_steps = c.stats.rejected_steps + 1 } }
 
 let stats c = c.stats

@@ -1,0 +1,1 @@
+let resolution t = 16. *. Float.epsilon *. Float.abs t

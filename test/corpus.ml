@@ -223,6 +223,25 @@ let newton_overflow =
     );
   ]
 
+(* The clock: a step below half an ulp of t cannot move t, and a step of a few
+   ulps moves t by less than its nominal length. Steps are snapped to the
+   floats, a step that cannot move t is rejected, and a remainder below t's
+   resolution is taken as the last step. Each run is on a call budget. *)
+let clock =
+  let y_is_t ~t0 ~t_end = { Ode.rhs = Guard.budget (fun _ _ -> [| 1. |]); t0; t_end; y0 = [| 0. |] } in
+  let landed t_end (s : _ Adaptive.solution) = Printf.sprintf "Ok, at t_end: %b, y = %.6g" (s.t = t_end) s.y.(0) in
+  let one_ulp = Float.succ 1. in
+  [
+    ( "adaptive y' = 1 over one ulp from t=1",
+      Guard.run (landed one_ulp) (fun () -> bdf2_halving ~tol:1e-6 (y_is_t ~t0:1. ~t_end:one_ulp)) );
+    ( "adaptive y' = 1 from t=1e10, dt_max = 5e-7 is below t's resolution",
+      Guard.run (landed (1e10 +. 1.)) (fun () ->
+          bdf2_halving ~dt_max:5e-7 ~tol:1e-6 (y_is_t ~t0:1e10 ~t_end:(1e10 +. 1.))) );
+    ( "adaptive y' = 1 from t=1e15 over 100, dt0 = dt_max = 0.19",
+      Guard.run (landed (1e15 +. 100.)) (fun () ->
+          bdf2_halving ~dt0:0.19 ~dt_max:0.19 ~tol:1e-6 (y_is_t ~t0:1e15 ~t_end:(1e15 +. 100.))) );
+  ]
+
 (* Table order is output order, the order of the lines in corpus.expected. *)
 let corpus =
   List.concat
@@ -240,6 +259,7 @@ let corpus =
       step_control;
       robertson_accuracy;
       newton_overflow;
+      clock;
     ]
 
 let () = Report.lines corpus
