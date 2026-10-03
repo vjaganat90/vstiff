@@ -81,3 +81,13 @@ let () =
         (Printf.sprintf "|y1 - ref| < 1e-3: %b, |y1 + y2 + y3 - 1| < 1e-8: %b" (y1_error < 1e-3)
            (mass_error < 1e-8))
   | Error e -> case "robertson t=1e4 tol=1e-6" ("Error " ^ Fail.to_string e)
+
+(* Regression pins. *)
+
+(* The canary at a stiff step: h lambda = 10 for the fast rate, so Newton only
+   converges with the right Jacobian, and a swapped row makes it diverge. *)
+let () =
+  let open Problems.Canary in
+  Bdf2.integrate ~rhs ~t0:0. ~t_end:1. ~dt:1e-3 y0
+  |> Result.map (max_error (exact 1.))
+  |> show_error "bdf2 canary t=1 dt=1e-3 (h lambda = 10)" 1e-6
