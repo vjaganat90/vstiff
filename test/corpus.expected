@@ -35,3 +35,8 @@ adaptive rhs of the wrong length: Invalid_argument Adaptive.integrate: rhs retur
 bdf1 rhs of the wrong length: Invalid_argument Stepper.fixed: rhs returns a vector of the wrong length
 bdf1 y0 = nan on an empty span: Error Nan
 adaptive over a span of 1e-320: Ok at t=9.99989e-321
+newton atan x0=1.5 (needs damping): Ok [0.000000000000]
+newton residual nan at the start: Error Nan
+newton step that overflows in the linear solve: Error Diverged
+jac forward difference of y^3 at y = -2 (exact 12): 11.9999998224
+adaptive y' = 2t on [0, 1] tol=1e-6: max error 1.57e-12

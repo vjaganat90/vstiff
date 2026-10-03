@@ -19,6 +19,10 @@ let max_error exact y = Vec.norm_inf (Vec.sub y exact)
 let bdf2_halving = Adaptive.integrate (module Bdf2) (module Halving)
 
 (* The error prints to three digits, so a line also moves when the error changes but still meets the bound. *)
+(* A problem on Guard's call budget, fresh for each run: a bug that makes a
+   long run crawl fails its line within seconds instead of stalling the test. *)
+let on_budget (p : Ode.problem) = { p with rhs = Guard.budget p.rhs }
+
 let error_below bound = function
   | Ok e -> Printf.sprintf "max error %.2e < %g: %b" e bound (e < bound)
   | Error e -> failure e
@@ -86,11 +90,10 @@ let bdf2_order =
 let van_der_pol =
   [
     ( "vdp mu=1000 [0,2000] tol=1e-4",
-      fun () ->
-        match bdf2_halving ~tol:1e-4 Problems.VanDerPol.problem with
-        | Ok s ->
-            Printf.sprintf "Ok at t=%g, rejected >= 1: %b, y finite: %b" s.t (s.stats.rejected_steps >= 1) (Vec.finite s.y)
-        | Error e -> failure e );
+      Guard.run
+        (fun (s : Halving.stats Adaptive.solution) ->
+          Printf.sprintf "Ok at t=%g, rejected >= 1: %b, y finite: %b" s.t (s.stats.rejected_steps >= 1) (Vec.finite s.y))
+        (fun () -> bdf2_halving ~tol:1e-4 (on_budget Problems.VanDerPol.problem)) );
   ]
 
 (* Step 6: Robertson against Refs, a value computed outside vstiff. The 1e-3 bound on y1 is loose (about 1% of
@@ -99,13 +102,12 @@ let van_der_pol =
 let robertson =
   [
     ( "robertson t=1e4 tol=1e-6",
-      fun () ->
-        match bdf2_halving ~tol:1e-6 Problems.Robertson.problem with
-        | Ok s ->
-            let y1_error = Float.abs (s.y.(0) -. Refs.robertson_y1_at_1e4) in
-            let mass_error = Float.abs (Array.fold_left ( +. ) 0. s.y -. 1.) in
-            Printf.sprintf "|y1 - ref| < 1e-3: %b, |y1 + y2 + y3 - 1| < 1e-8: %b" (y1_error < 1e-3) (mass_error < 1e-8)
-        | Error e -> failure e );
+      Guard.run
+        (fun (s : Halving.stats Adaptive.solution) ->
+          let y1_error = Float.abs (s.y.(0) -. Refs.robertson_y1_at_1e4) in
+          let mass_error = Float.abs (Array.fold_left ( +. ) 0. s.y -. 1.) in
+          Printf.sprintf "|y1 - ref| < 1e-3: %b, |y1 + y2 + y3 - 1| < 1e-8: %b" (y1_error < 1e-3) (mass_error < 1e-8))
+        (fun () -> bdf2_halving ~tol:1e-6 (on_budget Problems.Robertson.problem)) );
   ]
 
 (* Regression pins: each group fixes rules the steps above leave free; its comment says what moves its lines. *)
@@ -203,12 +205,11 @@ let step_control =
 let robertson_accuracy =
   [
     ( "robertson t=1e4 tol=1e-6 accuracy",
-      fun () ->
-        match bdf2_halving ~tol:1e-6 Problems.Robertson.problem with
-        | Ok s ->
-            let e = Float.abs (s.y.(0) -. Refs.robertson_y1_at_1e4) in
-            Printf.sprintf "|y1 - ref| = %.1e < 1e-5: %b" e (e < 1e-5)
-        | Error e -> failure e );
+      Guard.run
+        (fun (s : Halving.stats Adaptive.solution) ->
+          let e = Float.abs (s.y.(0) -. Refs.robertson_y1_at_1e4) in
+          Printf.sprintf "|y1 - ref| = %.1e < 1e-5: %b" e (e < 1e-5))
+        (fun () -> bdf2_halving ~tol:1e-6 (on_budget Problems.Robertson.problem)) );
   ]
 
 (* Newton must not call an overflow a root: here a too-small Jacobian makes the
@@ -312,6 +313,37 @@ let arguments =
     ("adaptive over a span of 1e-320", Guard.run reached (fun () -> bdf2_halving ~tol:1e-6 (decay ~t0:0. ~t_end:1e-320)));
   ]
 
+(* Newton's safeguards: damping (undamped Newton on atan diverges from 1.5),
+   and the names of its failures: a non-finite residual is Nan, a step the
+   linear solve cannot make finite is Diverged. *)
+let newton_guards =
+  let atan_f x = [| Float.atan x.(0) |] and atan_j x = [| [| 1. /. (1. +. (x.(0) *. x.(0))) |] |] in
+  [
+    ("newton atan x0=1.5 (needs damping)", fun () -> show (Newton.solve atan_f atan_j [| 1.5 |]));
+    ("newton residual nan at the start", fun () -> show (Newton.solve (fun _ -> [| Float.nan |]) (fun _ -> [| [| 1. |] |]) [| 0. |]));
+    ( "newton step that overflows in the linear solve",
+      fun () -> show (Newton.solve (fun x -> [| x.(0) -. 1. |]) (fun _ -> [| [| 1e-320 |] |]) [| 0. |]) );
+  ]
+
+(* The difference step 1e-8 (1 + |y_j|) itself: on y^3 at y = -2 the forward
+   difference is 12 - 3 * 2 * h + h^2 up to round-off, so its printed digits
+   change with the step, its sign or the direction of the difference. *)
+let jacobian_step =
+  [
+    ( "jac forward difference of y^3 at y = -2 (exact 12)",
+      fun () -> Printf.sprintf "%.10f" (Jac.forward (fun y -> [| y.(0) *. y.(0) *. y.(0) |]) [| -2. |]).(0).(0) );
+  ]
+
+(* Time dependence in the adaptive driver: y' = 2t, y(1) = 1. *)
+let adaptive_time =
+  [
+    ( "adaptive y' = 2t on [0, 1] tol=1e-6",
+      fun () ->
+        match bdf2_halving ~tol:1e-6 { Ode.rhs = (fun t _ -> [| 2. *. t |]); t0 = 0.; t_end = 1.; y0 = [| 0. |] } with
+        | Ok s -> Printf.sprintf "max error %.2e" (max_error [| 1. |] s.y)
+        | Error e -> failure e );
+  ]
+
 (* Table order is output order, the order of the lines in corpus.expected. *)
 let corpus =
   List.concat
@@ -334,6 +366,9 @@ let corpus =
       fixed_clock;
       zero_floor;
       arguments;
+      newton_guards;
+      jacobian_step;
+      adaptive_time;
     ]
 
 let () = Report.lines corpus
