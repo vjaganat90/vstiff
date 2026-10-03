@@ -1,3 +1,9 @@
 (library
+ ; One library: every .ml and .mli in this directory is a module of it, and none is listed. Dune wraps them
+ ; in the library name: outside, fail.ml is Vstiff.Fail (the tests write open Vstiff); inside, plain Fail.
  (name vstiff)
+ ; ode.mli holds only types and module types, so there is no ode.ml, and dune has to be told.
  (modules_without_implementation ode))
+
+; Not set on purpose: libraries (only the OCaml standard library is allowed) and flags (dune's dev
+; profile applies, where an unused variable or a misplaced doc comment fails the build).

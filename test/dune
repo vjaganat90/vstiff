@@ -1,3 +1,7 @@
 (tests
+ ; Each main module below (test/<name>.ml) runs as <name>.exe under dune runtest; dune diffs its stdout with
+ ; <name>.expected. The other .ml files here are helpers: an unused top-level value in a main module (generated
+ ; empty interface) is a dev-build error. Never dune promote a failure green: docs/testing.md.
  (names corpus soak)
+ ; vstiff is the library built from src/.
  (libraries vstiff))

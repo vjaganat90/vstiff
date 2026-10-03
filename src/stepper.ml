@@ -1,4 +1,4 @@
-(** A fixed-step driver for any method. *)
+(* Fixed-step driver; the method is passed as a modular explicit (docs/ocaml.md). *)
 
 open Fail.Syntax
 

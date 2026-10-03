@@ -1,10 +1,7 @@
-(** Argument checks for the drivers. This is the only module in the library
-    that raises: a bad argument is a programming error, not a numerical
-    failure. *)
+(** Argument checks for the drivers, the only library module that raises on purpose; a [nan] argument raises too. *)
 
 (** @raise Invalid_argument unless [dt > 0] and [t_end >= t0]. *)
 val fixed : dt:float -> Ode.problem -> unit
 
-(** @raise Invalid_argument if [t_end < t0], or if the span is not empty and
-    [dt0] is not positive. *)
+(** @raise Invalid_argument unless [t_end >= t0], and [dt0 > 0] when the span is not empty. *)
 val adaptive : dt0:float -> Ode.problem -> unit
