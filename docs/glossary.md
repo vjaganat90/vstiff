@@ -1,0 +1,112 @@
+# Glossary
+
+Terms and symbols used in the code and the documents, each with a short definition and where it is explained. Terms come first, alphabetically, then symbols. Paths are relative to this page. Math is plain text: `y_{n+1}` is `y` at step `n + 1`, `|x|_inf` the largest absolute entry of `x`, `d f_i / d y_j` a partial derivative.
+
+## Terms
+
+- **A-stability.** A method is A-stable when, on `y' = λ y` with any complex `λ` of negative real part, its numerical solution decays for every step size. Backward Euler is; explicit Euler is not (for real `λ < 0` it needs `h ≤ 2 / |λ|`). See [numerics/01-odes-and-stiffness.md](numerics/01-odes-and-stiffness.md), [numerics/04-bdf.md](numerics/04-bdf.md).
+- **Accepted step.** A step whose method succeeded and whose scaled error is at most `tol`: the state advances, and three accepted steps in a row make `Halving` double the step (up to `dt_max`). See *rejection*.
+- **Adaptive step size.** Choosing `h` while integrating, from an error estimate. `Adaptive.integrate` asks an embedded method for each step and its estimate, and a controller whether to keep it. See [numerics/05-step-control.md](numerics/05-step-control.md).
+- **Armijo condition.** The test a damped Newton step must pass: `|G(x + λ dx)|_inf ≤ (1 - 1e-4 λ) |G(x)|_inf`, so the residual must shrink by a small fraction of itself. `Newton`, [numerics/02-newton.md](numerics/02-newton.md).
+- **axpy.** The traditional name (from the BLAS numerical libraries) for `a x + y`, a number times a vector plus a vector: `Vec.axpy a x y`.
+- **Backward Euler (BDF1).** `y_{n+1} = y_n + h f(t_{n+1}, y_{n+1})`: the slope is read at the end of the step. Implicit, first order, A-stable; `Bdf1`. Its stage equation has `psi = y_n` and `gamma = h`.
+- **BDF (backward differentiation formula).** A family of implicit multistep methods: fit a polynomial through the newest points, the unknown new one included, and require its slope at the new point to equal `f` there. BDF2 uses the new point and two past ones; `Bdf2`. See [numerics/04-bdf.md](numerics/04-bdf.md).
+- **Black-box right-hand side.** A function the solver can call but not inspect: only the values `rhs t y` are known. That is why the Jacobian is built by forward differences inside the solver, and why corpus problems never supply one.
+- **Canary.** The corpus problem `y' = -Λ y` with `Λ = diag(1, 100, 1e4)` (`Problems.Canary`): three independent decays at rates four orders of magnitude apart. Solution and Jacobian are known, and the Jacobian is diagonal, so a mix-up between components shows (a Jacobian with swapped rows fails the two `jac canary` lines). See [numerics/06-the-corpus.md](numerics/06-the-corpus.md).
+- **Cancellation.** The loss of significant digits when two nearly equal floats are subtracted; it is why a forward difference becomes useless for a tiny perturbation. See [numerics/03-jacobians-and-floating-point.md](numerics/03-jacobians-and-floating-point.md).
+- **Check.** The library module with the argument checks of the two drivers, and the only one that raises on purpose: a bad argument is a programming error, not a numerical failure.
+- **Contract.** A module type in `Ode` (`Method`, `Embedded`, `Controller`) stating what a method or a controller must provide. Drivers depend on contracts, never on a particular method. See [architecture.md](architecture.md).
+- **Controller.** A step-size policy, a module implementing `Ode.Controller`: it proposes the next step, judges a step, reacts to an accept or a reject, may give up, and reports `stats`. `Halving` is the one policy.
+- **Conventional Commits.** The commit message style `type(scope): imperative summary`, for example `docs: explain the stage equation`. See [CONTRIBUTING.md](../CONTRIBUTING.md).
+- **Corpus.** The fixed set of test cases whose printed lines `test/corpus.expected` records: [test/problems.ml](../test/problems.ml) defines the problems, [test/refs.ml](../test/refs.ml) the reference values, [test/corpus.ml](../test/corpus.ml) the table of cases. See [testing.md](testing.md), [numerics/06-the-corpus.md](numerics/06-the-corpus.md).
+- **Damping.** Shortening a Newton step: `Newton.solve` tries `λ dx` with `λ = 1, 1/2, ..., 1/1024` and takes the first that passes the Armijo condition; if none does the result is `Error Diverged`.
+- **Dense output.** Evaluating the solution between the steps an integrator took. vstiff has none: the drivers return only the final state.
+- **Dev profile.** Dune's default build profile, in which many warnings are errors: an unused value, a match that misses a case, a documentation comment in the wrong place. See [ocaml.md](ocaml.md).
+- **Doc comment.** An OCaml comment `(** ... *)` that documentation tools attach to the item before or after it. In a function body it is warning 50, an error here: use `(* ... *)` there.
+- **Driver.** A loop that calls a method (and a controller): `Stepper.fixed` takes equal steps, `Adaptive.integrate` chooses its steps.
+- **dune.** OCaml's build system. `dune build` compiles and records the test output, `dune build @check` only type-checks, `dune runtest` compares the output with the expected files, `dune exec` runs a program, `dune promote` copies new output over an expected file. See [ocaml.md](ocaml.md).
+- **Effect quarantine.** The rule that effects live in a few named modules and everything else is pure. In the library only `Check` raises and only `Instrument` has mutable state; in the tests only `Guard` raises or catches and only `Report` prints. A pure step can be retried from unchanged data. See [architecture.md](architecture.md).
+- **Eigenvalue.** A number `λ` with `A v = λ v` for some nonzero `v`. The solutions of `y' = A y` are built from `e^{λ t}`; for a nonlinear `f` the eigenvalues of the Jacobian play that role locally. See [numerics/01-odes-and-stiffness.md](numerics/01-odes-and-stiffness.md).
+- **Embedded method.** A method that also estimates the error of its own step: `Ode.Embedded` adds `step_with_error` to `Method`. `Bdf2` is the one.
+- **eps.** `Float.epsilon`, about 2.2e-16: the gap between 1 and the next float. A correctly rounded operation has relative error at most eps/2. `Halving`'s step floor is `16 eps |t|`.
+- **Expect test.** A test that passes when a program's output equals a stored `.expected` file; here dune's own `tests` stanza in [test/dune](../test/dune) does it for `corpus` and `soak`. A mismatch prints a diff: `-` for the expected line, `+` for what was printed. See [testing.md](testing.md).
+- **Explicit and implicit methods.** An explicit method computes `y_{n+1}` from known values (explicit Euler: `y_n + h f(t_n, y_n)`). An implicit method has `y_{n+1}` on both sides, so each step solves the stage equation by Newton's method; it costs more per step and stays stable at far longer steps on stiff problems.
+- **FMA (fused multiply-add).** On arm64 `ocamlopt` fuses `a +. b *. c` and `a -. b *. c` into one operation with a single rounding when the product is a direct operand; binding the product with `let` first rounds twice. Moving a product into or out of a sum can therefore change the last bits of a result, so a refactor must be checked against both expected files.
+- **Forward difference.** `d f / d y ≈ (f(y + δ) - f(y)) / δ`: truncation error shrinks with `δ`, round-off grows like `eps |f| / δ`. `Jac.forward` perturbs one component at a time by `1e-8 (1 + |y_j|)`; each gives a column of `J`.
+- **Gaussian elimination.** Solving `A x = b` by using one row to eliminate an unknown from the others, solving the smaller system that remains, then substituting back; `Linalg.solve`, with partial pivoting.
+- **Global error.** The difference between the computed `y_n` and the exact `y(t_n)` at a fixed time. For a stable method of order `p` it is `O(h^p)`.
+- **Guard and Report.** The test modules that hold the test effects: `Guard` has the call budget `Guard.budget` (a runaway right-hand side raises instead of hanging the run) and `Guard.run`, which turns errors, an exhausted budget and `Invalid_argument` into text; `Report.lines` prints one line per case.
+- **History.** What a method carries from one step to the next, `Method.history`. `Bdf1` carries nothing (`unit`); `Bdf2` carries `Start` or `After { h_prev; y_prev }`. A caller gets one from `start` or from the previous `step` and passes it back; the constructors are hidden.
+- **Inf-norm.** `|x|_inf = max_i |x_i|`; `Vec.norm_inf`. It is 0 for the empty vector and NaN if any entry is NaN.
+- **Initial value problem.** An ODE with the state at the start, `y(t0) = y0`; the record `Ode.problem = { rhs; t0; t_end; y0 }`.
+- **Inline record.** A record declared inside a constructor, as in `Bdf2`'s `After of { h_prev : float; y_prev : Vec.t }`: named fields without a type of their own. See [ocaml.md](ocaml.md).
+- **Instrument.** `Instrument.count rhs` wraps a right-hand side to count its calls, so methods stay pure; the only library module with mutable state.
+- **Interface (`.mli`).** The file listing what a module offers, with its documentation; whatever it omits is private to the module.
+- **Invalid_argument.** OCaml's exception for a call with unacceptable arguments. `Check` raises it for `dt <= 0`, `t_end < t0` and a non-positive `dt0` or `dt_max`; standard-library functions raise it too, for instance on an out-of-bounds index.
+- **Jacobian.** For a function `f` of a vector, the matrix `J.(i).(j) = d f_i / d y_j`: row `i` is an output, column `j` an input. The Jacobian of the stage residual `G` is `I - γ J`. See [numerics/03-jacobians-and-floating-point.md](numerics/03-jacobians-and-floating-point.md).
+- **Labelled argument.** A parameter with a name, written `~dt`; `?dt0` is optional. Here labels appear only where two arguments of one type could be swapped, or to name a bare literal at a call site.
+- **Line search.** Choosing how far to move along the Newton direction; here, halving the damping factor. See *damping*.
+- **Local truncation error (LTE).** The error one step makes when it starts from the exact solution, `O(h^{p+1})` for order `p`. It cannot be measured, so `Bdf2` estimates it by a gap between two methods (conservative for BDF2). See [numerics/05-step-control.md](numerics/05-step-control.md).
+- **Method.** A module implementing `Ode.Method`: one step from a point to the next, with a `history`. `Bdf1` and `Bdf2`.
+- **Modular explicit.** A function parameter that is a module, written `(module M : Ode.Method)`, whose type may mention `M`. `Adaptive.integrate` needs it because its result type mentions `C.stats` of the controller passed in; `Stepper.fixed` uses the same form. It needs OCaml 5.5: older releases reject it. See [ocaml.md](ocaml.md).
+- **Module, module type.** Every `.ml` file is a module named after it (`vec.ml` is `Vec`); dune wraps the library, so outside it they are `Vstiff.Vec` and so on. A module type lists the types and values a module must provide, as in `module type Method = sig ... end`; a module satisfies it by providing at least those.
+- **Multistep method.** A method that uses several past values. BDF2 needs `y_n` and `y_{n-1}`, so its first step cannot be BDF2.
+- **Mutation (of the code).** Breaking the code on purpose in a scratch copy to see whether a test notices; silence marks a gap. See [testing.md](testing.md), section D of [exercises.md](exercises.md).
+- **NaN.** Not a number, the float of `0. /. 0.`, unequal to everything including itself; `Float.max` propagates it. `Vec.finite` is false for NaN and for infinities. `Newton.solve` and `Adaptive.integrate` return `Error Nan` when a value that had to be finite is not.
+- **Newton's method.** An iteration for `G(x) = 0`: solve the linear model `J dx = -G(x)` and move to `x + dx`. Near a root the number of correct digits roughly doubles per step (quadratic convergence): on `x^2 - 2` from 1 the iterates are 1.5, 1.4166666666666667, 1.4142156862745099. `Newton.solve` is damped and takes the Jacobian as an argument. See [numerics/02-newton.md](numerics/02-newton.md).
+- **ODE.** An ordinary differential equation `y' = f(t, y)`: the rate of change of a state from the time and the state; "ordinary" because `t` is the only independent variable.
+- **opam.** OCaml's package manager; a switch is one self-contained compiler installation. See [ocaml.md](ocaml.md).
+- **Option.** The type `None | Some x`. `Linalg.solve` returns a `Vec.t option`: `None` for an exactly zero pivot.
+- **Order.** A method has order `p` when its global error is `O(h^p)`, so halving `h` divides the error by about `2^p`. Backward Euler has order 1, BDF2 order 2; the corpus reports the ratio 3.99 for BDF2 when `dt` goes from 0.01 to 0.005.
+- **Partial application.** Giving a function fewer arguments than it takes, which yields a function. The corpus builds `Adaptive.integrate (module Bdf2) (module Halving)` this way.
+- **Partial pivoting.** In elimination, using as pivot the remaining row with the largest absolute entry in the column, which keeps every multiplier at most 1 in size and limits round-off. The internal `pivot` of `linalg.ml` picks the first row among equals.
+- **Pattern matching.** `match` inspects the shape of a value; the compiler checks that every case is covered.
+- **Pin (regression pin).** A corpus line added to guard one specific rule or mistake: it changes when that rule is broken. The corpus lines after the first nine are pins. See [numerics/06-the-corpus.md](numerics/06-the-corpus.md).
+- **Probe.** A throwaway program that calls the library to answer a question, kept in the probe project. See [exercises.md](exercises.md).
+- **Probe project.** The dune project `../vstiff-scratch`, outside the repository, whose `src` links to the repository's: where probes are built and run. It is not the *scratch copy*, which is `../vstiff-mutation`. See [exercises.md](exercises.md).
+- **Pure.** No mutation of an argument, no I/O, no hidden state. The library is pure except for `Check` (raises) and `Instrument` (counts).
+- **Quadratic convergence.** Convergence in which each iterate's error is about the square of the previous one, so the number of correct digits doubles. See *Newton's method*.
+- **Record.** A type with named fields, such as `Ode.point = { t; y }`; `{ r with f = v }` copies `r` with one field changed.
+- **Reference value.** A number computed outside vstiff and recorded as an expected answer, so that a test does not compare vstiff with itself; never edited once added. [test/refs.ml](../test/refs.ml).
+- **Rejection.** A step is rejected for one of two reasons, `Ode.rejection`: `Too_large` (the error estimate exceeds `tol`) or `Solver e` (the method failed). The state does not advance. `Halving` halves the step that failed, and gives up with `StepRejected n` when `n > max_rejects` or the halved step is below the step floor.
+- **Residual.** For `G(x) = 0`, the vector `G(x)`: how far `x` is from solving the equation.
+- **Result type.** `Ok x | Error e`, returned instead of raising. `Fail.Syntax` provides `let*` (`Result.bind`) and `let+` (`Result.map`).
+- **Round-off.** The error of storing numbers with finite precision: each operation rounds to a representable float, off by at most half an ulp.
+- **rtol and atol.** The relative and absolute tolerances of production integrators: component `i` may be off by `atol + rtol |y_i|`. vstiff has one `tol` and the weight `1 / (1 + |y_i|)`, which corresponds to `rtol = atol = tol`.
+- **Scaled error.** `max_i |err_i| / (1 + |y_i|)`: relative for large components, absolute for small ones. `Halving` accepts a step when it is at most `tol`.
+- **Scratch copy.** A copy of the committed files, made with `git archive HEAD`, in which you break the code and which you delete. See [exercises.md](exercises.md).
+- **Singular matrix.** A matrix for which `A x = b` has no unique solution (its rows are linearly dependent). `Linalg.solve` detects only an exactly zero pivot.
+- **Soak test.** [test/soak.ml](../test/soak.ml) runs four corpus cases ten times each and checks that every round passes and that all rounds are identical. A tripwire for hidden state, randomness or parallelism, not extra coverage.
+- **Solution and stats.** `Adaptive.solution` is `{ t; y; stats }`: the final time and state, and the controller's report. For `Halving`, `stats = { accepted_steps; rejected_steps }`; the type of `stats` depends on the controller passed in.
+- **Stability.** Whether errors stay bounded as steps are taken. Explicit Euler on `y' = -λ y` is stable only for `h ≤ 2 / λ`; backward Euler for every `h`. See also *A-stability*, *zero-stability*.
+- **Stage equation.** The equation `x = psi + gamma f(t_{n+1}, x)` that every backward Euler or BDF2 step solves for `x = y_{n+1}`; `Stage.equation` holds `t_{n+1}`, `gamma` and `psi`. Newton works on `G(x) = x - psi - gamma f(t_{n+1}, x)`. Backward Euler: `psi = y_n`, `gamma = h`. BDF2: `psi = a1 y_n + a0 y_{n-1}`, `gamma = beta h`.
+- **Startup estimate.** The error estimate of the first step, which has no history: half the gap between backward Euler and explicit Euler from the same point. Their local errors are about `-(h²/2) y''` and `(h²/2) y''`, so the gap is about `h² y''` and half of it estimates backward Euler's local error.
+- **Step floor.** `16 eps |t|`: a halved step below it ends the run with `StepRejected`, because a shorter step would hardly move `t`. A step that starts at `t = 0` has floor 0, so only `max_rejects` applies to it.
+- **Stiffness.** A problem is stiff, on an interval and for an accuracy, when the step an explicit method needs for stability is much smaller than accuracy alone would allow. The canary, Robertson and van der Pol with `μ = 1000` are the corpus's stiff problems. See [numerics/01-odes-and-stiffness.md](numerics/01-odes-and-stiffness.md).
+- **Tail call.** A call that is the last thing a function does. OCaml reuses the stack frame for it, so a loop written as recursion (`iterate` in `Newton.solve`, `go` in `Adaptive.integrate`) runs in constant stack. See [ocaml.md](ocaml.md).
+- **Test equation.** `y' = -λ y` with `λ > 0`, the simplest decay, against which the stability of a method is judged.
+- **Thunk.** A function of `()` that delays a computation. The corpus is a table of `(name, thunk)` pairs, so `Report` runs each case when it prints its line.
+- **Time scale.** How long a component takes to change appreciably: about `1 / λ` for `y' = -λ y`. Stiff problems mix very different time scales.
+- **tol.** Two things carry this name. `~tol` of `Adaptive.integrate` is the acceptance threshold on the scaled error (the corpus uses values from `1e-3` to `1e-6`). Newton's convergence threshold, `|dx|_inf ≤ 1e-10 (1 + |x|_inf)`, is an internal constant.
+- **Toplevel.** The interactive `ocaml` prompt: phrases end in `;;`, and `#use "file.ml";;` loads a file.
+- **Truncation error.** The error from cutting an expression short, such as a derivative replaced by a difference quotient.
+- **ulp.** Unit in the last place: the gap between a float and the next, growing with magnitude (eps in `[1, 2)`, about 1.8e-12 near `1e4`). Half an ulp is the largest rounding error of one operation.
+- **Variable step.** A step size that changes from step to step; BDF2 then depends on ω = h / h_prev.
+- **Variant.** A type whose values are one of several named cases that may carry data: `Fail.t`, `option`, `result`.
+- **Zero-stability.** A multistep method must behave on `y' = 0`: spurious solutions from using past values must not grow. Variable-step BDF2 is zero-stable for ω < 1 + √2 (about 2.414); `Halving` never produces ω above 2. See [numerics/04-bdf.md](numerics/04-bdf.md).
+
+## Symbols
+
+- **t, t0, t_end.** Time; `t_n` is the time of step `n`, `t_{n+1} = t_n + h`. `t0` and `t_end` bound an integration.
+- **y, y_n, y_{n+1}, y_prev.** `y` is the state, a vector (`float array`, `Vec.t`). `y_n` is the computed state at `t_n`, `y_{n+1}` the new one, `y_prev` the previous state `y_{n-1}`.
+- **f, rhs.** The right-hand side of `y' = f(t, y)`; in code `rhs : float -> Vec.t -> Vec.t` (`Ode.rhs`). `Newton.solve`'s own `f` is the function whose zero is sought, the residual `G`.
+- **h, dt, h_prev, dt0, dt_max.** `h` is a step taken or attempted, `dt` a requested step size (`~dt`, `proposal`), `h_prev` the previous step. `dt0` is the first step requested of `Adaptive.integrate` (default `1e-6 (t_end - t0)`, capped at `dt_max`) and `dt_max` the largest (default `(t_end - t0) / 10`).
+- **omega (ω).** The step ratio `h / h_prev`, the only input of the BDF2 coefficients.
+- **a1, a0, beta (β).** The weights of one BDF2 step, `y_{n+1} = a1 y_n + a0 y_{n-1} + beta h f(t_{n+1}, y_{n+1})`. `Bdf2.coeffs omega` returns them; this documentation never writes their values: evaluate `Vstiff.Bdf2.coeffs` yourself or derive them from [numerics/04-bdf.md](numerics/04-bdf.md).
+- **psi (ψ), gamma (γ), G, x, dx.** The known part and the multiplier of `f` in the stage equation; its residual `G(x) = x - psi - gamma f(t_{n+1}, x)`; the unknown `x` (the current iterate in `Newton`); the Newton step `dx` solving `J dx = -G(x)`.
+- **J, I.** The Jacobian of `f` (`J.(i).(j) = d f_i / d y_j`) and the identity matrix; `I - γ J` is the Jacobian of `G`.
+- **λ (lambda).** The rate in `y' = -λ y` or an eigenvalue of the Jacobian; `Canary.lambda`, the three decay rates; and, as a local name in `Newton`, the damping factor.
+- **μ (mu).** The parameter of van der Pol, `y_2' = μ (1 - y_1²) y_2 - y_1`; the larger, the stiffer. The corpus uses 1000.
+- **n.** The step number in `t_n`; elsewhere the number of components of `y`, as in "`Jac.forward` calls `f` `n + 1` times".
+- **δ (delta).** The size of a perturbation of an argument, the step of a finite difference (`Jac.forward` uses `1e-8 (1 + |y_j|)`); `h` stays reserved for an integration step.
+- **|x|_inf, ∂.** The inf-norm; `∂` (written `d` in code comments) marks a partial derivative.
