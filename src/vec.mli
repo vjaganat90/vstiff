@@ -3,7 +3,6 @@
 
 type t = float array
 
-val map2 : (float -> float -> float) -> t -> t -> t
 val add : t -> t -> t
 val sub : t -> t -> t
 val scale : float -> t -> t
