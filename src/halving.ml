@@ -46,7 +46,8 @@ let rejected c (_ : Ode.rejection) ~at ~h =
   let failures = c.failures + 1 and dt = h /. 2. in
   (* An accept resets failures, so a run closing in on a blow-up or a failing rhs
      may never reach max_rejects: the floor ends it. *)
-  if failures > c.max_rejects || dt < Clock.resolution at then Error (Fail.StepRejected failures)
+  (* At t = 0 the floor is 0, so a halved step that underflows to 0 ends the run too. *)
+  if failures > c.max_rejects || dt < Clock.resolution at || not (dt > 0.) then Error (Fail.StepRejected failures)
   else Ok { c with dt; streak = 0; failures; stats = { c.stats with rejected_steps = c.stats.rejected_steps + 1 } }
 
 let stats c = c.stats
