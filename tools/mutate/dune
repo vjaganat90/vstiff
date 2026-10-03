@@ -1,8 +1,9 @@
-; The mutation-testing tool of docs/plans/plan.md, section 3.4. compiler-libs ships with the compiler, so the project
-; still depends on nothing outside the standard distribution; neither library is linked into src/ or test/.
+; The mutation-testing tool of docs/plans/plan.md, section 3.4. compiler-libs ships with the compiler and unix with the
+; standard distribution, so the project still depends on nothing outside it; neither is linked into src/ or test/.
+; Effects are in Files (file system), Child (processes, the clock) and the main modules; the rest is pure.
 (executables
  (names mutate selftest)
- (libraries compiler-libs.common))
+ (libraries compiler-libs.common unix))
 
 ; Part of dune runtest, like the corpus: selftest prints the mutants of fixture.ml and dune diffs them with the file.
 ; The runner that applies mutants (mutate run) is not part of it.
