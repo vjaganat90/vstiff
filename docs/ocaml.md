@@ -29,20 +29,24 @@ These commands assume macOS, Linux or WSL (Windows Subsystem for Linux). The pro
 
 ### What dune reads
 
-Three small files configure the build. They are lists in parentheses, and `;` starts a comment (the copies in the repository may carry comments, left out here).
+Four small files configure the build. They are lists in parentheses, and `;` starts a comment (the copies in the repository may carry comments, left out here).
 
 ```text
-dune-project   (lang dune 3.0)           the dune language version, not the compiler's
-               (name vstiff)
-src/dune       (library
-                (name vstiff)
-                (modules_without_implementation ode))
-test/dune      (tests
-                (names corpus soak)
-                (libraries vstiff))
+dune-project       (lang dune 3.0)           the dune language version, not the compiler's
+                   (name vstiff)
+src/numerics/dune  (library
+                    (name numerics))
+src/dune           (library
+                    (name vstiff)
+                    (libraries numerics)
+                    (private_modules stage check)
+                    (modules_without_implementation ode))
+test/dune          (tests
+                    (names corpus soak)
+                    (libraries vstiff numerics))
 ```
 
-`(lang dune 3.0)` has to be the first line of `dune-project`: dune rejects the file if a comment comes before it. Every `.ml` and `.mli` in `src/` becomes a module of one library called `vstiff`; there is no list of files, and dune orders the compilation from the module names each file mentions. `test/dune` declares two test programs, `corpus` and `soak` (their main modules are `test/corpus.ml` and `test/soak.ml`), linked against the library; the other `.ml` files in `test/` are ordinary modules both can use. Each program has an `.expected` file next to it.
+`(lang dune 3.0)` has to be the first line of `dune-project`: dune rejects the file if a comment comes before it. Every `.ml` and `.mli` in `src/` becomes a module of one library called `vstiff`; there is no list of files, and dune orders the compilation from the module names each file mentions. The subdirectory `src/numerics/` has a `dune` file of its own, so its files form a second library, `numerics`, and are not modules of `vstiff`; `(libraries numerics)` lets the solver name them. `test/dune` declares two test programs, `corpus` and `soak` (their main modules are `test/corpus.ml` and `test/soak.ml`), linked against both libraries because they name modules of both; the other `.ml` files in `test/` are ordinary modules both can use. Each program has an `.expected` file next to it. "Libraries, main modules, aliases and re-exports" below explains `(libraries ...)`, `private_modules` and how the two libraries meet.
 
 ### Everyday commands
 
@@ -71,14 +75,14 @@ Run these from the repository root. Dune builds in its **dev profile** by defaul
 
 **Why `dune promote` is rarely the right move.** It copies the program's actual output over the `.expected` file, and from then on `dune runtest` is silent whatever the output was, wrong answers included. A red test is information; promoting it away destroys that. The legitimate uses are recording the line of a newly added case and a deliberate, reviewed change of format ([testing.md](testing.md) has the rules).
 
-**Editor and prompt.** Install `ocaml-lsp-server` and use an editor with Language Server support (VS Code with the OCaml Platform extension, Emacs, Vim or Neovim with an LSP client). You want type on hover, jump to definition and inline errors; open the editor at the repository root and run `dune build` once if they do not work at first. The repository has no `.ocamlformat`, so there is no formatter to run: follow the layout of the file you edit. `dune utop src` starts `utop` with the library loaded; type `open Vstiff;;` first (phrases end with `;;`), and `#show Newton;;` prints a module's interface.
+**Editor and prompt.** Install `ocaml-lsp-server` and use an editor with Language Server support (VS Code with the OCaml Platform extension, Emacs, Vim or Neovim with an LSP client). You want type on hover, jump to definition and inline errors; open the editor at the repository root and run `dune build` once if they do not work at first. The repository has no `.ocamlformat`, so there is no formatter to run: follow the layout of the file you edit. `dune utop src` starts `utop` with the library and its dependencies loaded; type `open Vstiff;;` first, and `open Numerics;;` for the kernel's modules (phrases end with `;;`), and `#show Newton;;` prints a module's interface.
 
 ## Part 2. The language as this code uses it
 
 ### How the code reads
 
 - **Everything is an expression.** `if` and `match` have values and a function returns the value of its body; there is no `return`.
-- **Application is juxtaposition.** Write `Vec.scale 2. v`, not `Vec.scale(2., v)`; parentheses only group. A negative literal needs them: `Vec.scale (-1.) fx` in [src/newton.ml](../src/newton.ml).
+- **Application is juxtaposition.** Write `Vec.scale 2. v`, not `Vec.scale(2., v)`; parentheses only group. A negative literal needs them: `Vec.scale (-1.) fx` in [src/numerics/newton.ml](../src/numerics/newton.ml).
 - **A name is usable only below its definition**, except that `let rec` may call itself. Helpers therefore come first, and modules cannot depend on each other in a cycle.
 - `(* ... *)` is a comment; `(** ... *)` is a documentation comment attached to the item before or after it. `x'` is an ordinary name ("x prime", the next x). `a; b` runs `a` (of type `unit`), then `b`. `()` is the only value of `unit`, and a top-level `let () = e` runs `e` when the program starts.
 
@@ -159,7 +163,7 @@ let entry = m.(0).(1)                                      (* row 0, column 1: =
 let (lo, hi) = (v.(0), v.(2))                              (* a tuple, taken apart by a pattern *)
 ```
 
-Two traps. Elements are separated by `;`: a comma builds a tuple, so `[| 1., 2. |]` is an array holding one pair. And arrays are mutable in OCaml (`a.(i) <- x`) and often shared, which is safe here only because this code never writes into an array after creating it: treat every array you receive as read-only ([architecture.md](architecture.md)). An index out of range raises `Invalid_argument`, and so does `Array.map2` on arrays of different lengths. Where: `Vec`, `Jac.forward`, `Linalg` and `Stage.solve` build arrays with `Array.init`, `Array.map` and `Array.mapi`; `Vec.finite` is `Array.for_all`; `Linalg` uses `Array.sub` and `Array.append`. A tuple carries several results at once: `M.step` returns `(y, history)`, of type `Vec.t * history`, and `let* y, history = M.step ... in` takes the pair apart. Lists (`[1; 2]`) appear only in the tests, as the case tables.
+Two traps. Elements are separated by `;`: a comma builds a tuple, so `[| 1., 2. |]` is an array holding one pair. And arrays are mutable in OCaml (`a.(i) <- x`) and often shared, which is safe here only because this code never writes into an array after creating it: treat every array you receive as read-only ([architecture.md](architecture.md)). An index out of range raises `Invalid_argument`, and so does `Array.map2` on arrays of different lengths. Where: `Vec`, `Jac.forward`, `Linalg` and `Stage.solve` build arrays with `Array.init`, `Array.map` and `Array.mapi`; `Vec.finite` is `Array.for_all`; `Linalg` uses `Array.sub` and `Array.append`. A tuple carries several results at once: `M.step` returns `(y, history)`, of type `float array * history`, and `let* y, history = M.step ... in` takes the pair apart. Lists (`[1; 2]`) appear only in the tests, as the case tables.
 
 ### Records
 
@@ -236,7 +240,7 @@ let sum s1 s2 =
 (* val sum : string -> string -> (float, string) result *)
 ```
 
-`sum "1" "2"` is `Ok 3.` and `sum "1" "x"` is `Error "not a number: x"`: after the first `Error` the rest is skipped. `let*` continues with a function that may fail again, `let+` ends with a plain value. A type with arguments is written with the arguments first: `float option`, `(float, string) result`, `Halving.stats Adaptive.solution`. `Fail.Syntax` ([src/fail.ml](../src/fail.ml)) defines both, and `open Fail.Syntax` brings them in. Where: `Bdf2.step_with_error` (`let* be = ...`, then `let+ y = ...`) and `Stepper.fixed` (`let* y, history = M.step ...`). `Linalg.solve` returns an `option` (`None` for a zero pivot), which `Newton.solve` turns into `Error Diverged`. Numerical failures are `Fail.t` values in a `result`, never exceptions.
+`sum "1" "2"` is `Ok 3.` and `sum "1" "x"` is `Error "not a number: x"`: after the first `Error` the rest is skipped. `let*` continues with a function that may fail again, `let+` ends with a plain value. A type with arguments is written with the arguments first: `float option`, `(float, string) result`, `Halving.stats Adaptive.solution`. `Fail.Syntax` ([src/numerics/fail.ml](../src/numerics/fail.ml)) defines both, and `open Fail.Syntax` brings them in (`Vstiff.Fail` re-exports it). Where: `Bdf2.step_with_error` (`let* be = ...`, then `let+ y = ...`) and `Stepper.fixed` (`let* y, history = M.step ...`). `Linalg.solve` returns an `option` (`None` for a zero pivot), which `Newton.solve` turns into `Error Diverged`. Numerical failures are `Fail.t` values in a `result`, never exceptions.
 
 ### Modules, `.mli` files and abstraction
 
@@ -263,16 +267,16 @@ end
 let two = Counter.(to_int (incr (incr zero))) (* = 2 *)
 ```
 
-Every `.ml` file is a module named after it (`vec.ml` is `Vec`), and `module Name = struct ... end` nests one (`Problems.Canary`). `open M` exposes M's names for the rest of the file, `let open M in e` only inside `e`; `Counter.(...)` is the same for one expression, and [test/corpus.ml](../test/corpus.ml) starts its groups with `let open Problems.Canary in`. Dune wraps the library: from outside, the modules are `Vstiff.Vec`, `Vstiff.Newton` and so on, so the tests start with `open Vstiff`; inside `src/` the short names work. `Stdlib` is always open, which is why `float_of_int` and `invalid_arg` need no prefix.
+Every `.ml` file is a module named after it (`vec.ml` is `Vec`), and `module Name = struct ... end` nests one (`Problems.Canary`). `open M` exposes M's names for the rest of the file, `let open M in e` only inside `e`; `Counter.(...)` is the same for one expression, and [test/corpus.ml](../test/corpus.ml) starts its groups with `let open Problems.Canary in`. Dune wraps a library: from outside, the modules of the solver are `Vstiff.Bdf2`, `Vstiff.Adaptive` and so on, and those of the kernel `Numerics.Vec`, `Numerics.Newton`, so the tests start with `open Vstiff` and `open Numerics`; inside a library the short names work. `Stdlib` is always open, which is why `float_of_int` and `invalid_arg` need no prefix.
 
-Each module in `src/` has an **interface**, `foo.mli`: the list of what other modules may use. Everything else in `foo.ml` is private, and a type declared without a definition is **abstract**: outsiders can pass its values around but cannot build or inspect them. `Counter.incr 3` is rejected:
+Each module in `src/` and `src/numerics/` has an **interface**, `foo.mli`: the list of what other modules may use. Everything else in `foo.ml` is private, and a type declared without a definition is **abstract**: outsiders can pass its values around but cannot build or inspect them. `Counter.incr 3` is rejected:
 
 ```text
 Error: The constant 3 has type int but an expression was expected of type
          Counter.t
 ```
 
-A name missing from the `.mli` does not exist outside (`Vstiff.Newton.tol` is `Unbound value`). That is how Newton's tuning constants and `Linalg.pivot` stay internal, how `Halving.t` stays opaque, and how `Bdf2.history` hides `Start` and `After`. The documentation comments in the `.mli` files are the API documentation.
+A name missing from the `.mli` does not exist outside (`Numerics.Newton.tol` is `Unbound value`). That is how Newton's tuning constants and `Linalg.pivot` stay internal, how `Halving.t` stays opaque, and how `Bdf2.history` hides `Start` and `After`. The documentation comments in the `.mli` files are the API documentation.
 
 ### Module types, `include` and interface-only modules
 
@@ -302,6 +306,83 @@ let n = (Count.stats Count.init).accepted
 A **module type** lists the types and values a module must provide; a module satisfies it when it provides at least those, with compatible types. There is no `implements` keyword. `include S` copies the items of `S` into another signature: `Ode.Embedded` is `Ode.Method` plus `step_with_error`. `with type stats := stats` substitutes: it removes `Policy`'s own `stats` and uses ours, without which the signature would define `stats` twice (`Multiple definition of the type name stats`). `halving.mli` does exactly this with `Ode.Controller`, so `Halving.stats` is a record whose fields (`accepted_steps`) the tests can read. `bdf1.mli` is `include Ode.Method` and `bdf2.mli` is `include Ode.Embedded` plus `coeffs`.
 
 [src/ode.mli](../src/ode.mli) has no `ode.ml`: it holds types and module types, so there is nothing to run. Dune has to be told, by `(modules_without_implementation ode)` in `src/dune`; without it the build stops with `Some modules don't have an implementation`.
+
+### Libraries, main modules, aliases and re-exports
+
+A **library** is a set of modules that dune builds together under one name, and a library or a program lists the libraries it uses in `(libraries ...)`. vstiff is two libraries: `numerics`, the kernel, and `vstiff`, the solver, which depends on it. This miniature has the same shape: a kernel, a solver that re-exports the kernel's failures and has a private module, and a program. Save the files under the names shown, in a directory of their own, then run `dune build` and `dune exec ./app/main.exe`, which prints `Diverged`:
+
+```text
+dune-project       (lang dune 3.0)
+kernel/dune        (library (name kernel))
+kernel/fail.ml     type t = Diverged | Nan
+                   let to_string = function Diverged -> "Diverged" | Nan -> "Nan"
+solver/dune        (library
+                    (name solver)
+                    (libraries kernel)
+                    (private_modules secret))
+solver/secret.ml   let limit = 3
+solver/fail.ml     include Kernel.Fail
+solver/fail.mli    include module type of struct include Kernel.Fail end
+solver/run.ml      let go n = if n > Secret.limit then Error Fail.Diverged else Ok n
+solver/solver.ml   module Run = Run
+                   module Fail = Fail
+app/dune           (executable (name main) (libraries solver kernel))
+app/main.ml        let () =
+                     match Solver.Run.go 5 with
+                     | Ok n -> Printf.printf "ok %d\n" n
+                     | Error (e : Kernel.Fail.t) -> print_endline (Kernel.Fail.to_string e)
+```
+
+**Libraries and dependencies.** `(library (name kernel))` makes `kernel/fail.ml` the module `Kernel.Fail` for everyone outside: dune wraps a library: the file is compiled as `Kernel__Fail`, and a module named `Kernel` is the way in. `(libraries kernel)` in `solver/dune` lets the solver write `Kernel.Fail`, and `app/dune` lists `kernel` too because `main.ml` names it, as `test/dune` lists `numerics`. By default dune also lets the dependencies of a listed library through, so a missing entry is not always an error, but the line says what the code relies on; `(implicit_transitive_deps false)` in `dune-project` turns a missing entry into `Unbound module Kernel`. Dependencies cannot loop: if `kernel/dune` listed `solver`, dune would stop with `Dependency cycle between` the two libraries, so the kernel cannot name anything of the solver.
+
+**An explicit main module.** A wrapped library has a module that carries its name, `Solver` here. If you write `solver/solver.ml` yourself it is that module, and outside the library only what it lists exists: `Solver.Run` and `Solver.Fail`, while `Solver.Secret` is `Error: Unbound module Solver.Secret`. Without the file, dune writes a main module that lists every module of the library. Inside the library the short names work (`Secret` and `Fail` in `run.ml`), because dune compiles each file with a generated module of aliases opened. vstiff writes its main module by hand: [src/vstiff.ml](../src/vstiff.ml) lists nine modules and [src/vstiff.mli](../src/vstiff.mli) documents them, so `Vstiff.Stage` and `Vstiff.Check` are unbound.
+
+**Module aliases.** `module Run = Run` in the main module is an alias: another name for a module that already exists, with nothing copied, so its types stay equal to the original's.
+
+```ocaml
+module Counter : sig
+  type t
+  val zero : t
+  val incr : t -> t
+end = struct
+  type t = int
+  let zero = 0
+  let incr n = n + 1
+end
+
+module C = Counter                       (* an alias: another name for the same module *)
+let one : Counter.t = C.incr C.zero      (* C.t and Counter.t are one type, although t is abstract *)
+```
+
+The solver's files use aliases for what they take from the kernel: [src/adaptive.ml](../src/adaptive.ml) starts with `module Vec = Numerics.Vec` and [src/stage.ml](../src/stage.ml) also names `Jac` and `Newton`, so the code reads `Vec.finite` and the top of the file says where `Vec` comes from.
+
+**Private modules.** `(private_modules secret)` marks a module private: dune keeps its compiled interface out of the installed form of the library, so a program that uses the installed library cannot name it. (vstiff's libraries have no `public_name`, so nothing is installed from this project today.) Inside the workspace that builds the library it hides nothing: delete `solver/solver.ml` and `Solver.Secret.limit` compiles in `app/main.ml`. What hides `Secret` in the miniature is the main module, which does not list it. vstiff has both for `Stage` and `Check`.
+
+**Re-exports with equal types.** `solver/fail.ml` copies the kernel's items with `include Kernel.Fail`, and `solver/fail.mli` gives them the signature `module type of struct include Kernel.Fail end`: that of `Kernel.Fail`, with each type stated as equal to the original, here `type t = Kernel.Fail.t = Diverged | Nan`. So `Solver.Fail.t` is `Kernel.Fail.t`: `main.ml` annotates the error as a `Kernel.Fail.t` and the compiler accepts it, and `Diverged` can be written `Solver.Fail.Diverged` or `Kernel.Fail.Diverged`. [src/fail.ml](../src/fail.ml) and [src/fail.mli](../src/fail.mli) do the same for `Vstiff.Fail`, so a program that uses the solver never needs the kernel to read a failure. The idiom in one file:
+
+```ocaml
+module Kernel_fail = struct
+  type t = Diverged | Nan
+
+  let to_string = function Diverged -> "Diverged" | Nan -> "Nan"
+end
+
+module Fail : module type of struct include Kernel_fail end = struct
+  include Kernel_fail
+end
+
+let a : Kernel_fail.t = Fail.Diverged    (* accepted: Fail.t is Kernel_fail.t *)
+```
+
+The long spelling is the one that says what is meant. For a module defined in the same file, `module type of Kernel_fail` alone describes new types with the same constructors, and with `Plain : module type of Kernel_fail` the line `let b : Kernel_fail.t = Plain.Diverged` is rejected:
+
+```text
+Error: The constructor Plain.Diverged belongs to the variant type Plain.t
+       but a constructor was expected belonging to the variant type
+         Kernel_fail.t
+```
+
+(For a module that comes from another library the short form happens to give equal types too, so the miniature builds either way.)
 
 ### First-class modules and modular explicits
 
@@ -350,7 +431,7 @@ val integrate :
   (C.stats solution, Fail.t) result
 ```
 
-The result type names `C.stats`: `Adaptive.integrate (module Bdf2) (module Halving) ~tol problem` returns `(Halving.stats Adaptive.solution, Fail.t) result`, so the tests read `s.stats.rejected_steps`, and another controller with another stats type gives another result type. `repeat (module C : Case) : (C.t, Fail.t) result list` in [test/soak.ml](../test/soak.ml) has the same shape. `Stepper.fixed (module M : Ode.Method)` takes a module the same way.
+The result type names `C.stats`: `Adaptive.integrate (module Bdf2) (module Halving) ~tol problem` returns `(Halving.stats Adaptive.solution, Fail.t) result`, so the tests read `s.stats.rejected_steps`, and another controller with another stats type gives another result type. `repeat (module C : Case) : (C.t, Fail.t) result option list` in [test/soak.ml](../test/soak.ml) has the same shape. `Stepper.fixed (module M : Ode.Method)` takes a module the same way.
 
 **Why this code prefers modular explicits** to functors and to first-class modules packed into values. The result type names the module's own types (`C.stats`), without the `with type` plumbing that a packed module needs. A functor (a function from modules to a module) would turn every combination into a named module (`module Run = Adaptive.Make (Bdf2) (Halving)`) before it could be called; here the call site just writes `(module Bdf2) (module Halving)`, and partial application works. The cost is that the argument must be written out in the source, so the choice of method cannot come from a runtime list; a first-class module is the tool for that.
 

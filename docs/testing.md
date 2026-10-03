@@ -6,24 +6,24 @@ vstiff is tested by two programs that print text and a file of expected text nex
 
 | File | What it is |
 |---|---|
-| [test/dune](../test/dune) | declares the two test programs, `corpus` and `soak` |
+| [test/dune](../test/dune) | declares the two test programs, `corpus` and `soak`, linked against both libraries |
 | [test/corpus.ml](../test/corpus.ml), [test/corpus.expected](../test/corpus.expected) | the **corpus**: a table of cases, one printed line each, and the text it must print |
 | [test/soak.ml](../test/soak.ml), [test/soak.expected](../test/soak.expected) | the **soak** test: four cases, ten rounds each, and its expected text |
 | [test/problems.ml](../test/problems.ml) | the corpus problems: `Canary` (three independent decays at very different rates), `Logistic`, `VanDerPol`, `Robertson` |
 | [test/refs.ml](../test/refs.ml) | reference values computed outside vstiff |
-| [test/guard.ml](../test/guard.ml) | `Guard.run` and `Guard.budget`: the only test module that raises or catches |
+| [test/guard.ml](../test/guard.ml) | `Guard.run`, `Guard.budget` and `Guard.bounded`: the only test module that raises or catches |
 | [test/report.ml](../test/report.ml) | `Report.lines`: the only module that prints |
 
-`problems.ml`, `refs.ml`, `guard.ml` and `report.ml` are ordinary modules, not tests: dune compiles each once and links it into the programs that use it, so editing one can change an output. `corpus.ml` and `soak.ml` are main modules and cannot use each other (dune gives each an empty interface), which is why `soak.ml` carries its own copies of two small helpers.
+`problems.ml`, `refs.ml`, `guard.ml` and `report.ml` are ordinary modules, not tests: dune compiles each once and links it into the programs that use it, so editing one can change an output. `corpus.ml` and `soak.ml` are main modules and cannot use each other (dune gives each an empty interface), which is why `soak.ml` carries its own copies of three small helpers (`max_error`, `bdf2_halving` and `on_budget`). Both start with `open Vstiff` and then `open Numerics`, because the cases call the solver and the kernel (`Newton`, `Jac`, `Linalg`, `Vec`) directly.
 
 ## How an expect test works
 
-`test/dune` declares `(tests (names corpus soak) (libraries vstiff))`. For each name dune builds `NAME.exe` from `NAME.ml`, runs it, captures standard output and compares it with `NAME.expected`. There are no assertions: a check fails by printing something other than the expected file says. The point of text: a failing check does not stop the run, so one run reports every line that changed, with the new value next to the old. The price is that the comparison is exact, which the rules below deal with.
+`test/dune` declares `(tests (names corpus soak) (libraries vstiff numerics))`. For each name dune builds `NAME.exe` from `NAME.ml`, runs it, captures standard output and compares it with `NAME.expected`. There are no assertions: a check fails by printing something other than the expected file says. The point of text: a failing check does not stop the run, so one run reports every line that changed, with the new value next to the old. The price is that the comparison is exact, which the rules below deal with.
 
 - **Everything matches:** `dune runtest` is silent and exits with status 0. Dune remembers a pass, so a repeat with nothing changed does nothing; a failing comparison is reported again every time.
 - **Output differs:** a diff and exit status 1 (next section).
 - **A program crashes** with an uncaught exception: dune shows the exception and no diff.
-- **A program never ends:** a case needs vastly more steps than it should. The long runs of the corpus are on a call budget and print a line instead (below); for the others, and for the soak test, interrupt the program and use probes to find which case.
+- **A program never ends:** a case needs vastly more steps than it should. The long runs of the corpus are on a call budget and print a line instead (below); for the others (the two logistic count lines and the adaptive `y' = 2t` line) interrupt the program and use probes to find which case. The soak test's adaptive cases are on the budget too, and its fixed-step cases always end.
 
 | Goal | Command |
 |---|---|
@@ -65,9 +65,18 @@ diff --git a/_build/default/test/corpus.expected b/_build/default/test/corpus.ex
  linalg zero leading pivot: [1.000000000000; 2.000000000000; 3.000000000000]
  linalg tiny leading pivot: [1.000000000000; 1.000000000000]
  adaptive blow-up y' = y^2 from y(0)=1 to t=2: Error StepRejected 1
+@@ -40,7 +40,7 @@ newton residual nan at the start: Error Nan
+ newton step that overflows in the linear solve: Error Diverged
+ jac forward difference of y^3 at y = -2 (exact 12): 11.9999998224
+ adaptive y' = 2t on [0, 1] tol=1e-6: max error 1.57e-12
+-adaptive canary t=1 tol=1e-6: max error 4.66e-07 < 1e-6: true, rhs calls 106445
++adaptive canary t=1 tol=1e-6: max error 4.86e-08 < 1e-6: true, rhs calls 634048
+ adaptive y0 = nan: Error Nan
+ newton x^2 = 2 from x0=1e-3 (deep line search): Ok [1.414213562373]
+ newton x^3 = 0 from x0=1 (needs more than 50 iterations): Error Diverged
 ```
 
-The header names the two files compared: the expected file and what the program printed. Lines starting with `-` are in the expected file but were not printed, lines starting with `+` were printed but are not in the file, and unmarked lines are context. Ask first which lines changed and what they have in common: here the three lines about Jacobians and the stiff step that needs a good one. One printed number moved (3.68e-07 to 3.83e-07) although its criterion still holds: a root of the stage equation does not depend on the Jacobian, only the speed of Newton's iteration does, so the iteration stopped at a slightly different point. A number printed with three digits is a tight check, a boolean a loose one. The corpus runs from the lowest layer (Newton) to the highest (the adaptive integrator), so the first changed line usually points at the real problem.
+The header names the two files compared: the expected file and what the program printed. Lines starting with `-` are in the expected file but were not printed, lines starting with `+` were printed but are not in the file, and unmarked lines are context. Ask first which lines changed and what they have in common: here the three lines about Jacobians, the stiff step that needs a good one and, far below, the adaptive canary. Two printed errors moved although their criteria still hold (3.68e-07 to 3.83e-07, and 4.66e-07 to 4.86e-08 on the adaptive canary): a root of the stage equation does not depend on the Jacobian, only the speed of Newton's iteration does, so the iteration stopped at a slightly different point, and the adaptive canary shows the speed itself in its count of right-hand-side calls (106445 to 634048). A number printed with three digits is a tight check, a boolean a loose one. The corpus runs from the lowest layer (Newton) to the highest (the adaptive integrator), so the first changed line usually points at the real problem.
 
 A crash looks different: dune names the program in `test/dune`, where the caret marks `corpus` in the `names` field (the line number is wherever the field sits in `test/dune`), and prints the exception, here an array index out of bounds. A mistake deep in the library often crashes both programs, and dune then prints one such block for each:
 
@@ -84,13 +93,13 @@ Fatal error: exception Invalid_argument("index out of bounds")
 
 ```text
 let newton = [ ("newton linear 2d", fun () -> show (Newton.solve ...)); ... ]
-let corpus = List.concat [ newton; jacobian; backward_euler; ...; clock; too_small; fixed_clock; ...; adaptive_time ]
+let corpus = List.concat [ newton; jacobian; backward_euler; ...; clock; too_small; fixed_clock; ...; adaptive_time; adaptive_canary; start_and_limits ]
 let () = Report.lines corpus
 ```
 
-`Report.lines` runs the cases in order and prints `name: text` for each. Computing the text is separate from printing it, so a case is a pure function and `Report` is the only module that prints. Reading the file from the top, the first six groups (Newton, Jacobian, backward Euler, BDF2 order, van der Pol, Robertson) run the library from the bottom layer to the top. The remaining groups are regression pins: each pins down specific mistakes, listed under "Judging test strength by mutation" below. The helpers at the top of the file (`pp_vec`, `failure`, `show`, `max_abs`, `max_error`, `bdf2_halving`, `on_budget`, `error_below`) keep the cases short and the printed lines uniform.
+`Report.lines` runs the cases in order and prints `name: text` for each. Computing the text is separate from printing it, so a case is a pure function and `Report` is the only module that prints. Reading the file from the top, the first six groups (Newton, Jacobian, backward Euler, BDF2 order, van der Pol, Robertson) run the library from the bottom layer to the top. The remaining groups are regression pins, 38 of the 47 lines: each pins down specific mistakes, listed under "Judging test strength by mutation" below. The helpers at the top of the file (`pp_vec`, `failure`, `show`, `max_abs`, `max_error`, `bdf2_halving`, `on_budget`, `error_below`) keep the cases short and the printed lines uniform.
 
-`Guard.run ok compute` builds the function of a table entry so that every outcome a case can have on purpose becomes a line of text: `compute` returns a `result`, and `ok` renders an `Ok`. An `Error e` prints `Error` and the name of `e`; an `Invalid_argument m` prints `Invalid_argument m`; a right-hand side that exhausted its budget prints `no answer within 5e6 rhs calls`. `Guard.budget rhs` wraps a right-hand side (with `Instrument.count`) so that after 5,000,000 calls it raises instead of evaluating. The groups `give_up`, `clock`, `too_small`, `zero_floor` and `arguments` run their termination and argument-check cases through both, and `on_budget` puts the van der Pol and Robertson lines on the budget too, so a loop that never ends, or a mistake that makes a long run crawl, prints a line, and the diff shows it, instead of stalling the run: a transposed Jacobian ends the corpus in about 2 s.
+`Guard.run ok compute` builds the function of a table entry so that every outcome a case can have on purpose becomes a line of text: `compute` returns a `result`, and `ok` renders an `Ok`. An `Error e` prints `Error` and the name of `e`; an `Invalid_argument m` prints `Invalid_argument m`; a right-hand side that exhausted its budget prints `no answer within 5e6 rhs calls`. `Guard.budget rhs` wraps a right-hand side (with `Instrument.count`) so that after 5,000,000 calls it raises instead of evaluating. The groups `give_up`, `clock`, `too_small`, `zero_floor`, `arguments` and `adaptive_canary` run their cases through both, and `on_budget` puts the van der Pol and Robertson lines on the budget too, so a loop that never ends, or a mistake that makes a long run crawl, prints a line, and the diff shows it, instead of stalling the run: a transposed Jacobian ends the corpus in about 2 s. `Guard.bounded run` is the same idea for the soak test: it returns `Some` of what `run ()` returns, or `None` when a budget inside it ran out, so a round can be counted as not passed without any module but `Guard` catching an exception.
 
 ## The rules
 
@@ -173,9 +182,9 @@ A new reference follows the same recipe and is added, never edited afterwards. N
 
 ## The soak test
 
-[test/soak.ml](../test/soak.ml) runs four corpus cases ten times each in one process and prints one line per case, for instance `soak canary x10: passed 10/10, identical: true`. `passed` counts the rounds whose result satisfies the case's criterion (the same criterion as its corpus line) and `identical` is `true` when every round equals the first, compared with `=`. The code is a module type `Case` (a result type `t`, a `name`, `run : unit -> (t, Fail.t) result` and `pass : t -> bool`), a function `repeat (module C : Case)` that returns every round's result (a modular explicit, because its result type names `C.t`), and one module per case. To add a case, write a module with that signature and add `soak (module YourCase)` to the final list.
+[test/soak.ml](../test/soak.ml) runs four corpus cases ten times each in one process and prints one line per case, for instance `soak canary x10: passed 10/10, identical: true`. `passed` counts the rounds whose result satisfies the case's criterion (the same criterion as its corpus line) and `identical` is `true` when every round equals the first, compared with `=`. The code is a module type `Case` (a result type `t`, a `name`, `run : unit -> (t, Fail.t) result` and `pass : t -> bool`), a function `repeat (module C : Case)` that returns every round's result, `None` for a round whose call budget ran out (a modular explicit, because its result type, `(C.t, Fail.t) result option list`, names `C.t`), and one module per case; `passed` counts the rounds that are `Some (Ok r)` with `C.pass r`. To add a case, write a module with that signature and add `soak (module YourCase)` to the final list.
 
-It is **a tripwire, not extra coverage.** The library has no hidden state, so `identical` can only turn `false` if someone adds hidden state, randomness or parallelism, or if a `nan` appears in a result (`nan` is never equal to itself, and `=` treats `0.` and `-0.` as equal, so "identical" is slightly weaker than bit for bit). The soak cases restate the corpus criteria in their own code, so changing a criterion means changing it in both places. Unlike the corpus lines for van der Pol and Robertson, the soak cases run without a call budget, so a mistake that makes one of them crawl stalls the soak test (a transposed Jacobian does).
+It is **a tripwire, not extra coverage.** The library has no hidden state, so `identical` can only turn `false` if someone adds hidden state, randomness or parallelism, or if a `nan` appears in a result (`nan` is never equal to itself, and `=` treats `0.` and `-0.` as equal, so "identical" is slightly weaker than bit for bit). The soak cases restate the corpus criteria in their own code, so changing a criterion means changing it in both places. The adaptive cases, van der Pol and Robertson, run on the same call budget as the corpus lines (`on_budget` wraps their `rhs` with `Guard.budget`) and `repeat` runs every round through `Guard.bounded`, so a mistake that makes one of them crawl ends the round instead of stalling the soak test: with a transposed Jacobian the soak test ends in about 14 s and prints `soak robertson x10: passed 0/10, identical: true`, ten rounds that all ran out of budget (`None` equals `None`, which is why `identical` stays `true`). The fixed-step cases, the canary and the logistic order, have no budget and always end.
 
 ## Probes
 
@@ -190,16 +199,16 @@ ln -sfn "$REPO/test/problems.ml" p/problems.ml
 printf '(executable (name probe) (libraries vstiff))\n' > p/dune
 ```
 
-(Add `ln -sfn "$REPO/test/refs.ml" p/refs.ml` for probes that use `Refs`.) Write `p/probe.ml`, starting with `open Vstiff`, then build and run it (`--root .` makes dune use the probe project even inside another dune project, and `dune exec --root . ./p/probe.exe` does both steps):
+(The link to `src` brings both libraries, since `src/numerics` is inside it. Add `ln -sfn "$REPO/test/refs.ml" p/refs.ml` for probes that use `Refs`.) Write `p/probe.ml`, starting with the `open`s it needs, then build and run it (`--root .` makes dune use the probe project even inside another dune project, and `dune exec --root . ./p/probe.exe` does both steps):
 
 ```sh
 dune build --root . ./p/probe.exe && ./_build/default/p/probe.exe
 ```
 
-A probe is the main module of an executable, so an unused top-level definition is a build error (warning 32): print what you define. A runaway probe belongs under a time limit, `perl -e 'alarm 120; exec @ARGV' ./_build/default/p/probe.exe`; a killed program prints only what it flushed, so end a `Printf.printf` format with `%!`. Two examples. Where does Newton evaluate the residual? Printing from inside `f` shows each point it tries:
+A probe that uses only the solver (`Adaptive`, `Stepper`, `Bdf1`, `Bdf2`, `Halving`, `Ode`, `Fail`, `Clock`, `Instrument`) needs just `(libraries vstiff)` and `open Vstiff`, as above. One that calls `Newton.solve`, `Jac.forward`, `Linalg.solve` or `Vec` needs `(libraries vstiff numerics)` in `p/dune` and `open Numerics` as well, as `test/corpus.ml` has it; an `open` that names nothing is itself a build error (warning 33). `Stage` and `Check` cannot be named from a probe at all (`Unbound module Vstiff.Stage`); to count the right-hand-side calls of one implicit step, call `Bdf1.step`. A probe is the main module of an executable, so an unused top-level definition is a build error (warning 32): print what you define. A runaway probe belongs under a time limit, `perl -e 'alarm 120; exec @ARGV' ./_build/default/p/probe.exe`; a killed program prints only what it flushed, so end a `Printf.printf` format with `%!`. Two examples. Where does Newton evaluate the residual? Printing from inside `f` shows each point it tries (a probe of the kernel: `numerics` goes into `p/dune`):
 
 ```ocaml
-open Vstiff
+open Numerics
 
 let () =
   let f x =
@@ -235,59 +244,65 @@ A test suite is only as good as the mistakes it notices. You can measure that by
 
 Run what might not end under a time limit, building first and running the program directly so that nothing is left running: `dune build --root . ./test/corpus.exe`, then `perl -e 'alarm 120; exec @ARGV' ./_build/default/test/corpus.exe | diff test/corpus.expected -`. Output is printed when the program exits, so a killed run prints nothing.
 
-The regression pins, the groups after the first six in `corpus.ml`, are worked examples: each row below can be repeated, and each pin fails when its mistake is made. "Silent" means no line of either expected file changed; [numerics/06-the-corpus.md](numerics/06-the-corpus.md) (sections 9 and 10) adds the line numbers and a few more changes. The newest lines are named by a word of their text: `sqrt(1 - t)`, `max_rejects = 5000` (the NaN wall at `t = 0`), `tol = 0`, `wrong length`, `y0 = nan`, `span of 1e-320`, `atan`, `residual nan`, `overflows in the linear solve`, `y^3`, and `y' = 2t` (the fixed-step line, or the adaptive one where the row says so).
+The regression pins, the groups after the first six in `corpus.ml`, are worked examples: each row below can be repeated, and each pin fails when its mistake is made. "Silent" means no line of either expected file changed; [numerics/06-the-corpus.md](numerics/06-the-corpus.md) (sections 9 and 10) adds the line numbers and a few more changes. The newest lines are named by a word of their text: `sqrt(1 - t)`, `max_rejects = 5000` (the NaN wall at `t = 0`), `tol = 0`, `wrong length`, `span of 1e-320`, `atan`, `residual nan`, `overflows in the linear solve`, `y^3`, `y' = 2t` (the fixed-step line, or the adaptive one where the row says so), `adaptive canary` (line 43) and, for lines 45 to 47, `deep line search`, `more than 50 iterations` and `leaves the domain`. `y0 = nan` is `bdf1 y0 = nan` (line 36) or `adaptive y0 = nan` (line 44).
 
 | Mistake (one edit) | What notices it |
 |---|---|
-| `Jac.forward`: rows 0 and 2 swapped (three components) | the two canary Jacobian lines and the non-symmetric line (`false`), the stiff canary (`Error Diverged`); the backward Euler canary only changes digits |
-| `Jac.forward`: the transpose | the non-symmetric line (`false`) and both Robertson lines, which print the budget text: the corpus ends in about 2 s and van der Pol still passes; the soak test has no budget and does not finish |
-| `Jac.step`: `1e-14` for `1e-8` | the canary-at-y0 line, the non-symmetric line (`false`) and the `y^3` line |
-| `Jac.step`: `1e-2` for `1e-8` | the non-symmetric line (`false`), the `y^3` line and both Robertson lines (the budget text) |
+| `Jac.forward`: rows 0 and 2 swapped (three components) | the two canary Jacobian lines and the non-symmetric line (`false`), the stiff canary (`Error Diverged`) and the adaptive canary (`rhs calls 634048` instead of 106445); the backward Euler canary only changes digits |
+| `Jac.forward`: rows 0 and 1, or rows 1 and 2, swapped | the same two canary lines and the non-symmetric line, the adaptive canary (`rhs calls 186690` or `551696`) and both Robertson lines, which print the budget text (`soak robertson` passes 0/10); the stiff canary only changes digits for rows 0 and 1 and prints `Error Diverged` for rows 1 and 2; the backward Euler canary does not change |
+| `Jac.forward`: the transpose | the non-symmetric line (`false`) and both Robertson lines, which print the budget text: the corpus ends in about 2 s and van der Pol still passes; `soak robertson` passes 0/10, and the soak test ends in about 14 s |
+| `Jac.step`: `1e-14` for `1e-8` | the canary-at-y0 line, the non-symmetric line (`false`), the `y^3` line and the adaptive canary (`rhs calls 123846`) |
+| `Jac.step`: `1e-2` for `1e-8` | the non-symmetric line (`false`), the `y^3` line and both Robertson lines (the budget text); `soak robertson` passes 0/10 |
 | `Jac.step`: no `abs`, `1e-6` for `1e-8`, or a backward difference; `Jac.forward`: the nominal step as divisor instead of the stored one | only the `y^3` line, in its digits |
 | `Linalg.pivot`: always row 0 | the two `linalg` lines |
-| `Stage`: `I + γJ` for `I - γJ` | the stiff canary (`Error Diverged`), van der Pol and both Robertson lines (the budget text), a digit of the BDF2 order line; the soak test does not finish |
-| `Newton`: `max_iter = 1` | van der Pol, both Robertson lines and the blow-up, NaN-wall and `dt0 = dt_max = 1e30` lines print the budget text, but both logistic count lines and the adaptive `y' = 2t` line have no budget and run on: the corpus does not finish (killed by the time limit) |
-| `Halving`: never double the step | van der Pol, both Robertson lines and the blow-up line print the budget text; both logistic count lines and the adaptive `y' = 2t` line change; the soak test does not finish |
-| `Bdf2.coeffs`: the sign of any one coefficient flipped | both BDF2 order lines (logistic and `y' = 2t`), the stiff canary, the Robertson lines and most adaptive lines |
-| `Bdf2`: return backward Euler's result instead of BDF2's | the Robertson accuracy line (the loose `1e-3` line still passes), the `dt0 = 0.5` line, the blow-up count and the adaptive `y' = 2t` line |
-| `Bdf2`: start-up estimate factor `1e-3` for `0.5` | the `dt0 = 0.5` line |
+| `Stage`: `I + γJ` for `I - γJ` | the stiff canary (`Error Diverged`), van der Pol and both Robertson lines (the budget text), the adaptive canary (`rhs calls 872996`), a digit of the BDF2 order line; `soak van der Pol` and `soak robertson` pass 0/10 |
+| `Newton`: `max_iter = 1` | van der Pol, both Robertson lines, the adaptive canary and the blow-up, NaN-wall and `dt0 = dt_max = 1e30` lines print the budget text, but both logistic count lines and the adaptive `y' = 2t` line have no budget and run on: the corpus does not finish (killed by the time limit); the soak test ends, with all four lines at 0/10 |
+| `Halving`: never double the step | van der Pol, both Robertson lines, the blow-up line and the adaptive canary print the budget text; both logistic count lines and the adaptive `y' = 2t` line change; `soak van der Pol` and `soak robertson` pass 0/10 |
+| `Bdf2.coeffs`: the sign of any one coefficient flipped | both BDF2 order lines (logistic and `y' = 2t`), the stiff canary, the Robertson lines, the adaptive canary and most other adaptive lines; `soak logistic order`, `soak van der Pol` and `soak robertson` pass 0/10 |
+| `Bdf2`: return backward Euler's result instead of BDF2's | the Robertson accuracy line (the loose `1e-3` line still passes), the `dt0 = 0.5` line, the blow-up count, the adaptive `y' = 2t` line and the adaptive canary (`false`, error `3.45e-04`) |
+| `Bdf2`: start-up estimate factor `1e-3` for `0.5` | the `dt0 = 0.5` line and the adaptive canary's count (`rhs calls 106188`) |
 | `Bdf2`, `Bdf1`: evaluate the stage at `at.t` instead of `at.t + h` | `Bdf2`: the `y' = 2t` line (error ratio 1.75 instead of 4.00) and the adaptive one (`1.02e-03` instead of `1.57e-12`); `Bdf1`: the `sqrt(1 - t)`, `max_rejects = 5000` and adaptive `y' = 2t` lines |
-| `Newton`: tolerance `1e-6` for `1e-10` | only `newton quadratic x0=1`, in its 12th decimal |
-| `Newton`: the step test applied only after the line search accepts a step, not before it | the backward Euler canary, the BDF2 order line, the stiff canary and the two fixed-step `y'` lines print `Error Diverged`; van der Pol, the `dt0 = dt_max = 1e30` line, both logistic count lines and the adaptive `y' = 2t` line print `Error StepRejected`, the blow-up and NaN-wall lines other counts; the overflow line prints `max_float` in full and the `from t=1e15` line `Error StepRejected 1`; `soak canary`, `soak logistic order` and `soak van der Pol` pass 0/10 |
+| `Newton`: tolerance `1e-6` for `1e-10` | five lines: `newton quadratic x0=1` in its 12th decimal, the adaptive canary's count (`rhs calls 89820`), the 12th decimal of the `x^2 = 2` and `log x = 0` lines, and `Ok [0.000001545213]` instead of `Error Diverged` for `x^3 = 0` |
+| `Newton`: the step test applied only after the line search accepts a step, not before it | the backward Euler canary, the BDF2 order line, the stiff canary and the two fixed-step `y'` lines print `Error Diverged`; van der Pol, the `dt0 = dt_max = 1e30` line, both logistic count lines and the adaptive `y' = 2t` line print `Error StepRejected`, the blow-up and NaN-wall lines other counts, and the adaptive canary the budget text; the overflow line prints `max_float` in full and the `from t=1e15` line `Error StepRejected 1`; `soak canary`, `soak logistic order` and `soak van der Pol` pass 0/10 |
 | `Newton`: no finiteness check on the converged `x + dx` | the `newton step that converges into an overflow` line prints `Ok [inf]` |
-| `Newton`: no damping (the full step every time), or a line search that accepts any finite trial point | the `atan` line prints `Error Diverged` |
+| `Newton`: no damping (the full step every time) | the `atan` line prints `Error Diverged` and the `log x = 0` line `Error Nan` |
+| `Newton`: a line search that accepts any finite trial point | the `atan` line prints `Error Diverged` |
 | `Newton`: a `nan` residual at the start named `Diverged`, or a non-finite step named `Nan` | the `residual nan` line, respectively the `overflows in the linear solve` line |
-| `Halving`: double after two accepts, not three | both logistic count lines, the adaptive `y' = 2t` line and the counts on the blow-up line (`StepRejected 2`) and the NaN-wall line (the right-hand side that returns `nan` past `t = 0.5`) |
+| `Newton`: `min_damping = 1. /. 2.` | the `deep line search` line prints `Error Diverged` |
+| `Newton`: an iteration limit of 100 for 50 | the `more than 50 iterations` line prints `Ok [0.000000000138]` |
+| `Newton`: a `nan` trial residual accepted | the `leaves the domain` line prints `Error Nan` |
+| `Halving`: double after two accepts, not three | both logistic count lines, the adaptive `y' = 2t` line, the adaptive canary (`rhs calls 119661`) and the counts on the blow-up line (`StepRejected 2`) and the NaN-wall line (`StepRejected 47`) |
 | `Halving`: no `dt_max` cap on doubling | the `dt_max = 1e-3` line |
-| `Halving`: no `16 eps abs(t)` floor | the blow-up and NaN-wall lines print `Error StepRejected 51` instead of 1 and 46: only `max_rejects` is left to end them (the `from t=1e10` lines still end at once, because the halved step is 0) |
+| `Halving`: no `16 eps abs(t)` floor | the blow-up and NaN-wall lines print `Error StepRejected 7` and `Error StepRejected 51` instead of 1 and 46: the NaN wall is left to `max_rejects`, and the blow-up run ends when a halved step snaps to 0, after the driver's `Too_small` rejections of the steps below the resolution (the `from t=1e10` lines still end at once, because the halved step is 0) |
 | `Halving`: no give-up on a halved step of 0 | the `max_rejects = 5000` line prints `Error StepRejected 5001` instead of 1055 |
 | `Halving`: halve the proposal, not the step that failed | the `dt0 = dt_max = 1e30` line (`Error StepRejected 51`) |
-| `Halving`: accept every step | the two Robertson lines, the `dt0 = 0.5` line, the blow-up and NaN-wall counts, the adaptive `y' = 2t` line and `soak robertson` (it stops passing) |
+| `Halving`: accept every step | the two Robertson lines, the `dt0 = 0.5` line, the blow-up and NaN-wall counts, the adaptive `y' = 2t` line, the adaptive canary (`false`) and `soak robertson` (it stops passing) |
 | `Check`: remove the argument checks | the three `Invalid_argument` lines of the termination group, and the `dt = 1e-7 at t=1e10`, `tol = 0` and two `wrong length` lines, which print `Ok`, a `StepRejected` or an index error instead |
 | `Stepper.fixed`: a running sum for `t` instead of the grid | the `sqrt(1 - t)` line prints `Error Nan` |
-| `Stepper.fixed`: no finiteness check on `y0` and `rhs t0 y0` | the `y0 = nan` line prints `Ok [nan]` |
+| `Stepper.fixed`: no finiteness check on `y0` and `rhs t0 y0` | the `bdf1 y0 = nan` line prints `Ok [nan]` |
 | `Adaptive`: no fallback to the span when a default `dt0` or `dt_max` underflows to 0 | the `span of 1e-320` line prints `Invalid_argument Adaptive.integrate: dt0 and dt_max must be positive` |
-| `Adaptive`: do not shorten the last step (`h = dt` where it takes `t_end - t`) | the `dt0 = dt_max = 1e30` line, the Robertson accuracy line, the adaptive `y' = 2t` line, and the `over one ulp` and `from t=1e15` lines, whose state advances by `dt` instead of the remainder |
-| `Adaptive`: no snapping (`h = dt` for a step that is not the last) | the `from t=1e10` and `never reaches the method` lines print the budget text, the `from t=1e15` line `y = 76.84` instead of `y = 100`, and the adaptive `y' = 2t` line changes |
+| `Adaptive`: do not shorten the last step (`h = dt` where it takes `t_end - t`) | the `dt0 = dt_max = 1e30` line, the Robertson accuracy line, the adaptive `y' = 2t` line, the adaptive canary (`false`), and the `over one ulp` and `from t=1e15` lines, whose state advances by `dt` instead of the remainder |
+| `Adaptive`: no snapping (`h = dt` for a step that is not the last) | the `from t=1e15` line prints `y = 98.7` instead of `y = 100`, and the adaptive `y' = 2t` line (`1.54e-12`) and the adaptive canary's count (`rhs calls 106441`) change; the `from t=1e10` and `never reaches the method` lines no longer notice, because the driver rejects those steps as below the resolution anyway |
 | `Adaptive`: no remainder rule (`last = dt >= remaining`) | the `over one ulp` line prints `Error StepRejected 1` |
-| `Adaptive`: neither snapping nor the remainder rule | the `over one ulp`, `from t=1e10` and `never reaches the method` lines print the budget text, the `from t=1e15` line `y = 76`, and the adaptive `y' = 2t` line changes |
+| `Adaptive`: neither snapping nor the remainder rule | the `over one ulp` line prints `Error StepRejected 1`, the `from t=1e15` line `y = 98.7`, and the adaptive `y' = 2t` line and the adaptive canary's count change |
 | `Adaptive`: no `Too_small` rejection (call the method with `h = 0`) | the `never reaches the method` line prints `rhs calls: 5` instead of `1` |
+| `Adaptive`: no finiteness check on `y0` and `rhs t0 y0` | the `adaptive y0 = nan` line prints `Error StepRejected 51` instead of `Error Nan` |
 | `Bdf2`: start Newton from `y_n` instead of the extrapolation | silent: only the speed of Newton changes |
-| `Newton`: Armijo constant `0.`; `min_damping = 1. /. 2.`; an iteration limit of 100 for 50; a `nan` trial residual accepted; no check that `x`, the step or the line-search residual is finite | each silent |
-| `Adaptive`: default `dt_max` of `span` for `span / 10`; no finiteness check on `y0` and `rhs t0 y0` | each silent |
+| `Newton`: Armijo constant `0.`; no check that `x`, the step or the line-search residual is finite | each silent |
+| `Adaptive`: default `dt_max` of `span` for `span / 10`; reject only a step with `h <= 0`, not one below the resolution of `t`; only one half of the start check (`y0` alone or `rhs t0 y0` alone) | each silent |
 | `Halving`: no `max_rejects` give-up; a `nan` estimate accepted | each silent |
-| `Stepper.fixed`: drop the `max 1`; steps of `dt` instead of `span / n`; the last grid time `t0 + n h` instead of `t_end`; `h` instead of the difference of the end times | each silent |
+| `Stepper.fixed`: drop the `max 1`; steps of `dt` instead of `span / n`; the last grid time `t0 + n h` instead of `t_end`; `h` instead of the difference of the end times; only one half of the start check | each silent |
 
-The corpus catches gross breakage (a wrong coefficient, a Jacobian that is plainly wrong, a step that is never allowed to grow back, which exhausts the call budget of the long runs), the pins catch particular mistakes, and it is nearly blind to anything that only changes how fast Newton converges.
+The corpus catches gross breakage (a wrong coefficient, a Jacobian that is plainly wrong, a step that is never allowed to grow back, which exhausts the call budget of the long runs), the pins catch particular mistakes, and it is nearly blind to anything that only changes how fast Newton converges, except through the call count of the adaptive canary: that count moves with the Jacobian (under every swap of two rows, so each swap fails a line of its own) and with Newton's tolerance, but not with the starting guess or the Armijo constant.
 
 ### Known gaps
 
 The silent rows are gaps, and starting points for contributions; [numerics/06-the-corpus.md](numerics/06-the-corpus.md) (section 10) suggests a case for most of them.
 
-- **Newton's safeguards.** Damping is pinned (without it the `atan` line prints `Error Diverged`), and so are the failure names at the start of an iteration and for an infinite step, but not the depth of the line search (the `atan` line needs only the half step), the Armijo constant, the iteration limit or a `nan` trial residual accepted. The checks on the step and on the trial residual are redundant in behaviour (the line search refuses the trial point of a non-finite step, and `nan <= bound` is false), and the check that `x` itself is finite never fires alone in the corpus, so no line pins them. The order of the step test and the line search is pinned, indirectly (table above); a direct pin would be `x² - 3` from 1, which converges today and gives `Error Diverged` when the line search comes first.
-- **Defaults and guards of the drivers:** the default `dt_max`, the `max_rejects` give-up, a `nan` estimate accepted, the finiteness check of `Adaptive.integrate` at the start (the corpus pins that of `Stepper.fixed`), and three rules of `Stepper.fixed`: at least one step, steps of `span / n` rather than `dt`, and a last grid time that is `t_end` itself with each step the difference of its end times (in every corpus case `dt` divides the span and the grid reaches `t_end` by itself).
+- **Newton's safeguards.** Damping is pinned (without it the `atan` line prints `Error Diverged`), and so are its depth (`min_damping = 1/2` turns the `deep line search` line into `Error Diverged`), the iteration limit (a limit of 100 turns `x³` into `Ok [0.000000000138]`), the refusal of a `nan` trial point (`Error Nan` otherwise) and the failure names at the start of an iteration and for an infinite step. The Armijo constant is not pinned: no line tells `1e-4` from `0`, because the root does not depend on it, so a case has to count evaluations. `x² - 5` from 1 is one: the full step lands on 3, where `|f|` is 4, the value it has at 1, a tie that only the constant `0` accepts, and the solve takes 7 evaluations of `f` with `1e-4` and 6 with `0`. The checks on the step and on the trial residual are redundant in behaviour (the line search refuses the trial point of a non-finite step, and `nan <= bound` is false), and the check that `x` itself is finite never fires alone in the corpus, so no line pins them. The order of the step test and the line search is pinned, indirectly (table above); a direct pin would be `x² - 3` from 1, which converges today and gives `Error Diverged` when the line search comes first.
+- **Defaults and guards of the drivers:** the default `dt_max`, the `max_rejects` give-up, a `nan` estimate accepted, the two halves of each driver's start check (in the two `y0 = nan` lines the right-hand side also returns `nan` for that `y0`, so dropping either half alone changes nothing), the rule that rejects a step below the resolution of `t` when it would still move `t` (lines 26 and 28 have steps that snap to 0, and line 27 steps above the resolution; the case would be `dt0 = dt_max = 0.19` from `t = 1e15`, the old line 27, which ends in `Error StepRejected 1` today and in `Ok` with `y = 100` without the rule), and three rules of `Stepper.fixed`: at least one step, steps of `span / n` rather than `dt`, and a last grid time that is `t_end` itself with each step the difference of its end times (in every corpus case `dt` divides the span and the grid reaches `t_end` by itself).
 - **van der Pol** checks only `Ok` at `t = 2000`, a rejection and a finite state, not the values against a reference.
-- **A transposed Jacobian** is pinned by one line, and the Robertson lines print the budget text within seconds, but the soak test has no budget and still stalls on it.
+- **A transposed Jacobian** is pinned by one line, and the Robertson lines print the budget text within seconds; the soak test, whose adaptive cases are on the budget too, ends in about 14 s with `soak robertson x10: passed 0/10`.
 - **The soak test** is a tripwire. **Run time:** the backward Euler canary takes (t_end - t0) / dt = 1 / 2e-6 = 500,000 fixed steps, once in the corpus and ten times in the soak test, and dominates the run; measure it with `time`.
 
 Closing a gap is a self-contained contribution: write the case that would have noticed the mistake, add it by the steps above, and confirm with the mutation that it now fails. [exercises.md](exercises.md) turns several into starter contributions.
