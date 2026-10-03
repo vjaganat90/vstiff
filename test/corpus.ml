@@ -211,6 +211,18 @@ let robertson_accuracy =
         | Error e -> failure e );
   ]
 
+(* Newton must not call an overflow a root: here a too-small Jacobian makes the
+   converged step run past max_float. *)
+let newton_overflow =
+  [
+    ( "newton step that converges into an overflow",
+      Guard.run
+        (fun x -> "Ok " ^ pp_vec x)
+        (fun () ->
+          Newton.solve (fun x -> [| x.(0) -. Float.max_float |]) (fun _ -> [| [| 0.25 |] |]) [| Float.max_float -. 1e297 |])
+    );
+  ]
+
 (* Table order is output order, the order of the lines in corpus.expected. *)
 let corpus =
   List.concat
@@ -227,6 +239,7 @@ let corpus =
       give_up;
       step_control;
       robertson_accuracy;
+      newton_overflow;
     ]
 
 let () = Report.lines corpus

@@ -26,7 +26,10 @@ let solve (f : Vec.t -> Vec.t) (jac : Vec.t -> Linalg.matrix) (x0 : Vec.t) : (Ve
       | Some dx when not (Vec.finite dx) -> Error Fail.Diverged
       (* The step test comes before the line search: near the root round-off keeps the residual from
          decreasing, so the search would refuse every step and call a solved problem Diverged. *)
-      | Some dx when Vec.norm_inf dx <= tol *. (1. +. Vec.norm_inf x) -> Ok (Vec.add x dx)
+      | Some dx when Vec.norm_inf dx <= tol *. (1. +. Vec.norm_inf x) ->
+          (* Next to max_float even a converged step can overflow. *)
+          let x' = Vec.add x dx in
+          if Vec.finite x' then Ok x' else Error Fail.Nan
       | Some dx ->
           (* Damping: far from the root the full step can overshoot; halve lambda until the Armijo test passes. *)
           let rec damp lambda =
