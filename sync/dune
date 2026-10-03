@@ -1,0 +1,30 @@
+; The tripwire between the code and the proofs in verif/, which are about Rocq mirrors of the modules
+; below. dune runtest diffs the canonical form of each (canon.exe: the code without comments or layout)
+; with its committed .canon file, so a code change fails it until the mirror is re-checked and the new
+; form promoted, and a comment-only edit passes. verif/README.md says how to promote.
+(executable
+ (name canon)
+ ; The compiler's own parser and printer; compiler-libs ships with the compiler.
+ (libraries compiler-libs.common))
+
+; Bdf2.coeffs is mirrored in verif/theories/Bdf2_weights.v. A code change anywhere in the module trips.
+(rule
+ (with-stdout-to
+  bdf2.ml.out
+  (run ./canon.exe %{dep:../src/bdf2.ml})))
+
+(rule
+ (alias runtest)
+ (action
+  (diff bdf2.ml.canon bdf2.ml.out)))
+
+; Clock.resolution is the floor under every step, which the controller theorem (T3) will mirror.
+(rule
+ (with-stdout-to
+  clock.ml.out
+  (run ./canon.exe %{dep:../src/clock.ml})))
+
+(rule
+ (alias runtest)
+ (action
+  (diff clock.ml.canon clock.ml.out)))
