@@ -1,0 +1,35 @@
+# Builds and tests vstiff on every pull request and on main: Linux on x86_64 and arm64, macOS
+# on arm64. The expected files must pass unchanged on all three.
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    name: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, ubuntu-24.04-arm, macos-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ocaml/setup-ocaml@v3
+        with:
+          ocaml-compiler: "5.5"
+      - run: opam install --yes dune
+      # --root . makes the checkout the workspace even before it has a dune-project.
+      - run: opam exec -- dune build --root . @check
+      - run: opam exec -- dune build --root .
+      - run: opam exec -- dune runtest --root .
