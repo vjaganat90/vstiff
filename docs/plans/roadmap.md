@@ -1042,7 +1042,9 @@ calibrated against measured effort on this code base **[?]**.
 
 Status (2026-10-03): the recommendations below are accepted, except D13. There is no frozen
 baseline: a PR that supersedes an algorithm re-pins the corpus lines it moves, with the old and
-the new values in its message, and never loosens a correctness bound.
+the new values in its message, and never loosens a correctness bound. The [plan](plan.md) adds
+D15 to D20, takes Radau IIA first under D12, and moves M8's property tests and mutation script to
+its first wave.
 
 | ID | question | recommendation |
 |---|---|---|

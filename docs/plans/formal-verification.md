@@ -612,6 +612,8 @@ Paşca's Kantorovich proof is prior art but predates MathComp 2. Global converge
 - one theorem spans three modules, which tests can only sample;
 - the result turns into a design rule for future controllers.
 
+The [plan](plan.md) keeps T1 and T2 as the pilot and states T3 for the controller that replaces `Halving` in roadmap M2, once its contract has settled (the plan's section 6).
+
 ### 4.2 Prerequisites and cheap test pins
 
 - **The T4 fix and its pins are in** (`dc3bb67`). [`Adaptive.integrate`](../../src/adaptive.ml) snaps steps to the floats and rejects steps that cannot move `t`, and since `3da8c2c` non-final steps below the resolution. Corpus lines 25 to 27 pin one ulp at `t = 1` (using the existing [`Guard.budget`](../../test/guard.ml)), a `dt_max` below the resolution of `t`, and the `y' = 1` wrong-clock case with steps just above it, which a hang detector cannot see; line 28 counts right-hand-side calls to pin that a step which cannot move `t` never reaches the method. The pins landed together with the fix, as the rule never to rewrite a passing expect line ([CONTRIBUTING.md](../../CONTRIBUTING.md), "Expect files are the contract") requires: before the fix the first two printed `no answer within 5e6 rhs calls`.
