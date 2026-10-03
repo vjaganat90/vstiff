@@ -22,3 +22,6 @@ adaptive logistic [0,5] dt0=0.5 tol=1e-6: accepted 1109, rejected 374, max error
 adaptive logistic [0,5] dt_max=1e-3 tol=1e-6: accepted 5021, rejected 0
 robertson t=1e4 tol=1e-6 accuracy: |y1 - ref| = 7.2e-07 < 1e-5: true
 newton step that converges into an overflow: Error Nan
+adaptive y' = 1 over one ulp from t=1: Ok, at t_end: true, y = 2.22045e-16
+adaptive y' = 1 from t=1e10, dt_max = 5e-7 is below t's resolution: Error StepRejected 1
+adaptive y' = 1 from t=1e15 over 100, dt0 = dt_max = 0.19: Ok, at t_end: true, y = 100

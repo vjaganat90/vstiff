@@ -14,10 +14,11 @@ type problem = { rhs : rhs; t0 : float; t_end : float; y0 : Vec.t }
 type point = { t : float; y : Vec.t }
 
 (** Why an adaptive step was rejected. The controller is told so that it can
-    treat the two causes differently; [Halving] does not. *)
+    treat the causes differently; [Halving] does not. *)
 type rejection =
   | Too_large  (** The local error estimate exceeded the tolerance. *)
   | Solver of Fail.t  (** The method could not take the step. *)
+  | Too_small  (** The step is too short to move [t]: the method was not called. *)
 
 (** A method that advances a solution one step at a time: [Stepper.fixed] runs
     any [Method], [Adaptive.integrate] an [Embedded] one. [step] is pure, so a
