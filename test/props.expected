@@ -12,3 +12,6 @@ prop newton Ok is finite: ok 20000
 prop newton Ok passes its own stopping test again: ok 10000
 prop newton converges on linear problems, condition up to 1e4: ok 10000
 prop newton converges from random starts on monotone cubics: ok, at least 99% of 10000
+prop bdf2 exact on quadratics up to the rounding of the coefficients (T1): ok 20000
+prop bdf2 |a1 + a0 - 1| within a few ulps (T1): ok 20000
+prop bdf2 differences contract by q(w) when every ratio is at most w < 1 + sqrt 2 (T2): ok 20000

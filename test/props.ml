@@ -1,7 +1,8 @@
 (* The property suite: each line runs one property on generated cases and prints ok with the count, or the seed and
-   the shrunk case that failed. The kernel properties of docs/plans/plan.md (section 3.3). Each bound is derived in
-   the comment above its property; u is the unit roundoff, the largest relative error of one rounding.
-   docs/testing.md, Properties. *)
+   the shrunk case that failed. The kernel properties of docs/plans/plan.md (section 3.3), then shadows of theorems
+   T1 and T2 of docs/plans/formal-verification.md. Each bound is derived in the comment above its property; u is
+   the unit roundoff, the largest relative error of one rounding. docs/testing.md, Properties. *)
+open Vstiff
 open Numerics
 
 let eps = Float.epsilon
@@ -432,6 +433,100 @@ module NewtonConverges = struct
   let holds p = Result.is_ok (newton p)
 end
 
+(* T1: with h = omega h_prev the formula is exact on quadratics. In units of h_prev the nodes are -1, 0 and omega,
+   so P(s) = c0 + c1 s + c2 s^2 must satisfy P(omega) = a1 P(0) + a0 P(-1) + beta omega P'(omega). Double-double
+   evaluates the defect so closely that only the rounding of Bdf2.coeffs remains: to first order at most 5
+   roundings of a1, 3 of a0 and 3 of beta, so |defect| <= u (5 |a1 P(0)| + 3 |a0 P(-1)| + 3 |beta omega P'(omega)|). *)
+let steps =
+  Gen.map
+    (fun (h_prev, r) -> (h_prev, h_prev *. r))
+    (Gen.pair (Gen.log_uniform ~lo:1e-6 ~hi:1.)
+       (Gen.one_of [ Gen.float ~lo:0.01 ~hi:2.2; Gen.log_uniform ~lo:1e-6 ~hi:2.2 ]))
+
+let show_steps (h_prev, h) = Printf.sprintf "h_prev = %s, h = %s" (num h_prev) (num h)
+
+module Bdf2Exact = struct
+  type t = (float * float) * (float * float * float)
+
+  let name = "bdf2 exact on quadratics up to the rounding of the coefficients (T1)"
+  let gen = Gen.pair steps (Gen.triple entry entry entry)
+  let show (hs, (c0, c1, c2)) = Printf.sprintf "%s, P = %s + %s s + %s s^2" (show_steps hs) (num c0) (num c1) (num c2)
+
+  let worst ((h_prev, h), (c0, c1, c2)) =
+    let omega = h /. h_prev in
+    let { Bdf2.a1; a0; beta } = Bdf2.coeffs omega in
+    let open Dd in
+    let p s = add (of_float c0) (add (mul (of_float c1) s) (mul (of_float c2) (mul s s))) in
+    let w = of_float omega in
+    let now = mul (of_float a1) (p (of_float 0.)) and before = mul (of_float a0) (p (of_float (-1.))) in
+    let slope = mul (of_float beta) (mul w (add (of_float c1) (mul (of_float (2. *. c2)) w))) in
+    let mag x = Float.abs (to_float x) in
+    ratio
+      (mag (sub (p w) (add now (add before slope))))
+      (u *. ((5. *. mag now) +. (3. *. mag before) +. (3. *. mag slope)) *. (1. +. 1e-12))
+
+  let holds c = worst c <= 1.
+end
+
+(* T1 with p = 1 is a1 + a0 = 1. In Bdf2.coeffs both share one rounded denominator, whose rounding cancels to first
+   order in the sum (a1 + a0 = 1); a1 has 4 roundings more and a0 2, so |a1 + a0 - 1| <= u (4 |a1| + 2 |a0| + 1),
+   about 5 ulps of 1 at omega = 2.2. The sum is exact in double-double. *)
+module Bdf2Sum = struct
+  type t = float * float
+
+  let name = "bdf2 |a1 + a0 - 1| within a few ulps (T1)"
+  let gen = steps
+  let show = show_steps
+
+  let worst (h_prev, h) =
+    let { Bdf2.a1; a0; _ } = Bdf2.coeffs (h /. h_prev) in
+    let s = Dd.add (Dd.of_float a1) (Dd.of_float a0) in
+    ratio (Float.abs (s.hi -. 1. +. s.lo)) (u *. ((4. *. Float.abs a1) +. (2. *. Float.abs a0) +. 1.) *. (1. +. 1e-12))
+
+  let holds c = worst c <= 1.
+end
+
+(* T2: since a1 + a0 = 1 the homogeneous recurrence y_{n+2} = a1 y_{n+1} + a0 y_n has d_{n+1} = -a0 d_n for
+   d_n = y_{n+1} - y_n, and -a0 grows with omega and stays below 1 for omega < 1 + sqrt 2: with every ratio at most w
+   the differences contract by q(w) per step. Rounding adds (a1 + a0 - 1) y_{n+1}, at most
+   u (4 |a1| + 2 |a0| + 1) |y_{n+1}| (Bdf2Sum); the three roundings of the recurrence,
+   u (|a1 y_{n+1}| + |a0 y_n| + |y_{n+2}|); and those of a0, q(w), the differences and this test, 10 u q(w) |d_n|.
+   q(w) is computed in closed form, apart from Bdf2.coeffs. *)
+let contraction w = w *. w /. (1. +. (2. *. w))
+
+module Bdf2Contracts = struct
+  type t = float * (float * float) * float array
+
+  let name = "bdf2 differences contract by q(w) when every ratio is at most w < 1 + sqrt 2 (T2)"
+
+  (* Each ratio is w times a share in (0, 1], w itself first. *)
+  let gen =
+    Gen.triple (Gen.float ~lo:0.05 ~hi:2.414) (Gen.pair entry entry)
+      (Gen.array (Gen.int ~lo:1 ~hi:40) (Gen.one_of [ Gen.return 1.; Gen.float ~lo:1e-3 ~hi:1. ]))
+
+  let show (w, (y0, y1), shares) =
+    Printf.sprintf "w = %s, y0 = %s, y1 = %s, ratios w times %s" (num w) (num y0) (num y1) (vector shares)
+
+  let worst (w, (y0, y1), shares) =
+    let q = contraction w in
+    let step (worst, y_prev, y) share =
+      let { Bdf2.a1; a0; _ } = Bdf2.coeffs (w *. share) in
+      let y_next = (a1 *. y) +. (a0 *. y_prev) in
+      let d = Float.abs (y -. y_prev) and y_abs = Float.abs y in
+      let rounding =
+        (((4. *. Float.abs a1) +. (2. *. Float.abs a0) +. 1.) *. y_abs)
+        +. Float.abs (a1 *. y)
+        +. Float.abs (a0 *. y_prev)
+      in
+      let slack = u *. ((10. *. q *. d) +. rounding +. Float.abs y_next) in
+      (Float.max worst (ratio (Float.abs (y_next -. y)) ((q *. d) +. slack)), y, y_next)
+    in
+    let worst, _, _ = Array.fold_left step (0., y0, y1) shares in
+    worst
+
+  let holds c = worst c <= 1.
+end
+
 (* The run seed and the multiplier on the counts: fixed for dune runtest, set from the environment for nightly runs,
    and read once, here. *)
 let setting var default valid =
@@ -464,6 +559,9 @@ let suite ~seed ~scale =
     prop (module NewtonStops) ~count:10000;
     prop (module NewtonLinear) ~count:10000;
     share (module NewtonConverges) ~count:10000;
+    prop (module Bdf2Exact) ~count:20000;
+    prop (module Bdf2Sum) ~count:20000;
+    prop (module Bdf2Contracts) ~count:20000;
   ]
 
 let () =
