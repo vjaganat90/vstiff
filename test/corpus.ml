@@ -242,6 +242,22 @@ let clock =
           bdf2_halving ~dt0:0.19 ~dt_max:0.19 ~tol:1e-6 (y_is_t ~t0:1e15 ~t_end:(1e15 +. 100.))) );
   ]
 
+(* A step that cannot move t is rejected before the method sees it: the only
+   call of the right-hand side is the driver's check of the initial state. *)
+let too_small =
+  [
+    ( "adaptive step that cannot move t never reaches the method",
+      fun () ->
+        let rhs, calls = Instrument.count (Guard.budget (fun _ _ -> [| 1. |])) in
+        let outcome =
+          Guard.run
+            (fun _ -> "Ok")
+            (fun () -> bdf2_halving ~dt_max:5e-7 ~tol:1e-6 { Ode.rhs; t0 = 1e10; t_end = 1e10 +. 1.; y0 = [| 0. |] })
+            ()
+        in
+        Printf.sprintf "%s, rhs calls: %d" outcome (calls ()) );
+  ]
+
 (* Table order is output order, the order of the lines in corpus.expected. *)
 let corpus =
   List.concat
@@ -260,6 +276,7 @@ let corpus =
       robertson_accuracy;
       newton_overflow;
       clock;
+      too_small;
     ]
 
 let () = Report.lines corpus

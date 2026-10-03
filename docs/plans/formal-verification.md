@@ -608,7 +608,7 @@ Paşca's Kantorovich proof is prior art but predates MathComp 2. Global converge
 
 ### 4.2 Prerequisites and cheap test pins
 
-- **The T4 fix and its pins are in** (`dc3bb67`). [`Adaptive.integrate`](../../src/adaptive.ml) snaps steps to the floats and rejects steps that cannot move `t`. Corpus lines 25 to 27 pin one ulp at `t = 1` (using the existing [`Guard.budget`](../../test/guard.ml)), a `dt_max` below the resolution of `t`, and the `y' = 1` wrong-clock case, which a hang detector cannot see. The pins landed together with the fix, as the rule never to rewrite a passing expect line ([CONTRIBUTING.md](../../CONTRIBUTING.md), "Expect files are the contract") requires: before the fix the first two printed `no answer within 5e6 rhs calls`.
+- **The T4 fix and its pins are in** (`dc3bb67`). [`Adaptive.integrate`](../../src/adaptive.ml) snaps steps to the floats and rejects steps that cannot move `t`. Corpus lines 25 to 27 pin one ulp at `t = 1` (using the existing [`Guard.budget`](../../test/guard.ml)), a `dt_max` below the resolution of `t`, and the `y' = 1` wrong-clock case, which a hang detector cannot see; line 28 counts right-hand-side calls to pin that a step which cannot move `t` never reaches the method. The pins landed together with the fix, as the rule never to rewrite a passing expect line ([CONTRIBUTING.md](../../CONTRIBUTING.md), "Expect files are the contract") requires: before the fix the first two printed `no answer within 5e6 rhs calls`.
 - **The Newton overflow is fixed** (`052fdc7`, corpus line 24), and the `.mli` of [`Stepper.fixed`](../../src/stepper.ml) no longer claims an exact landing on `t_end`, so the wording question raised by T10 is closed.
 - **Optionally, add theorem-shadow tests in the corpus style:**
   - ω ≤ 2 on the adaptive cases, by wrapping [`Bdf2`](../../src/bdf2.ml) (a prototype did so with a recording wrapper and a global `ref`; in this repo's style the wrapper is a concrete `Bdf2` wrapper in `Guard`, the one test module allowed to raise, failing with `Invalid_argument` when h exceeds 2 h_prev by more than the snapping of T3 allows, a final step within the clock's resolution aside, which `Guard.run` already prints);
@@ -737,7 +737,7 @@ Row sums: expert 4.5–7.5 days, newcomer 16–29 days. These are judgement, not
 
 | Level | What | Catches | Misses | Cost |
 |---|---|---|---|---|
-| L0 | Current expect corpus and soak | Regressions on 27 cases, bit-level reproducibility | Anything off the sampled paths (finding 1 was off them; lines 25 to 27 pin it now) | Done |
+| L0 | Current expect corpus and soak | Regressions on 28 cases, bit-level reproducibility | Anything off the sampled paths (finding 1 was off them; lines 25 to 27 pin it now) | Done |
 | L1 | Theorem-shadow property tests on the real binary | Violations of a stated property (ω ≤ 2, invariant drift, coefficient rounding) on more inputs | Unsampled inputs | Days |
 | L2 | Real-arithmetic theorems on the mirror (pilot) | Design errors: wrong formula, unsafe ratio policy, broken invariant, non-termination in the model | Coding slips outside the mirror, all rounding effects | Weeks |
 | L3 | Binary64 theorems on the mirror (Flocq, Gappa) | Special values, overflow, rounding bounds, float-only non-termination | Mirror gap, other architectures unless modelled | Weeks to months per theorem |
