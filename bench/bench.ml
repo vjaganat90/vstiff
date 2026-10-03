@@ -62,6 +62,7 @@ let () =
   | Ok options -> (
       match options.mode with
       | Help -> Console.print Options.usage
+      | Transcription -> List.iter Console.print (Transcription.lines ())
       | Table -> with_rows options (table options)
       | Csv -> with_rows options (csv options)
       | Pin -> with_rows options (pin options))

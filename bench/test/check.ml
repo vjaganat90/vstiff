@@ -83,6 +83,7 @@ let parse args =
         | Table -> "table"
         | Csv -> "csv"
         | Pin -> "pin"
+        | Transcription -> "transcription"
         | Help -> "help"
       in
       Printf.sprintf "%s, cpu %b, only %s" mode cpu (Option.value only ~default:"none")
@@ -96,6 +97,8 @@ let options =
     ("--pin", fun () -> parse [ "--pin" ]);
     ("--pin --only hires", fun () -> parse [ "--pin"; "--only"; "hires" ]);
     ("--pin --cpu", fun () -> parse [ "--pin"; "--cpu" ]);
+    ("--transcription", fun () -> parse [ "--transcription" ]);
+    ("--transcription --only hires", fun () -> parse [ "--transcription"; "--only"; "hires" ]);
     ("--csv --pin", fun () -> parse [ "--csv"; "--pin" ]);
     ("--only without a name", fun () -> parse [ "--only" ]);
     ("--only twice", fun () -> parse [ "--only"; "hires"; "--only"; "robertson" ]);
@@ -130,4 +133,21 @@ let problems =
     ("hires right-hand side at y0", fun () -> String.concat "; " (Array.to_list hires));
   ]
 
-let () = Report.lines (List.concat [ accuracy; gate; pin; csv; options; suite; problems ])
+(* The export for the transcription check: a hundred points per problem from a pure generator, the same on every
+   platform; the digits shown are few, because the last bits of y depend on the platform's rounding. *)
+let transcription =
+  let lines = Transcription.lines () in
+  let count (case : Suite.case) =
+    let own line = String.starts_with ~prefix:(case.name ^ ",") line in
+    Printf.sprintf "%s %d" case.name (List.length (List.filter own lines))
+  in
+  let digits field = match float_of_string_opt field with Some v -> Printf.sprintf "%.6g" v | None -> field in
+  let first_five line = List.filteri (fun i _ -> i < 5) (String.split_on_char ',' line) in
+  [
+    ("points per problem", fun () -> String.concat ", " (List.map count Suite.cases));
+    ( "the first point: problem, t, y",
+      fun () ->
+        match lines with line :: _ -> String.concat ", " (List.map digits (first_five line)) | [] -> "no points" );
+  ]
+
+let () = Report.lines (List.concat [ accuracy; gate; pin; csv; options; suite; problems; transcription ])

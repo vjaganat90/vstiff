@@ -1,20 +1,21 @@
-type mode = Table | Csv | Pin | Help
+type mode = Table | Csv | Pin | Transcription | Help
 type t = { mode : mode; cpu : bool; only : string option }
 
 let usage =
-  "usage: bench [--cpu] [--only NAME] [--csv | --pin | --help]\n\
-  \  (no flag)      run every row and print the table, with a verdict per row against the golden table;\n\
-  \                 the exit status is 1 unless every verdict is ok\n\
-  \  --csv          print the rows as CSV instead, without verdicts\n\
-  \  --pin          print the source of bench/golden.ml for this run (bench/README.md)\n\
-  \  --cpu          add the CPU time of each row; it is not reproducible, so nothing compares it\n\
-  \  --only NAME    run only the rows of the problem NAME, as the first column names it\n\
-  \  --help         print this text\n"
+  "usage: bench [--cpu] [--only NAME] [--csv | --pin | --transcription | --help]\n\
+  \  (no flag)        run every row and print the table, with a verdict per row against the golden table;\n\
+  \                   the exit status is 1 unless every verdict is ok\n\
+  \  --csv            print the rows as CSV instead, without verdicts\n\
+  \  --pin            print the source of bench/golden.ml for this run (bench/README.md)\n\
+  \  --transcription  print the right-hand sides at seeded points for bench/compare/transcription.py\n\
+  \  --cpu            add the CPU time of each row; it is not reproducible, so nothing compares it\n\
+  \  --only NAME      run only the rows of the problem NAME, as the first column names it\n\
+  \  --help           print this text\n"
 
-let modes = [ ("--csv", Csv); ("--pin", Pin); ("--help", Help) ]
+let modes = [ ("--csv", Csv); ("--pin", Pin); ("--transcription", Transcription); ("--help", Help) ]
 
 (* The modes that cover every problem: a partial pin would drop the other rows. *)
-let whole = function Pin -> true | Table | Csv | Help -> false
+let whole = function Pin | Transcription -> true | Table | Csv | Help -> false
 
 (* Two mode flags, or two problems, are a mistake: the later one would silently win. The mode keeps its flag for the
    message. *)

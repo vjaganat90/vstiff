@@ -25,7 +25,9 @@ no flag: table, cpu false, only none
 --pin: pin, cpu false, only none
 --pin --only hires: error: --pin covers every problem and takes neither --cpu nor --only
 --pin --cpu: error: --pin covers every problem and takes neither --cpu nor --only
---csv --pin: error: give at most one of --csv, --pin, --help
+--transcription: transcription, cpu false, only none
+--transcription --only hires: error: --transcription covers every problem and takes neither --cpu nor --only
+--csv --pin: error: give at most one of --csv, --pin, --transcription, --help
 --only without a name: error: --only needs a problem name
 --only twice: error: give --only once
 an unknown flag: error: unknown argument --fast
@@ -34,3 +36,5 @@ every row is pinned: true
 brusselator right-hand side at (1, 3): max |f| = 0
 brusselator state has 80 components: 80
 hires right-hand side at y0: -1.7093; 1.7100; 0.0000; 0.0000; 0.0000; 0.0000; 0.0000; 0.0000
+points per problem: robertson 100, hires 100, van_der_pol 100, brusselator_80 100
+the first point: problem, t, y: robertson, 9711.2, 0.857854, 0.471627, 0.667345
