@@ -91,3 +91,20 @@ let () =
   Bdf2.integrate ~rhs ~t0:0. ~t_end:1. ~dt:1e-3 y0
   |> Result.map (max_error (exact 1.))
   |> show_error "bdf2 canary t=1 dt=1e-3 (h lambda = 10)" 1e-6
+
+(* Jacobian orientation: J is not symmetric here, so a transposed J fails. *)
+let () =
+  let f y = [| y.(1); -.y.(0) -. (3. *. y.(1)); (5. *. y.(0)) +. (y.(2) *. y.(2)) |] in
+  let y = [| 1.; 2.; 3. |] in
+  let analytic = [| [| 0.; 1.; 0. |]; [| -1.; -3.; 0. |]; [| 5.; 0.; 2. *. y.(2) |] |] in
+  let relative = Array.map2 (Array.map2 (fun fd a -> (fd -. a) /. (1. +. Float.abs a))) in
+  let err = max_abs (relative (Jac.forward f y) analytic) in
+  case "jac non-symmetric at (1, 2, 3), max entry error relative to |J_ij| < 1e-6" (string_of_bool (err < 1e-6))
+
+(* Partial pivoting: a zero leading entry that needs a row exchange, and a tiny
+   one that elimination without the exchange turns into a wrong answer. *)
+let () =
+  let solved = function Some x -> pp_vec x | None -> "None" in
+  case "linalg zero leading pivot"
+    (solved (Linalg.solve [| [| 0.; 1.; 1. |]; [| 2.; 1.; 0. |]; [| 1.; 0.; 3. |] |] [| 5.; 4.; 10. |]));
+  case "linalg tiny leading pivot" (solved (Linalg.solve [| [| 1e-20; 1. |]; [| 1.; 1. |] |] [| 1.; 2. |]))
