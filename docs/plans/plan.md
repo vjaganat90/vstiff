@@ -1,6 +1,7 @@
 # vstiff plan: a verified, property-tested stiff solver
 
-Status: proposal (2026-10-03). This is the top-level plan. It sets the order of work for two
+Status (2026-10-03): accepted. D15 to D18 and D20 follow their recommendations, and D19 is
+decided as section 9 states. This is the top-level plan. It sets the order of work for two
 accepted documents:
 
 - the [roadmap](roadmap.md), with milestones M1 to M13 and decisions D1 to D14;
@@ -100,12 +101,10 @@ This is the roadmap's "general" (its section 1.3), plus four items:
 - **R4.** Bounded work. Every run ends within a number of right-hand-side calls fixed by its
   options (steps, rejections, budget). A property checks this, and T4 proves it for the driver
   model.
-- **R5.** Determinism. Identical inputs give bit-identical outputs:
-  - within a build;
-  - across processes;
-  - across OCaml 5 domains running solves concurrently.
-
-  Differences between arm64 and x86_64 are zero or documented (D19).
+- **R5.** Determinism within a build. The same binary, given the same inputs, returns the same
+  outputs, across processes and across OCaml 5 domains running solves concurrently. This rules
+  out hidden state, randomness and races. Platforms, compilers and refactors may change the last
+  bits, and every check holds on each of them (D19).
 - **R6.** Scale. These finish: a banded heat problem with n = 1e5, the Brusselator with n = 2000,
   and a sparse circuit or network problem with n from 1e3 to 1e4. Their times are reported, not
   gated.
@@ -184,7 +183,7 @@ At equal achieved error, the cost is within 2x of scipy's BDF (the roadmap's cri
 | V, proofs | Theorems, mirrors, tripwire, differential pins | `feat/verification`, rebased onto `feat/solver` after each solver milestone | `dune build --root verif` in CI; the tripwire is green; the theorem's shadow property exists |
 | B, benchmarks | `bench/` and the scorecard | `feat/solver` (`bench/compare/` is outside the build) | Regenerated from scripts; references follow roadmap 4.2 |
 
-Four rules hold across tracks:
+Five rules hold across tracks:
 
 1. A defect can be found anywhere: by a property, a nightly run, a proof attempt or the
    scorecard. It lands together with its fix and a pinned line that would have shown it. The
@@ -194,7 +193,11 @@ Four rules hold across tracks:
    replaces.
 3. Pins move only as D13 says, and correctness bounds never loosen.
    [`test/refs.ml`](../../test/refs.ml) is never edited; new references go into new modules.
-4. Documentation is updated once per wave.
+4. Checks are about correctness, not bits (D19). An expect line prints a verdict, a typed
+   outcome, or a value to the digits its bound makes meaningful, so the same files pass on every
+   platform of the CI matrix. A change that moves a line either changed behaviour, or exposed a
+   line printed more precisely than its check needs; the commit message says which.
+5. Documentation is updated once per wave.
 
 ---
 
@@ -253,11 +256,11 @@ The contract map lists every property. These examples show the range.
 - **Kernel.**
   - LU's residual stays within the backward-error bound of partial pivoting, with the observed
     growth factor.
-  - `solve (P A) (P b)` equals `solve A b` bit for bit whenever no two pivot candidates tie.
+  - `solve (P A) (P b)` agrees with `solve A b` within that bound.
   - Banded and sparse LU agree with dense LU within that bound.
   - `Jac.forward` is exact on affine maps up to its rounding bound. It keeps the orientation
     J_ij = df_i/dy_j; an asymmetric map catches a transpose.
-  - Coloured differences equal plain ones bit for bit when the sparsity structure is exact.
+  - Coloured differences agree with plain ones within the finite-difference rounding bound.
   - `Newton.solve` never returns `Ok` with a non-finite vector. An `Ok` passes its own stopping
     test when that test is evaluated again.
 - **Methods.**
@@ -273,7 +276,7 @@ The contract map lists every property. These examples show the range.
   - The attempt count stays within T4's bound.
 - **Drivers.**
   - Requested output times are hit exactly.
-  - Dense output reproduces the accepted states bit for bit.
+  - Dense output reproduces the accepted states to rounding error.
   - These transformations act on the solution in the same way, within the tolerance:
     - permuting the components;
     - scaling y and atol by a power of two;
@@ -282,8 +285,8 @@ The contract map lists every property. These examples show the range.
     2's bound.
   - Tolerance proportionality holds on at least 99 % of manufactured problems: achieved error
     over tolerance stays within [1e-2, 1e2], for rtol from 1e-3 to 1e-8.
-- **Robustness.** R2 to R5 are properties: fault injection, budgets, partial results, and
-  identical bits across concurrently running domains.
+- **Robustness.** R2 to R5 are properties: fault injection, budgets, partial results, and the
+  same results from concurrently running domains as from a sequential run.
 - **Global error.**
   - The estimate is within a factor 10 of the true error on at least 95 % of manufactured
     problems.
@@ -417,9 +420,10 @@ reports them.
   D13 re-pin, and its cost shows in the work-precision gate.
 
 **Differential pins** (FV report 4.5, item 4) run in CI throughout. Rocq's primitive-float mirror
-computes coefficient tables and controller decision traces, and CI diffs them against the OCaml
-output. Rocq's primitive floats have no fused multiply-add, so the mirrored OCaml expressions are
-kept free of contraction (D19).
+computes coefficient tables and controller decision traces, and CI compares them with the OCaml
+output within stated rounding bounds, not bit for bit. Rocq's primitive floats have no fused
+multiply-add, and the OCaml code may use it (D19). Traces are compared only on inputs that stay
+clear of each decision threshold by more than those bounds.
 
 **Not planned:**
 
@@ -469,7 +473,7 @@ kept free of contraction (D19).
 
 | Wave | Solver | Properties and robustness | Proofs | Benchmarks | Exit |
 |---|---|---|---|---|---|
-| 0 | M1: bench, references, CI | Harness; kernel properties; contract map; mutation tool and a baseline run | V0 | The work-precision baseline (roadmap Appendix B) | CI green: build, corpus, soak, properties, proofs, tripwire |
+| 0 | M1: bench, references, CI matrix (Linux x86_64 and arm64, macOS arm64) | Harness; kernel properties; contract map; mutation tool and a baseline run | V0 | The work-precision baseline (roadmap Appendix B) | CI green: build, corpus, soak, properties, proofs, tripwire |
 | 1 | M2: tolerances, controllers, the contract change with D16 and D17 | Controller and driver properties; budgets and partial results | V1 | Table re-pinned | Roadmap M2 acceptance; T3 and T4 checked |
 | 2 | M3: in-place LU, modified Newton | LU differential and invariant properties | V2 | Gate | Roadmap M3 acceptance |
 | 3 | M4, M5: variable order | Exactness, order, A(alpha) canaries | V3 | Gate | Roadmap M5 acceptance; a certificate per order, or a certified controller |
@@ -486,6 +490,9 @@ What changes in the two accepted documents:
 - M10 comes before M9. Of D12's two conditions, the cross-check is the one a correctness goal
   needs.
 - M12, the verification hooks, is spread over V0 to V3.
+- The roadmap's bit-identity requirements become agreement within correctness bounds (D19). These
+  are 4.4's bit-identical refactors and hex-dump detector, M3's bit-identical LU, M6's
+  bit-for-bit run with a user Jacobian, and D3's bit-identical PRs.
 - The FV pilot's T3 is restated for the M2 controller and moves to V1.
 
 Effort is judgement, not calibrated against this code base. It is in person-days for one
@@ -507,7 +514,8 @@ developer who knows the code.
 
 ## 9. Decisions
 
-These recommendations follow the roadmap's format; D1 to D14 stand.
+These follow the roadmap's format; D1 to D14 stand. D15 to D18 and D20 are accepted as
+recommended. D19 is decided.
 
 | ID | Question | Recommendation |
 |---|---|---|
@@ -515,7 +523,7 @@ These recommendations follow the roadmap's format; D1 to D14 stand.
 | **D16** | What does an `Error` carry? | The reason, the last accepted point and the statistics. This lands in M2, with D3's history on failure. The reasons gain `Budget`, and later event and DAE-initialization failures, instead of folding them into `StepRejected`. |
 | **D17** | Integrate backward in time? | Yes, in M2. That is before T3 and T4 are stated, so both cover the two directions once. |
 | **D18** | Which other solvers does the scorecard run? | scipy now. CVODE and IDA through `sundialsml`, once the SUNDIALS C library is installed outside the build. Nothing else, unless a gap appears. |
-| **D19** | Bit-identical results across arm64 and x86_64? | Yes, as the target. Float expressions stay free of fused multiply-add contraction; blocking contraction moved no output of today's corpus (FV finding 5). Before the decision is final, M1 measures x86_64 against the pinned files, and the CPU cost of blocking contraction. |
+| **D19** | Bit-identical results across platforms, compilers or refactors? | No. The goal is correct results, not bug compatibility. Every check is a correctness bound, a typed outcome, or a value printed to the digits its bound makes meaningful, so the last bits may change between arm64 and x86_64, between compilers, and in a refactor. Determinism within a build stays (R5): it costs nothing in pure code and catches hidden state. `Float.fma` and compensated sums are used wherever they make a result more accurate. |
 | **D20** | A sparse direct solver? | Yes, as M6b: after the banded solver and before Krylov. Circuits and networks (roadmap 1.1) are sparse without a band. |
 
 ---
@@ -534,5 +542,7 @@ These recommendations follow the roadmap's format; D1 to D14 stand.
   two methods add a cross-check.
 - **CI time.** The per-push run stays within its budget, with about a minute for properties.
   Everything heavier runs nightly.
+- **No bit-level tripwire.** Without bit-identical refactors, a change of behaviour can hide below
+  the printed digits. Properties, mutation testing and the work-precision gate carry that load.
 - **Estimates** are judgement. The waves are ordered so that each one leaves the solver better and
   green, and stopping after any wave leaves a coherent state.
