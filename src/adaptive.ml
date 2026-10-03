@@ -25,12 +25,14 @@ let integrate (module M : Ode.Embedded) (module C : Ode.Controller) ?dt0 ?dt_max
       let dt = C.proposal c and remaining = p.t_end -. at.t in
       (* The last step lands on t_end itself, and so does a remainder below t's
          resolution. Other steps are snapped to the floats, so the state moves by
-         exactly what the clock does; a step that cannot move t is rejected. *)
+         exactly what the clock does, and one below the resolution is rejected:
+         above it snapping changes a step by at most 1/32, so BDF2's step ratio
+         stays near 2, inside its limit 1 + sqrt 2. *)
       let last = dt >= remaining || remaining <= Clock.resolution at.t in
       let t_next = if last then p.t_end else at.t +. dt in
       let h = if last then remaining else t_next -. at.t in
       let retry reason = Result.bind (C.rejected c reason ~at:at.t ~h) (fun c -> go c history at) in
-      if h <= 0. then retry Ode.Too_small
+      if h <= 0. || ((not last) && h < Clock.resolution at.t) then retry Ode.Too_small
       else
         match M.step_with_error p.rhs h history at with
         | Ok (y, err, next) when C.acceptable c ~y ~err -> go (C.accepted c) next { Ode.t = t_next; y }

@@ -1,6 +1,6 @@
 (* Every proposal is at most twice the last accepted step, so BDF2's step ratio
    omega = h / h_prev stays at most 2, inside its limit 1 + sqrt 2, up to the
-   driver snapping steps of a few ulps to the floats. The estimate
+   at most 1/32 by which the driver's snapping changes a step. The estimate
    only decides accept or reject; production controllers also use its size.
    See docs/numerics/05-step-control.md. *)
 

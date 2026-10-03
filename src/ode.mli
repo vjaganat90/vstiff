@@ -19,7 +19,7 @@ type point = { t : float; y : Vec.t }
 type rejection =
   | Too_large  (** The local error estimate exceeded the tolerance. *)
   | Solver of Fail.t  (** The method could not take the step. *)
-  | Too_small  (** The step is too short to move [t]: the method was not called. *)
+  | Too_small  (** The step is below the resolution of [t], and might not move [t] at all: the method was not called. *)
 
 (** A method that advances a solution one step at a time: [Stepper.fixed] runs
     any [Method], [Adaptive.integrate] an [Embedded] one. [step] is pure, so a
