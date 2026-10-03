@@ -126,6 +126,7 @@ You can reproduce the two numbers, and add a third step size, with:
 
 ```ocaml
 open Vstiff
+open Numerics
 
 let () =
   let open Problems.Logistic in
@@ -221,7 +222,7 @@ With variable steps the coefficients change at every step, so the picture with f
 - After a rejection it halves the step that failed, and the history stays what it was. The failed step was at most twice the last accepted step, so the retry is at most as long as that: `ω <= 1`.
 - A fixed-step run, `Stepper.fixed (module Bdf2)`, has `ω = 1` on every BDF2 step up to rounding: each step is the difference of two grid times, which is `h` to within an ulp of `t` (its first step is backward Euler).
 
-So every ratio of proposals is at most 2, safely below `1 + √2 ≈ 2.414`. (The driver also snaps each step to the floats, which moves it by at most an ulp of `t`; [chapter 5](05-step-control.md), section 9, shows that `ω` then stays below 2.2 for steps of 16 ulps or more, and that only shorter steps can pass the limit.) Any change to step control that lets the ratio exceed 2 must re-check it against `1 + √2` first, and the check belongs with the controller, because a different `Ode.Controller` can propose anything. Very small ratios are harmless: as `ω → 0` BDF2 approaches backward Euler (exercise 3).
+So every ratio of proposals is at most 2, safely below `1 + √2 ≈ 2.414`. (The driver also snaps each step to the floats. It rejects a non-final step below `Clock.resolution t`, `16 eps |t|`, and above that the snap changes a step by at most 1/32 of its length, so each step is within 1/32 of its proposal and `ω` stays at most `2 (33/32) / (31/32) = 66/31`, about 2.13 ([chapter 5](05-step-control.md), section 9). Without the rejection a step of a few ulps could snap to a very different length and pass the limit.) Any change to step control that lets the ratio exceed 2 must re-check it against `1 + √2` first, and the check belongs with the controller, because a different `Ode.Controller` can propose anything. Very small ratios are harmless: as `ω → 0` BDF2 approaches backward Euler (exercise 3).
 
 **Probe: watch the ratios.** This wrapper is an `Ode.Embedded` method made of `Bdf2` plus a note of the previous step in its history, and it records the largest `h / h_prev` it is ever asked to take. The driver drops the history of a rejected attempt, so the note always describes the last accepted step:
 
@@ -263,7 +264,7 @@ OCaml notes: `module Spy : Ode.Embedded = struct ... end` is a module that satis
 | Idea | Where |
 |------|-------|
 | The weights `a1`, `a0`, `beta` for a given `ω` | `Bdf2.coeffs omega`, returning a record `{ a1; a0; beta }`, in [`src/bdf2.ml`](../../src/bdf2.ml). The only place where the numbers are defined |
-| One variable-step BDF2 step | `Bdf2.step rhs h history at`, which returns the new state and the next history. Once a previous point exists the internal `bdf2` does the work: `omega = h / h_prev`, the weights from `coeffs`, `psi` and the `guess` of section 6 built with the helpers of [`src/vec.ml`](../../src/vec.ml) (each returns a fresh array; the library never writes into an array it was given), then `Stage.solve` at `t_n + h` with `gamma = beta h` |
+| One variable-step BDF2 step | `Bdf2.step rhs h history at`, which returns the new state and the next history. Once a previous point exists the internal `bdf2` does the work: `omega = h / h_prev`, the weights from `coeffs`, `psi` and the `guess` of section 6 built with the helpers of [`src/numerics/vec.ml`](../../src/numerics/vec.ml) (each returns a fresh array; the library never writes into an array it was given), then `Stage.solve` at `t_n + h` with `gamma = beta h` |
 | Backward Euler (BDF1), and BDF2's first step | `Bdf1.step` in [`src/bdf1.ml`](../../src/bdf1.ml) |
 | The history | `Bdf2.start` is `Start`; every step returns `After { h_prev; y_prev }` (constructors internal to [`src/bdf2.ml`](../../src/bdf2.ml)) |
 | The shared stage equation | `Stage.solve rhs { Stage.t; gamma; psi } guess` in [`src/stage.ml`](../../src/stage.ml) |
@@ -292,7 +293,7 @@ OCaml notes: `module Spy : Ode.Embedded = struct ... end` is a module that satis
    The line through the last two points, `y_n + ω (y_n - y_{n-1})`, which is `O(h²)` away for smooth solutions. Backward Euler starts from `y_n`, which is `O(h)` away.
 
 7. **What is the largest step ratio the adaptive integrator can produce, and why is that safe?**
-   2 for the proposals, below the zero-stability limit `1 + √2`. `Halving` doubles at most once per three accepts and halves on every rejection, so the ratio of its proposals never exceeds 2. Snapping the steps to the floats changes each by at most an ulp of `t`, which lifts the ratio of the steps themselves to at most 2.2 for steps of 16 ulps or more (chapter 5, section 9). A controller with a larger growth factor would need the bound re-checked.
+   2 for the proposals, below the zero-stability limit `1 + √2`. `Halving` doubles at most once per three accepts and halves on every rejection, so the ratio of its proposals never exceeds 2. Snapping the steps to the floats changes each by at most 1/32 of its length (the driver rejects non-final steps below `16 eps |t|`, at least 16 ulps), which lifts the ratio of the steps themselves to at most 66/31, about 2.13 (chapter 5, section 9). A controller with a larger growth factor would need the bound re-checked.
 
 8. **The corpus reports a ratio of 3.99 for the logistic test. What would a first-order method report, and what does the test check?**
    About 2. The test passes only for ratios between 3.5 and 4.5, i.e. orders from about 1.81 to 2.17.

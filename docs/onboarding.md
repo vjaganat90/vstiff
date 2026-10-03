@@ -32,20 +32,21 @@ Days 1 to 8 are foundations: setup, then the code from the smallest module to th
 
 - **Goal.** A working toolchain, a green test run, a map of the repository and a program of your own that calls the library.
 - **Read.** The [README](../README.md) at the repository root; the index in [README.md](README.md) of this folder; the tooling part of [ocaml.md](ocaml.md); the overview of [architecture.md](architecture.md) (skim the rest).
-- **Do.** Install OCaml 5.5.0 and dune as [ocaml.md](ocaml.md) describes. Clone, `git switch night/wip`, run `dune build` and `dune runtest`. Do A1 and A2, set up the probe project and run the README program. Skim every file of `src/` for a minute, one sentence each, then draw the call chain: `Adaptive.integrate` calls `Bdf2.step_with_error`, which calls `Bdf1.step` and (once there is history) a BDF2 step; both call `Stage.solve`, which hands `Newton.solve` a residual and a Jacobian built on `Jac.forward`; every Newton iteration calls that Jacobian and `Linalg.solve`; `Halving` judges the outcome, and `Clock.resolution` tells `Halving`, `Adaptive` and `Check` how short a step `t` can still resolve.
+- **Do.** Install OCaml 5.5.0 and dune as [ocaml.md](ocaml.md) describes. Clone, `git switch night/wip`, run `dune build` and `dune runtest`. Do A1 and A2, set up the probe project and run the README program. Skim every file of `src/` and `src/numerics/` for a minute, one sentence each, then draw the call chain: `Adaptive.integrate` calls `Bdf2.step_with_error`, which calls `Bdf1.step` and (once there is history) a BDF2 step; both call `Stage.solve`, which hands `Newton.solve` a residual and a Jacobian built on `Jac.forward`; every Newton iteration calls that Jacobian and `Linalg.solve`; `Halving` judges the outcome, and `Clock.resolution` tells `Halving`, `Adaptive` and `Check` how short a step `t` can still resolve.
 - **Self-check.**
   1. What does a silent `dune runtest` mean? *Every program's output matched its expected file; a failure prints a diff and exits with status 1.*
   2. What compares the test output with the expected files, `dune build` or `dune runtest`? *Only `dune runtest`. `dune build` runs the two programs, when their output is out of date, to record it and compares nothing.*
   3. Which function integrates with automatic step sizes, and which with equal steps? *`Adaptive.integrate` and `Stepper.fixed`.*
-  4. What does `open Vstiff` do? *Dune wraps the library, so its modules are `Vstiff.Vec`, `Vstiff.Newton` and so on; `open` allows the short names.*
+  4. What does `open Vstiff` do? *Dune wraps each library, so the solver's public modules are `Vstiff.Bdf2`, `Vstiff.Adaptive` and so on, and the kernel's are `Numerics.Vec`, `Numerics.Newton`; `open` allows the short names.*
   5. Why do experiments happen in a probe or a scratch copy? *Nothing is written in the repository, so there is nothing to undo, and a stray file cannot break the build for others.*
+  6. What are the two libraries, and what is public? *`numerics`, the kernel (`Fail`, `Vec`, `Linalg`, `Newton`, `Jac`), which knows nothing about ODEs, and `vstiff`, the solver. `src/vstiff.ml` lists the public modules; `Stage` and `Check` are not on it.*
 - **Done when.** The tests are green, the README program printed `t = 10000`, and you can draw the call chain from memory.
 
 ## Day 2. OCaml basics through `fail` and `vec`
 
 - **Goal.** Read the two smallest modules fluently, ask the compiler for a type, and know what an `.mli` is for.
-- **Read.** The language section of [ocaml.md](ocaml.md) from "How the code reads" through "Modules, `.mli` files and abstraction", and its "Warnings are errors". [src/fail.mli](../src/fail.mli), [src/fail.ml](../src/fail.ml), [src/vec.mli](../src/vec.mli), [src/vec.ml](../src/vec.ml). Glossary: variant, result, option, record, labelled argument, pure.
-- **Do.** From the repository root start `ocaml` (end each phrase with `;;`, leave with `#quit;;`), type `#use "src/vec.ml";;`, then `axpy 2. [|1.; 2.|] [|10.; 20.|];;` and `add [|1.; 2.|] [|10.|];;`. Ask the compiler for the types of `Vec.axpy`, `Newton.solve` and `Jac.forward` (see "Setup" in [exercises.md](exercises.md); it may spell out the library prefix, `Vstiff.Vec.t`: question 4 of day 1). In a probe write `norm_1` (sum of absolute values, with `Array.fold_left`) and `normalized v = Vec.scale (1. /. Vec.norm_inf v) v`, and check that `v` is unchanged. In a scratch copy add a constructor at the end of `Fail.t` in both `fail.ml` and `fail.mli` and run `dune build @check`.
+- **Read.** The language section of [ocaml.md](ocaml.md) from "How the code reads" through "Modules, `.mli` files and abstraction", and its "Warnings are errors". [src/numerics/fail.mli](../src/numerics/fail.mli), [src/numerics/fail.ml](../src/numerics/fail.ml), [src/numerics/vec.mli](../src/numerics/vec.mli), [src/numerics/vec.ml](../src/numerics/vec.ml). Glossary: variant, result, option, record, labelled argument, pure.
+- **Do.** From the repository root start `ocaml` (end each phrase with `;;`, leave with `#quit;;`), type `#use "src/numerics/vec.ml";;`, then `axpy 2. [|1.; 2.|] [|10.; 20.|];;` and `add [|1.; 2.|] [|10.|];;`. Ask the compiler for the types of `Vec.axpy`, `Newton.solve` and `Jac.forward` (a kernel probe, see "Setup" in [exercises.md](exercises.md); it may spell out the library prefix, `Numerics.Vec.t`: question 4 of day 1). In a kernel probe write `norm_1` (sum of absolute values, with `Array.fold_left`) and `normalized v = Vec.scale (1. /. Vec.norm_inf v) v`, and check that `v` is unchanged. In a scratch copy add a constructor at the end of `Fail.t` in both `src/numerics/fail.ml` and `src/numerics/fail.mli` and run `dune build @check`.
 - **Self-check.**
   1. Why does OCaml have `+.` as well as `+`? *No operator overloading and no silent int-to-float conversion: `+` is for integers, `+.` for floats.*
   2. What does `Vec.add [|1.; 2.|] [|10.|]` do, and with the arguments swapped? *The first raises `Invalid_argument`: the operations index by the first argument's length. The second returns `[|11.|]` and ignores the extra entry.*
@@ -58,7 +59,7 @@ Days 1 to 8 are foundations: setup, then the code from the smallest module to th
 ## Day 3. Linear solves and Newton's method
 
 - **Goal.** Understand `Linalg.solve` and `Newton.solve` and run both by hand.
-- **Read.** [numerics/02-newton.md](numerics/02-newton.md), the whole chapter (its last section, on Newton inside the integrator, previews day 5: skim it now and come back to it then); [src/linalg.mli](../src/linalg.mli), [src/linalg.ml](../src/linalg.ml), [src/newton.mli](../src/newton.mli), [src/newton.ml](../src/newton.ml); in [ocaml.md](ocaml.md) the sections on exceptions and mutable cells and on tail recursion. Glossary: partial pivoting, damping, Armijo condition, residual, inf-norm.
+- **Read.** [numerics/02-newton.md](numerics/02-newton.md), the whole chapter (its last section, on Newton inside the integrator, previews day 5: skim it now and come back to it then); [src/numerics/linalg.mli](../src/numerics/linalg.mli), [src/numerics/linalg.ml](../src/numerics/linalg.ml), [src/numerics/newton.mli](../src/numerics/newton.mli), [src/numerics/newton.ml](../src/numerics/newton.ml); in [ocaml.md](ocaml.md) the sections on exceptions and mutable cells and on tail recursion. Glossary: partial pivoting, damping, Armijo condition, residual, inf-norm.
 - **Do.** A3 and A4. Read `Newton.solve` case by case (every `if` branch and `match` case) and write down which result each produces and why.
 - **Self-check.**
   1. Newton on `x^2 - 2` from `x = 1`: the first two iterates? *1.5 and 1.4166666666666667.*
@@ -71,7 +72,7 @@ Days 1 to 8 are foundations: setup, then the code from the smallest module to th
 ## Day 4. Floating point and Jacobians
 
 - **Goal.** Know why a computer cannot differentiate exactly, how `Jac.forward` approximates the Jacobian and where its error comes from.
-- **Read.** [numerics/03-jacobians-and-floating-point.md](numerics/03-jacobians-and-floating-point.md); [src/jac.mli](../src/jac.mli), [src/jac.ml](../src/jac.ml); the `jacobian` cases in [test/corpus.ml](../test/corpus.ml) and the comment above them. Glossary: eps, ulp, round-off, cancellation, forward difference, Jacobian, NaN.
+- **Read.** [numerics/03-jacobians-and-floating-point.md](numerics/03-jacobians-and-floating-point.md); [src/numerics/jac.mli](../src/numerics/jac.mli), [src/numerics/jac.ml](../src/numerics/jac.ml); the `jacobian` cases in [test/corpus.ml](../test/corpus.ml) and the comment above them. Glossary: eps, ulp, round-off, cancellation, forward difference, Jacobian, NaN.
 - **Do.** A5 and C2.
 - **Self-check.**
   1. What are the two errors of a forward difference? *Truncation error, which shrinks with the perturbation, and round-off, which grows like `eps |f| / perturbation`.*
@@ -85,7 +86,7 @@ Days 1 to 8 are foundations: setup, then the code from the smallest module to th
 ## Day 5. ODEs, stiffness, backward Euler and the contracts
 
 - **Goal.** Know what an ODE is, why stiffness defeats explicit methods, how backward Euler escapes, how one step is built, and what a contract is.
-- **Read.** [numerics/01-odes-and-stiffness.md](numerics/01-odes-and-stiffness.md), the whole chapter; [src/ode.mli](../src/ode.mli), [src/stage.mli](../src/stage.mli), [src/stage.ml](../src/stage.ml), [src/bdf1.mli](../src/bdf1.mli), [src/bdf1.ml](../src/bdf1.ml), [src/stepper.mli](../src/stepper.mli), [src/stepper.ml](../src/stepper.ml), [src/check.ml](../src/check.ml); in [ocaml.md](ocaml.md) the sections on module types and on modular explicits. Glossary: stiffness, stage equation, A-stability, contract, module type, modular explicit, history.
+- **Read.** [numerics/01-odes-and-stiffness.md](numerics/01-odes-and-stiffness.md), the whole chapter; [src/ode.mli](../src/ode.mli), [src/stage.mli](../src/stage.mli), [src/stage.ml](../src/stage.ml), [src/bdf1.mli](../src/bdf1.mli), [src/bdf1.ml](../src/bdf1.ml), [src/stepper.mli](../src/stepper.mli), [src/stepper.ml](../src/stepper.ml), [src/check.ml](../src/check.ml); in [ocaml.md](ocaml.md) the sections on module types, on libraries and main modules, and on modular explicits. Glossary: stiffness, stage equation, A-stability, contract, module type, modular explicit, history, public API.
 - **Do.** Run the explicit Euler snippet of chapter 1. B3 and C3. Derive the Jacobian of `G(x) = x - psi - gamma f(t, x)` on paper and find the lines of `Stage.solve` that build it.
 - **Self-check.**
   1. What is the stage equation of a backward Euler step? *`x = psi + gamma f(t_{n+1}, x)` with `psi = y_n`, `gamma = h`; its residual has Jacobian `I - gamma J`.*
@@ -119,8 +120,9 @@ Days 1 to 8 are foundations: setup, then the code from the smallest module to th
   3. When does the step double, and what does a rejection do? *After three accepts in a row, up to `dt_max`. A rejection, for any reason, halves the step that failed and restarts the count.*
   4. Which failures can `Adaptive.integrate` return with `Halving`? *`Nan` before the first step, from `Adaptive`; `StepRejected n` from `Halving`. A failed Newton solve is just a rejection.*
   5. Why does the NaN-wall corpus line say `StepRejected 46` when `max_rejects` is 50? *The floor `16 eps |t|` ends the run before the count does (C4).*
-  6. What are the three reasons for a rejection? *`Too_large`, the estimate exceeded `tol`; `Solver e`, the method could not take the step (Newton failed); and `Too_small`, the driver found the step too short to move `t` and did not call the method. The controller sees which, and `Halving` treats them alike.*
+  6. What are the three reasons for a rejection? *`Too_large`, the estimate exceeded `tol`; `Solver e`, the method could not take the step (Newton failed); and `Too_small`, the step was below the resolution of `t` (it might not move `t` at all), so the driver did not call the method. The controller sees which, and `Halving` treats them alike.*
   7. What does the driver do with a step shorter than half an ulp of `t`? *It snaps the step to `h = (t + dt) - t = 0` and rejects it as `Too_small`; `Halving` halves 0, which is below the floor, so the run ends with `StepRejected 1`.*
+  8. And with a step that would still move `t` but is below `Clock.resolution t`? *Unless it is the last step, it is rejected as `Too_small` too, without calling the method, and `Halving` halves it below the floor: `StepRejected 1`. Above the resolution snapping changes a step by at most 1/32 of its length, which keeps BDF2's step ratio near 2.*
 - **Done when.** Your B4 table matches, you have measured counts for three tolerances, and you can retell `go` without looking.
 
 ## Day 8. The corpus, the effect quarantine and the test policy
@@ -133,8 +135,9 @@ Days 1 to 8 are foundations: setup, then the code from the smallest module to th
   2. What is the soak test for? *A tripwire: the library has no hidden state, so `identical` turns false only if hidden state, randomness, parallelism or a NaN appears.*
   3. When is `dune promote` legitimate? *To record the line of a newly added case, or a deliberate, reviewed format change; never to turn red green.*
   4. Which modules may raise, mutate or print? *Library: `Check` raises, `Instrument` has mutable state. Tests: `Guard` raises and catches, `Report` prints. The rest is pure.*
-  5. Which lines notice swapped Jacobian rows (D1)? *Five change. The `bdf1 canary` line stays `true` and only its digits move, because Newton's root does not depend on the Jacobian, only its speed does.*
-- **Done when.** Your table is complete, you saw D1's five changed lines, and you can state the policy for expected files.
+  5. Which lines notice swapped Jacobian rows (D1)? *Six change. The `bdf1 canary` line stays `true` and only its digits move, because Newton's root does not depend on the Jacobian, only its speed does; the `adaptive canary` line stays `true` too and shows the speed as its count of right-hand-side calls.*
+  6. How does the soak test avoid stalling on a run that crawls? *Its adaptive cases run on the call budget, and `Guard.bounded` turns an exhausted budget into `None`, a round that did not pass.*
+- **Done when.** Your table is complete, you saw D1's six changed lines, and you can state the policy for expected files.
 
 ## Day 9. Breaking the code in a scratch copy, and a first method
 
@@ -152,7 +155,7 @@ Days 1 to 8 are foundations: setup, then the code from the smallest module to th
 
 - **Goal.** Choose a contribution, plan it and prepare it so that a reviewer can accept it.
 - **Read.** All of [CONTRIBUTING.md](../CONTRIBUTING.md), checklist included; section F of [exercises.md](exercises.md); your notebook.
-- **Do.** Pick one item you understand: F1 needs no discussion; F2 adds a corpus case and F9 changes the corpus, so they are discussed first; F3 to F8 are design-first. Write a plan of about five sentences: goal, files, the check that shows it works, documents to update, what you will not do. Branch from `night/wip` (`git switch -c docs/short-slug night/wip`), commit in small Conventional Commits steps and run the checklist item by item. Hand the branch over by pushing it (`git push -u origin <branch>`, to your fork if you cannot push to the project) and asking your reviewer to take it, as [CONTRIBUTING.md](../CONTRIBUTING.md) says; do not merge it.
+- **Do.** Pick one item you understand: F1 needs no discussion; F2 and F3 add a corpus case and F9 changes the corpus, so they are discussed first; F4 to F8 are design-first. Write a plan of about five sentences: goal, files, the check that shows it works, documents to update, what you will not do. Branch from `night/wip` (`git switch -c docs/short-slug night/wip`), commit in small Conventional Commits steps and run the checklist item by item. Hand the branch over by pushing it (`git push -u origin <branch>`, to your fork if you cannot push to the project) and asking your reviewer to take it, as [CONTRIBUTING.md](../CONTRIBUTING.md) says; do not merge it.
 - **Self-check** (the answers are the items of the checklist). Does the change alter behaviour, and which test covers it or which gap remains? Did an expected file change, and only by the lines of a case discussed first? Are effects still quarantined? Do the documents you touched still tell the truth, with every snippet compiled in a probe? Is every commit one logical change?
 - **Done when.** A branch exists whose diff you would defend line by line and every checklist item holds.
 

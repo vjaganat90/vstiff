@@ -4,7 +4,7 @@ Chapter 3 of 6 in the numerical-methods track. Previous: [2. Newton's method](02
 
 **Summary.** A floating-point number is scientific notation in base 2, so `0.1 + 0.2` is not `0.3` and subtracting nearly equal numbers loses digits (cancellation). That limits how well a derivative can be estimated from function values: a forward difference has a truncation error that shrinks with the step and a round-off error that grows as it shrinks, and the best step is near `sqrt(eps)`. `Jac.forward` builds the Jacobian that Newton needs from such differences, with the step `1e-8 (1 + |y_j|)` and a division by the perturbation that was actually stored. A worked example shows a Jacobian entry of the corpus' canary off by `3e-5` although the function is linear, and why the corpus checks the Jacobian absolutely at the origin and relatively elsewhere. The chapter ends with NaN and infinity, and with the fused multiply-add, which can change the last digits of a result when arithmetic is rearranged.
 
-You need [chapter 2](02-newton.md) (why Newton needs a Jacobian) and Taylor series from first-year calculus. The snippets run in the probe project (set up on day 1 from Setup in [exercises.md](../exercises.md), the same recipe as "Running the snippets" in [chapter 1](01-odes-and-stiffness.md)); the OCaml features they use are listed at the top of chapter 2, with more in [docs/ocaml.md](../ocaml.md). Only the canary snippet needs the `problems.ml` link. Notation: `J.(i).(j) = ∂f_i/∂y_j` is the Jacobian of the right-hand side `f`: row `i` is the output component, column `j` the input component. `eps` is `Float.epsilon`, about `2.2e-16`. `|v|_inf` is the largest absolute component of `v`. In this chapter `δ` is the size of a perturbation of an argument (the step of a finite difference); `h` stays reserved for an integration step, which does not appear here.
+You need [chapter 2](02-newton.md) (why Newton needs a Jacobian) and Taylor series from first-year calculus. The snippets run in the probe project (set up on day 1 from Setup in [exercises.md](../exercises.md), the same recipe as "Running the snippets" in [chapter 1](01-odes-and-stiffness.md)); the OCaml features they use are listed at the top of chapter 2, with more in [docs/ocaml.md](../ocaml.md). Only the canary snippet needs the `problems.ml` link, and the snippets that call the kernel (`Jac`, `Vec`) start with `open Numerics`. Notation: `J.(i).(j) = ∂f_i/∂y_j` is the Jacobian of the right-hand side `f`: row `i` is the output component, column `j` the input component. `eps` is `Float.epsilon`, about `2.2e-16`. `|v|_inf` is the largest absolute component of `v`. In this chapter `δ` is the size of a perturbation of an argument (the step of a finite difference); `h` stays reserved for an integration step, which does not appear here.
 
 ## 1. Floating-point numbers
 
@@ -95,7 +95,7 @@ J.(i).(j)  ≈  ( f_i(y + δ_j e_j) - f_i(y) ) / δ_j        e_j = the j-th unit
 One evaluation `f(y)` is shared by all columns and each column needs one more, so a Jacobian costs `n + 1` evaluations of `f`. Newton asks for a new one at every iteration ([chapter 2](02-newton.md)), which is expensive; production codes reuse one across iterations. `Jac.forward f y` returns an array of rows: `Array.length (f y)` rows and `Array.length y` columns, so three outputs and two inputs give a 3×2 matrix. A check of the orientation, with `f_0 = y_0 + 2 y_1` and `f_1 = 3 y_0 + 4 y_1`:
 
 ```ocaml
-open Vstiff
+open Numerics
 
 let () =
   let f y = [| y.(0) +. (2. *. y.(1)); (3. *. y.(0)) +. (4. *. y.(1)) |] in
@@ -116,7 +116,7 @@ let () =
 
 ## 4. The step of `Jac.forward`
 
-[`src/jac.ml`](../../src/jac.ml) has a private step function and the code that builds the perturbed point for column `j`:
+[`src/numerics/jac.ml`](../../src/numerics/jac.ml) has a private step function and the code that builds the perturbed point for column `j`:
 
 ```text
 let step yj = 1e-8 *. (1. +. Float.abs yj)
@@ -167,7 +167,7 @@ The corpus' canary is `y' = -Λ y` with `Λ = diag(1, 100, 1e4)` ([chapter 6](06
 The error is pure round-off from one rounded product: the price of a forward difference with this step, not a bug. Its bound is half an ulp of `1e4` over the step, `9.1e-13 / 2e-8 = 4.5e-5`; the rule of thumb `eps |f| / δ` gives `1.1e-4`. Relative to the entry it is `3.0e-9`. Check it (needs the `problems.ml` link):
 
 ```ocaml
-open Vstiff
+open Numerics
 
 let () =
   let open Problems.Canary in
@@ -210,7 +210,7 @@ Both lines also pass with a step of `1e-6`, so a third line pins the step itself
 **`max` and equality.** `Float.max` and `Float.min` return `nan` if either argument is `nan`, so one NaN component makes `Vec.norm_inf` (and the weighted error of `Halving.acceptable`) `nan`, which then fails the tests above. For the same reason the explicit `Vec.finite fx'` in Newton's line search is redundant: `norm_inf fx'` is already `nan` or `infinity` whenever an entry is not finite, and `nan <= bound` is false. The generic `max` (no `Float.` prefix) does not do this and is not even symmetric: `max nan 1.` is `1.` but `max 1. nan` is `nan`. A `norm_inf` built on it would lose a NaN that is followed by a larger entry, which is why the example below puts the NaN first. Equality: `=` says `nan = nan` is false, even for the same value, and `[| nan |] = [| nan |]` is false; `Float.equal nan nan` and `compare nan nan = 0` treat NaN as equal to itself; and `0. = -0.` is true. The soak test compares results with `=` ([docs/testing.md](../testing.md)), so a result containing NaN prints `identical: false`.
 
 ```ocaml
-open Vstiff
+open Numerics
 
 let () =
   let nan = Float.nan in
@@ -231,7 +231,7 @@ Vec.norm_inf [|nan; 1|] = nan
 1/0 = inf   0/0 = nan   inf - inf = nan   exp 710 = inf
 ```
 
-**What the library does with them.** `Newton.solve` returns `Error Nan` when `x` or `G(x)` is not finite at the start of an iteration; after the first iteration that does not happen in practice, because damping refuses any trial point whose residual is not finite and shortens the step instead (if every shortened step is refused, the result is `Error Diverged`, and so it is for a non-finite Newton step; corpus lines 39 and 40 pin the names at the start and for a step that overflows). It returns `Error Nan` too when a converged step `x + dx` overflows to infinity, which the stopping test, being relative, cannot see. `Stepper.fixed` and `Adaptive.integrate` return `Error Nan` if `y0` or `rhs t0 y0` is not finite (a fixed-step run with an empty span included); `Adaptive.integrate` treats a failed Newton solve like a bad error estimate: the step is rejected and halved ([chapter 5](05-step-control.md)). All numerical failures are `Fail.t` values, never exceptions.
+**What the library does with them.** `Newton.solve` returns `Error Nan` when `x` or `G(x)` is not finite at the start of an iteration; after the first iteration that does not happen in practice, because damping refuses any trial point whose residual is not finite and shortens the step instead (if every shortened step is refused, the result is `Error Diverged`, and so it is for a non-finite Newton step; corpus lines 39 and 40 pin the names at the start and for a step that overflows, and line 47 pins the refusal: the full step of `log x` from 3 lands where `log` is `nan`). It returns `Error Nan` too when a converged step `x + dx` overflows to infinity, which the stopping test, being relative, cannot see. `Stepper.fixed` and `Adaptive.integrate` return `Error Nan` if `y0` or `rhs t0 y0` is not finite (a fixed-step run with an empty span included; corpus lines 36 and 44); `Adaptive.integrate` treats a failed Newton solve like a bad error estimate: the step is rejected and halved ([chapter 5](05-step-control.md)). All numerical failures are `Fail.t` values, never exceptions.
 
 ## 8. Fused multiply-add and the last digits
 
@@ -258,20 +258,20 @@ The exact value of `1 - (1 + eps)(1 - eps)` is `eps² = 2^-104`: the fused form 
 
 What this means for changing the code:
 
-- Whether a product fuses depends on the shape of the expression, not on how it reads. In the current build on arm64 the products in `Vec.axpy` (`a *. x.(i) +. y.(i)`), in the stage Jacobian (`1 - gamma J`), in the perturbed point of `Jac.forward` (`y_j + 1e-8 (1 + |y_j|)`), in the grid time `t0 + k h` of `Stepper.fixed` and twice in the van der Pol right-hand side of `test/problems.ml` fuse, as do `1 - armijo λ` in `Newton` and one product in `Bdf2.coeffs` (both are a float times a power of two, hence exact, so fusing them changes nothing); the elimination step of `Linalg` does not. To see for yourself, compile a standalone file with `ocamlopt -S -c file.ml` and look in `file.s` for the mnemonics `fmadd`, `fmsub`, `fnmadd` and `fnmsub`; for a library module, add `(ocamlopt_flags (:standard -S))` to the `library` stanza of `src/dune` in a scratch copy and look in `_build/default/src/.vstiff.objs/native/` after `dune build`.
+- Whether a product fuses depends on the shape of the expression, not on how it reads. In the current build on arm64 the products in `Vec.axpy` (`a *. x.(i) +. y.(i)`), in the stage Jacobian (`1 - gamma J`), in the perturbed point of `Jac.forward` (`y_j + 1e-8 (1 + |y_j|)`), in the grid time `t0 + k h` of `Stepper.fixed` and twice in the van der Pol right-hand side of `test/problems.ml` fuse, as do `1 - armijo λ` in `Newton` and one product in `Bdf2.coeffs` (both are a float times a power of two, hence exact, so fusing them changes nothing); the elimination step of `Linalg` does not. To see for yourself, compile a standalone file with `ocamlopt -S -c file.ml` and look in `file.s` for the mnemonics `fmadd`, `fmsub`, `fnmadd` and `fnmsub`; for a library module, add `(ocamlopt_flags (:standard -S))` to the `library` stanza of `src/dune` (a solver module) or of `src/numerics/dune` (a kernel module: `Vec`, `Jac`, `Newton`, `Linalg`) in a scratch copy and look in `_build/default/src/.vstiff.objs/native/`, respectively `_build/default/src/numerics/.numerics.objs/native/`, after `dune build`.
 - Moving a product into or out of a sum (binding it with `let`, factoring, reordering operands) can change the last bits of a result, and `test/corpus.expected` and `test/soak.expected` print digits (`3.68e-07`) and counts (`accepted 1109`) that such a change could move. A change that is meant to leave the numbers alone must leave both expect files byte-identical; run `dune runtest` after any arithmetic edit.
-- Today the recorded lines do not hinge on fusion: binding every fused product of the library and of `test/problems.ml` with `let` leaves both expect files byte-identical on arm64. That is a fact about this code, not a promise about the next change. A rounding difference is not a bug, but it must not be recorded as a silent change to an expect file ([docs/testing.md](../testing.md) has the policy).
+- Today the recorded lines do not hinge on fusion: binding every fused product of both libraries and of `test/problems.ml` with `let` leaves both expect files byte-identical on arm64. That is a fact about this code, not a promise about the next change. A rounding difference is not a bug, but it must not be recorded as a silent change to an expect file ([docs/testing.md](../testing.md) has the policy).
 
 ## In the code
 
 | Idea | Where |
 |------|-------|
-| The step `1e-8 (1 + abs y_j)` | the private function `step` in [`src/jac.ml`](../../src/jac.ml) |
+| The step `1e-8 (1 + abs y_j)` | the private function `step` in [`src/numerics/jac.ml`](../../src/numerics/jac.ml) |
 | The forward-difference Jacobian: perturb one component, divide by the stored perturbation, build the rows | `Jac.forward`, local function `column` |
 | The stage Jacobian `I - gamma J` | `Stage.solve` in [`src/stage.ml`](../../src/stage.ml): local `jacobian` calls `Jac.forward f x` and forms `(if i = j then 1. else 0.) -. gamma *. v` |
-| Finite checks | `Vec.finite`, `Vec.norm_inf` in [`src/vec.ml`](../../src/vec.ml); `Newton.solve` ([`src/newton.ml`](../../src/newton.ml)) at the start of an iteration, on the step, on each trial residual and on a converged `x + dx` |
+| Finite checks | `Vec.finite`, `Vec.norm_inf` in [`src/numerics/vec.ml`](../../src/numerics/vec.ml); `Newton.solve` ([`src/numerics/newton.ml`](../../src/numerics/newton.ml)) at the start of an iteration, on the step, on each trial residual and on a converged `x + dx` |
 | The accept test that rejects NaN | `Halving.acceptable` in [`src/halving.ml`](../../src/halving.ml) |
-| `Error Nan` at the start of a run | `Adaptive.integrate` and `Stepper.fixed`: `Vec.finite p.y0 && Vec.finite f0`, with `f0 = p.rhs p.t0 p.y0`, in [`src/adaptive.ml`](../../src/adaptive.ml) and [`src/stepper.ml`](../../src/stepper.ml); `Fail.Nan` in [`src/fail.ml`](../../src/fail.ml) |
+| `Error Nan` at the start of a run | `Adaptive.integrate` and `Stepper.fixed`: `Vec.finite p.y0 && Vec.finite f0`, with `f0 = p.rhs p.t0 p.y0`, in [`src/adaptive.ml`](../../src/adaptive.ml) and [`src/stepper.ml`](../../src/stepper.ml); `Fail.Nan` in [`src/numerics/fail.ml`](../../src/numerics/fail.ml) |
 | The Jacobian checks | the `jacobian`, `orientation` and `jacobian_step` cases of [`test/corpus.ml`](../../test/corpus.ml); the `jac` lines of [`test/corpus.expected`](../../test/corpus.expected) |
 
 ## Check yourself

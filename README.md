@@ -2,18 +2,19 @@
 
 GPL-3.0-only. Work happens on night/wip. Do not merge.
 
-vstiff is a small OCaml library (OCaml 5.5, standard library only, built with dune) that integrates stiff ordinary differential equations with a variable-step BDF2 method.
+vstiff is a small OCaml library (OCaml 5.5, standard library only, built with dune) that integrates stiff ordinary differential equations with a variable-step BDF2 method. It is built as two dune libraries: the solver, `vstiff`, and the numerical kernel it rests on, `numerics`.
 
 An ordinary differential equation (ODE) `y' = f(t, y)` says how fast a state `y` (a vector of numbers, for example three concentrations) changes with time `t`; integrating it means computing the state at a later time from the state at the start. It is *stiff* when some parts of the state change on very short time scales while the part you care about changes slowly. Explicit methods then need tiny steps to stay stable, even when accuracy alone would allow long ones. vstiff uses implicit methods, backward Euler and BDF2 (backward differentiation formulas): every step solves an equation for the new state with Newton's method, and stays stable at long steps. The ideas are explained from scratch in [docs/numerics/01-odes-and-stiffness.md](docs/numerics/01-odes-and-stiffness.md) and the five chapters after it; [docs/glossary.md](docs/glossary.md) defines the terms.
 
 ## What it provides
 
-- **Contracts** (OCaml module types) in [src/ode.mli](src/ode.mli): `Ode.Method` (one step), `Ode.Embedded` (a step plus an error estimate) and `Ode.Controller` (a step-size policy), with the types `Ode.problem`, `Ode.point` and `Ode.rhs`. Methods and controllers are modules that implement them.
+- **Contracts** (OCaml module types) in [src/ode.mli](src/ode.mli): `Ode.Method` (one step), `Ode.Embedded` (a step plus an error estimate) and `Ode.Controller` (a step-size policy), with the types `Ode.problem`, `Ode.point` and `Ode.rhs`. Methods and controllers are modules that implement them. A vector is a plain `float array` in every public signature.
 - **Methods:** `Bdf1` (backward Euler, an `Ode.Method`) and `Bdf2` (variable-step BDF2, an `Ode.Embedded` whose first step is backward Euler).
-- **Controller:** `Halving` rejects a step whose scaled error estimate exceeds `tol` (or whose solve fails, or that is too short to move `t`), halves the step that failed, and doubles the step after three accepts in a row, up to `dt_max`.
-- **Drivers:** `Stepper.fixed` takes about `(t_end - t0) / dt` steps of one length `h` with any `Ode.Method`, step `k` ending at `t0 + k h` and the last one at `t_end` itself; `Adaptive.integrate` takes adaptive steps with any `Ode.Embedded` and `Ode.Controller`, lands exactly on `t_end` and snaps every other step to the floats, `h = (t + dt) - t`. Both hand the method the difference of a step's end times, so that the state advances by exactly what the clock does.
-- **Named failures:** numerical trouble comes back as `Error` of `Fail.t` (`Diverged`, `StepRejected n` or `Nan`, which both drivers also return for a start that is not finite), never as an exception. Only `Check` raises on purpose: `Invalid_argument`, for arguments that make no sense (`dt`, `dt0`, `dt_max` or `tol` not positive, `t_end < t0`, a `dt` below the resolution of `t`, an `rhs t0 y0` of the wrong length).
-- **Building blocks:** `Newton`, `Jac` (forward-difference Jacobians), `Linalg`, `Stage`, `Vec`, `Clock` (how short a step `t` can still resolve) and `Instrument` to count right-hand-side calls.
+- **Controller:** `Halving` rejects a step whose scaled error estimate exceeds `tol` (or whose solve fails, or that is below the resolution of `t`), halves the step that failed, and doubles the step after three accepts in a row, up to `dt_max`.
+- **Drivers:** `Stepper.fixed` takes about `(t_end - t0) / dt` steps of one length `h` with any `Ode.Method`, step `k` ending at `t0 + k h` and the last one at `t_end` itself; `Adaptive.integrate` takes adaptive steps with any `Ode.Embedded` and `Ode.Controller`, lands exactly on `t_end`, snaps every other step to the floats, `h = (t + dt) - t`, and rejects one below the resolution of `t` without calling the method. Both hand the method the difference of a step's end times, so that the state advances by exactly what the clock does.
+- **Named failures:** numerical trouble comes back as `Error` of `Fail.t` (`Diverged`, `StepRejected n` or `Nan`, which both drivers also return for a start that is not finite), never as an exception. Only the internal `Check` raises on purpose: `Invalid_argument`, for arguments that make no sense (`dt`, `dt0`, `dt_max` or `tol` not positive, `t_end < t0`, a `dt` below the resolution of `t`, an `rhs t0 y0` of the wrong length).
+- **Public API:** `Vstiff` ([src/vstiff.mli](src/vstiff.mli)) lists `Ode`, `Fail`, `Clock` (how short a step `t` can still resolve), `Instrument` (counts right-hand-side calls), `Bdf1`, `Bdf2`, `Halving`, `Stepper` and `Adaptive`. `Stage` (the equation inside every implicit step) and `Check` are internal.
+- **Numerical kernel:** the library `numerics` (`src/numerics/`): `Newton`, `Jac` (forward-difference Jacobians), `Linalg`, `Vec` and `Fail`. It knows nothing about ODEs. `Vstiff.Fail` is its `Fail`, re-exported; a program that calls `Newton`, `Jac`, `Linalg` or `Vec` itself links `numerics` too.
 
 ## A first program
 
@@ -52,7 +53,7 @@ printf '(executable (name probe) (libraries vstiff))\n' > p/dune
 dune build --root . ./p/probe.exe && ./_build/default/p/probe.exe
 ```
 
-(`--root .` keeps dune from treating an enclosing directory as the project.) The first line is `t = 10000`, and `y1` prints as `0.10730`, the reference value in [test/refs.ml](test/refs.ml) to five decimals (the corpus pins the error below `1e-5`). The step counts on the last line are yours to measure: they are not in the expected files and depend on the tolerance. [docs/exercises.md](docs/exercises.md) builds on this setup.
+(`--root .` keeps dune from treating an enclosing directory as the project; a program that calls `Newton`, `Jac`, `Linalg` or `Vec` needs `(libraries vstiff numerics)` and `open Numerics`, see [docs/testing.md](docs/testing.md).) The first line is `t = 10000`, and `y1` prints as `0.10730`, the reference value in [test/refs.ml](test/refs.ml) to five decimals (the corpus pins the error below `1e-5`). The step counts on the last line are yours to measure: they are not in the expected files and depend on the tolerance. [docs/exercises.md](docs/exercises.md) builds on this setup.
 
 ## Quick start
 
@@ -65,18 +66,22 @@ dune build
 dune runtest
 ```
 
-`dune build` compiles the library and the tests and also runs the two test programs to record their output, so it is not instant. `dune runtest` compares that output with [test/corpus.expected](test/corpus.expected) and [test/soak.expected](test/soak.expected): silence and exit status 0 mean it matches, otherwise dune prints a diff (`-` is the expected line, `+` what was printed) and exits with status 1. A failing test is information: never run `dune promote` to silence it ([CONTRIBUTING.md](CONTRIBUTING.md) says when promoting is legitimate).
+`dune build` compiles both libraries and the tests and also runs the two test programs to record their output, so it is not instant. `dune runtest` compares that output with [test/corpus.expected](test/corpus.expected) and [test/soak.expected](test/soak.expected): silence and exit status 0 mean it matches, otherwise dune prints a diff (`-` is the expected line, `+` what was printed) and exits with status 1. A failing test is information: never run `dune promote` to silence it ([CONTRIBUTING.md](CONTRIBUTING.md) says when promoting is legitimate).
 
 ## Layout
 
 ```text
-src/        the library; every module has an .mli, ode.mli is interface only
-  fail  vec  linalg  clock   failures, vectors, the linear solve, the resolution of time
-  newton  jac  stage         the equation inside every implicit step
+src/        the solver library, vstiff; every module has an .mli, ode.mli is interface only
+  vstiff                     the main module: the public API (vstiff.ml, vstiff.mli)
+  fail  clock                failures (the kernel's, re-exported), the resolution of time
+  stage                      the equation inside every implicit step (internal)
   ode.mli                    the contracts
   bdf1  bdf2  halving        methods and the step-size controller
   stepper  adaptive          the two drivers
-  check  instrument          the only effects: raising, counting
+  check  instrument          the only effects: raising (internal), counting
+  numerics/                  the kernel, a library of its own that knows nothing about ODEs
+    fail  vec  linalg        failures, vectors, the linear solve
+    newton  jac              damped Newton, forward-difference Jacobians
 test/       corpus.ml (the cases) with corpus.expected, soak.ml with soak.expected,
             problems.ml, refs.ml (reference values), guard.ml, report.ml
 docs/       documentation; docs/README.md is the index
@@ -86,7 +91,7 @@ docs/       documentation; docs/README.md is the index
 
 - **New to OCaml or numerical analysis?** Follow [docs/onboarding.md](docs/onboarding.md), ten working days from setup to a first contribution.
 - **Looking for something?** [docs/README.md](docs/README.md) indexes every document, with reading orders and a one-hour path.
-- **Want the code first?** Read the `.mli` files of `src/` in the order of [docs/README.md](docs/README.md), then `test/corpus.ml` and `test/corpus.expected`.
+- **Want the code first?** Read the `.mli` files of `src/` and `src/numerics/` in the order of [docs/README.md](docs/README.md), then `test/corpus.ml` and `test/corpus.expected`.
 - **Ready to change something?** Read [CONTRIBUTING.md](CONTRIBUTING.md), then pick an item from [docs/exercises.md](docs/exercises.md).
 
 ## Status and limitations
@@ -98,7 +103,7 @@ vstiff is a work in progress. The known gaps double as starter contributions ([d
 - One mixed absolute and relative weight `1 / (1 + |y_i|)`, no separate `rtol` and `atol`: tiny components such as Robertson's `y2` are controlled only loosely.
 - `Halving` counts every rejection together, whatever its reason; `Instrument` counts right-hand-side calls only, so Newton iterations per step are invisible from outside.
 - No dense output: the drivers return only the final state. `Linalg.solve` is dense Gaussian elimination, meant for small systems.
-- Tests: the backward Euler canary takes 500,000 steps and dominates the test time; van der Pol accuracy is not checked against a reference; the soak test is a tripwire, not extra coverage, and unlike the corpus it has no call budget, so a transposed Jacobian fails the corpus within seconds but still stalls the soak test.
+- Tests: the backward Euler canary takes 500,000 steps and dominates the test time; van der Pol accuracy is not checked against a reference; the soak test is a tripwire, not extra coverage, and its adaptive cases run on a call budget, so a transposed Jacobian ends it in about 14 s with `soak robertson x10: passed 0/10` instead of stalling it; no line pins Newton's Armijo constant, nor the driver's rejection of a step that is below the resolution of `t` but would still move it.
 
 ## License
 

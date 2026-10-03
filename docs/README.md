@@ -14,8 +14,8 @@ Throughout, `t` is time, `y` the state vector, `f` the right-hand side (called `
 | [onboarding.md](onboarding.md) | A ten-working-day plan from zero to a first contribution, with readings, exercises, self-checks and a done-when line for each day. |
 | [glossary.md](glossary.md) | Terms and symbols, each with a short definition and where it is explained. |
 | [exercises.md](exercises.md) | Graded exercises (warm-ups, reading, probes, breaking the code in a scratch copy), a capstone against the contracts, and starter contributions. |
-| [ocaml.md](ocaml.md) | OCaml and tooling primer: opam, dune, the commands you will type, and the language features the code uses. |
-| [architecture.md](architecture.md) | The contracts, the modules, how data flows between them, and where effects live. |
+| [ocaml.md](ocaml.md) | OCaml and tooling primer: opam, dune, the commands you will type, and the language features the code uses, libraries and main modules included. |
+| [architecture.md](architecture.md) | The two libraries and the public API, the contracts, the modules, how data flows between them, and where effects live. |
 | [testing.md](testing.md) | How the tests are built and run, how to read a failure, the policy for changing expectations, adding a case, probes. |
 | [numerics/01-odes-and-stiffness.md](numerics/01-odes-and-stiffness.md) | ODEs, explicit and backward Euler, order, stability and stiffness. |
 | [numerics/02-newton.md](numerics/02-newton.md) | Newton's method, damping and the linear solves inside it. |
@@ -30,19 +30,20 @@ Throughout, `t` is time, `y` the state vector, `f` the right-hand side (called `
 
 **The numerics track.** Read the six chapters in `numerics/` in order, 1 to 6. Each begins by saying what it assumes from the earlier ones and ends with questions to check yourself. You need calculus, plus the little linear algebra that is explained where it appears. The OCaml snippets are optional but worth running. ([onboarding.md](onboarding.md) visits the chapters in the order 2, 3, 1, 4, 5, 6, which their prerequisites allow, to match the code it asks you to read each day.)
 
-**The code track.** Learn OCaml from [ocaml.md](ocaml.md) while reading the library from the smallest pieces towards the drivers. For each module read the `.mli` first, which documents the API, then the `.ml`, which has implementation notes:
+**The code track.** Learn OCaml from [ocaml.md](ocaml.md) while reading the code from the smallest pieces towards the drivers: first the kernel, the library `numerics`, then the solver, the library `vstiff`. For each module read the `.mli` first, which documents the API, then the `.ml`, which has implementation notes:
 
-1. [src/fail.mli](../src/fail.mli): the named failures and the `let*` operators.
-2. [src/vec.mli](../src/vec.mli): vectors that are never mutated.
-3. [src/linalg.mli](../src/linalg.mli): the linear solve.
-4. [src/newton.mli](../src/newton.mli): damped Newton's method.
-5. [src/jac.mli](../src/jac.mli): forward-difference Jacobians.
-6. [src/ode.mli](../src/ode.mli): the contracts every method and controller implements.
-7. [src/stage.mli](../src/stage.mli): the implicit equation every BDF step solves.
-8. [src/check.mli](../src/check.mli) and [src/instrument.mli](../src/instrument.mli): the only effects in the library.
-9. [src/bdf1.mli](../src/bdf1.mli), [src/bdf2.mli](../src/bdf2.mli): the methods.
-10. [src/clock.mli](../src/clock.mli) and [src/halving.mli](../src/halving.mli): the resolution of time, and the step-size controller.
-11. [src/stepper.mli](../src/stepper.mli), [src/adaptive.mli](../src/adaptive.mli): the two drivers.
+1. [src/numerics/fail.mli](../src/numerics/fail.mli): the named failures and the `let*` operators.
+2. [src/numerics/vec.mli](../src/numerics/vec.mli): vectors that are never mutated.
+3. [src/numerics/linalg.mli](../src/numerics/linalg.mli): the linear solve.
+4. [src/numerics/newton.mli](../src/numerics/newton.mli): damped Newton's method.
+5. [src/numerics/jac.mli](../src/numerics/jac.mli): forward-difference Jacobians.
+6. [src/vstiff.mli](../src/vstiff.mli) and [src/fail.mli](../src/fail.mli): the public API of the solver, and how it re-exports the kernel's failures.
+7. [src/ode.mli](../src/ode.mli): the contracts every method and controller implements.
+8. [src/stage.mli](../src/stage.mli): the implicit equation every BDF step solves.
+9. [src/check.mli](../src/check.mli) and [src/instrument.mli](../src/instrument.mli): the only effects in the library.
+10. [src/bdf1.mli](../src/bdf1.mli), [src/bdf2.mli](../src/bdf2.mli): the methods.
+11. [src/clock.mli](../src/clock.mli) and [src/halving.mli](../src/halving.mli): the resolution of time, and the step-size controller.
+12. [src/stepper.mli](../src/stepper.mli), [src/adaptive.mli](../src/adaptive.mli): the two drivers.
 
 Then the tests: [test/problems.ml](../test/problems.ml), [test/refs.ml](../test/refs.ml), [test/guard.ml](../test/guard.ml), [test/report.ml](../test/report.ml), [test/corpus.ml](../test/corpus.ml) with [test/corpus.expected](../test/corpus.expected), and [test/soak.ml](../test/soak.ml) with [test/soak.expected](../test/soak.expected).
 
@@ -50,6 +51,7 @@ Then the tests: [test/problems.ml](../test/problems.ml), [test/refs.ml](../test/
 
 | Source | Read about it in |
 |---|---|
+| `vstiff`, `numerics` (the libraries) | [architecture.md](architecture.md) (the two libraries, the public API), [ocaml.md](ocaml.md) (libraries, main modules, aliases, re-exports) |
 | `fail`, `vec` | [ocaml.md](ocaml.md) (variants, arrays, `let*`), [architecture.md](architecture.md) |
 | `linalg`, `newton` | [numerics/02-newton.md](numerics/02-newton.md) |
 | `jac` | [numerics/03-jacobians-and-floating-point.md](numerics/03-jacobians-and-floating-point.md) |
@@ -77,6 +79,7 @@ Keep the [glossary](glossary.md) open for the terms you meet. To carry on, start
 | You want to | Go to |
 |---|---|
 | Know what a word or symbol means | [glossary.md](glossary.md) |
+| Know what is public API and what is internal | [architecture.md](architecture.md), [src/vstiff.mli](../src/vstiff.mli) |
 | Run a piece of the library and see what it does | the probe project in [exercises.md](exercises.md) |
 | Understand a failing test | [testing.md](testing.md) |
 | Add a test | [testing.md](testing.md) and [CONTRIBUTING.md](../CONTRIBUTING.md) |

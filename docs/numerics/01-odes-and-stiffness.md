@@ -34,7 +34,7 @@ At `t = 0` it gives `1 / (1 + 9) = 0.1`, and differentiating gives `y' = 9 e^(-t
 
 Most ODEs have no formula like this, which is why numerical methods exist: they compute approximate values of `y(t)` on a grid of times. The project's tests, called the **corpus** ([`test/corpus.ml`](../../test/corpus.ml)), run the code on four problems defined in [`test/problems.ml`](../../test/problems.ml): `Canary`, `Logistic`, `VanDerPol` and `Robertson`. `Canary` and `Logistic` have an `exact` function that gives the true solution, so the tests can measure the error of the code. For the other two the tests check different properties; [chapter 6](06-the-corpus.md) covers all four.
 
-**Systems.** In general `y = (y_1, ..., y_m)` is a vector and `f` returns a vector of the same length. In the code `f` has the type `Ode.rhs = float -> Vec.t -> Vec.t`, where `Vec.t` is `float array` ([`src/ode.mli`](../../src/ode.mli), [`src/vec.mli`](../../src/vec.mli)). Read the arrows as: a function that takes a float (the time) and a vector (the state) and returns a vector (the derivative); [docs/ocaml.md](../ocaml.md) explains the notation. A whole problem is one record, `Ode.problem = { rhs; t0; t_end; y0 }`. The *canary* is a system of three independent equations packed into one vector:
+**Systems.** In general `y = (y_1, ..., y_m)` is a vector and `f` returns a vector of the same length. In the code `f` has the type `Ode.rhs = float -> float array -> float array` ([`src/ode.mli`](../../src/ode.mli)); the numerical kernel calls a vector `Vec.t`, and that is `float array` too ([`src/numerics/vec.mli`](../../src/numerics/vec.mli)), so nothing converts between the two. Read the arrows as: a function that takes a float (the time) and a vector (the state) and returns a vector (the derivative); [docs/ocaml.md](../ocaml.md) explains the notation. A whole problem is one record, `Ode.problem = { rhs; t0; t_end; y0 }`. The *canary* is a system of three independent equations packed into one vector:
 
 ```
 y_1' = -1 y_1,     y_2' = -100 y_2,     y_3' = -10000 y_3,     y(0) = (1, 1, 1)
@@ -187,7 +187,7 @@ An implicit step therefore costs several Newton iterations, each needing evaluat
 
 ## Running the snippets
 
-The snippets in these chapters call the library directly. Build a small probe project outside the repository that links to it. Run this from the repository root, with your opam switch active ([docs/ocaml.md](../ocaml.md) explains opam and dune):
+The snippets in these chapters call the project's libraries directly. Build a small probe project outside the repository that links to them. Run this from the repository root, with your opam switch active ([docs/ocaml.md](../ocaml.md) explains opam and dune):
 
 ```sh
 REPO=$(pwd)
@@ -195,17 +195,18 @@ mkdir -p ../vstiff-scratch/p && cd ../vstiff-scratch
 printf '(lang dune 3.0)\n' > dune-project
 ln -sfn "$REPO/src" src
 ln -sfn "$REPO/test/problems.ml" p/problems.ml
-printf '(executable (name probe) (libraries vstiff))\n' > p/dune
+printf '(executable (name probe) (libraries vstiff numerics))\n' > p/dune
 # then, for each snippet: put it in p/probe.ml, build and run
 dune build --root . ./p/probe.exe && ./_build/default/p/probe.exe
 ```
 
-Nothing is written inside the repository. The `problems.ml` link makes the corpus problems (`Problems.Canary` and friends) available to your snippet. Dune's default profile turns warnings into errors, and an unused top-level definition is one of them: delete it or use it. Later chapters reuse this setup; the section Probes of [docs/testing.md](../testing.md) describes the same setup and more ways to use it.
+Nothing is written inside the repository. The link to `src` brings in both libraries of the project: `vstiff`, the solver (`Ode`, `Stepper`, `Adaptive`, `Bdf1`, `Bdf2`, `Halving`, `Clock`, `Instrument`, `Fail`), and `numerics`, the numerical kernel it builds on, which knows nothing about ODEs (`Vec`, `Linalg`, `Newton`, `Jac`, `Fail`). A snippet starts with the opens it needs: `open Vstiff` for the solver and `open Numerics` when it calls `Newton.solve`, `Jac.forward`, `Linalg.solve` or `Vec`, both when it does both (`(libraries vstiff)` is enough for a snippet that never touches the kernel). `Fail` is in both, with one type: `Vstiff.Fail.t` is `Numerics.Fail.t`. `Stage` and `Check` are internal to the solver and not reachable from a probe, and there is no `Vstiff.Vec`: the solver's interfaces say `float array`. The `problems.ml` link makes the corpus problems (`Problems.Canary` and friends) available to your snippet. Dune's default profile turns warnings into errors, and an unused top-level definition is one of them, and so is an `open` that nothing uses: delete it or use it. Later chapters reuse this setup; the section Probes of [docs/testing.md](../testing.md) describes the same setup and more ways to use it.
 
 Explicit Euler is not part of the library, but it fits the contract `Ode.Method` in a few lines, and then `Stepper.fixed` can drive it like any other method:
 
 ```ocaml
 open Vstiff
+open Numerics
 
 (* Explicit Euler: y_{n+1} = y_n + h f(t_n, y_n), with nothing to remember. *)
 module Explicit_euler : Ode.Method = struct
@@ -244,13 +245,14 @@ All three components stay finite. The slow one is off by about `0.184 h ≈ 1.8e
 
 | Idea | Where |
 |------|-------|
-| State, right-hand side, problem | `Ode.rhs`, `Ode.problem` and `Ode.point` in [`src/ode.mli`](../../src/ode.mli); `Vec.t` is `float array` ([`src/vec.mli`](../../src/vec.mli)) |
+| The two libraries | The kernel `Numerics` (`Fail`, `Vec`, `Linalg`, `Newton`, `Jac`), declared in [`src/numerics/dune`](../../src/numerics/dune); the solver `Vstiff`, declared in [`src/dune`](../../src/dune), whose public modules [`src/vstiff.mli`](../../src/vstiff.mli) lists |
+| State, right-hand side, problem | `Ode.rhs`, `Ode.problem` and `Ode.point` in [`src/ode.mli`](../../src/ode.mli), all `float array`; `Vec.t` is the same type ([`src/numerics/vec.mli`](../../src/numerics/vec.mli)) |
 | Corpus ODEs with their exact solutions | `Canary` and `Logistic` in [`test/problems.ml`](../../test/problems.ml): `rhs`, `y0`, `exact` and a `problem` record |
 | What a method must provide | `Ode.Method` in [`src/ode.mli`](../../src/ode.mli): `history`, `start` and `step rhs h history at`, which returns the new state and the next history, or a `Fail.t` |
 | Time stepping with a constant step | `Stepper.fixed (module M) ~dt problem` in [`src/stepper.ml`](../../src/stepper.ml): `n = round((t_end - t0) / dt)` steps (at least one for a non-empty span) of `h = (t_end - t0) / n`, which equals `dt` only when `dt` divides the span: step `k` ends at `t0 + k h`, the last at `t_end`, and the method is given the difference of the end times; it returns the final state or the first failure |
 | One backward Euler step | `Bdf1.step` in [`src/bdf1.ml`](../../src/bdf1.ml), a `Method` whose history is `unit` inside the module (the interface keeps it abstract) |
-| The implicit equation `G(x) = 0` and its Jacobian `I - h J` | `Stage.solve` in [`src/stage.ml`](../../src/stage.ml), which hands both to `Newton.solve` ([`src/newton.ml`](../../src/newton.ml)) |
-| Failure of the implicit solve | `Fail.t` in [`src/fail.mli`](../../src/fail.mli), as `Error Diverged` or `Error Nan` |
+| The implicit equation `G(x) = 0` and its Jacobian `I - h J` | `Stage.solve` in [`src/stage.ml`](../../src/stage.ml), which hands both to `Newton.solve` ([`src/numerics/newton.ml`](../../src/numerics/newton.ml)) |
+| Failure of the implicit solve | `Fail.t` in [`src/numerics/fail.mli`](../../src/numerics/fail.mli), as `Error Diverged` or `Error Nan`; `Vstiff.Fail` re-exports it ([`src/fail.mli`](../../src/fail.mli)) |
 | Explicit Euler | Not a library method. The snippet above writes it as one; the expression `Vec.axpy h (rhs t y) y` also appears in `Bdf2.step_with_error`, on the first step, as part of the error estimate ([chapter 5](05-step-control.md)) |
 | The first-order accuracy check | The `bdf1 canary` line of [`test/corpus.ml`](../../test/corpus.ml); expected output in [`test/corpus.expected`](../../test/corpus.expected) |
 

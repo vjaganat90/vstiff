@@ -5,11 +5,15 @@ otherwise (OCaml 5.5.0, dune 3.24.2, standard library only, no flambda, flat flo
 later commits fixed defects found by running the code: 052fdc7 (`Newton.solve` reports a
 converged step that overflows as `Error Nan`) and dc3bb67 (`Adaptive.integrate` snaps steps to
 the clock and rejects steps that cannot move `t`; the floor 16 eps |t| is now held by
-[`Clock.resolution`](../../src/clock.ml)). Three further fixes followed: 9d23f27
+[`Clock.resolution`](../../src/clock.ml)). Four further fixes followed: 9d23f27
 (`Stepper.fixed` ends step k at t0 + k h and the last one at `t_end` itself), 47a8119 (`Halving`
-also gives up once a halved step underflows to 0, which matters at t = 0, where the floor is 0)
-and d709e81 (both drivers reject a non-positive `tol` and a right-hand side of the wrong length
-at their start, and `Stepper.fixed` returns `Error Nan` for a start that is not finite). The text
+also gives up once a halved step underflows to 0, which matters at t = 0, where the floor is 0),
+d709e81 (both drivers reject a non-positive `tol` and a right-hand side of the wrong length
+at their start, and `Stepper.fixed` returns `Error Nan` for a start that is not finite) and
+3da8c2c (`Adaptive.integrate` also rejects a non-final step below `Clock.resolution t`, so the snap
+changes a step by at most 1/32). After them cc003b6 moved the numerical kernel (`Fail`, `Vec`,
+`Linalg`, `Newton`, `Jac`) into the library `Numerics`, in `src/numerics/`, separate from the
+solver library `Vstiff` (Section 3.6): links point to the files where the modules live now. The text
 states the current behaviour where they matter and the baseline behaviour where a measurement
 predates them. The companion [formal verification report](formal-verification.md), called the FV
 report here, covers Rocq and MathComp.
@@ -123,12 +127,22 @@ Robust means, for every problem of the corpus in Section 4.1 and every rtol in
    Since dc3bb67 it holds: every non-final step is snapped to the floats, h = (t + dt) - t; a step
    that cannot move `t` (h <= 0) is rejected as `Too_small` without calling the method; and a
    remainder at or below [`Clock.resolution t`](../../src/clock.ml) = 16 eps |t| is taken as the
-   last step. The controller decides what a rejection does: [`Halving`](../../src/halving.ml) halves
-   the step, which is below the floor, so it gives up with `StepRejected`. A step that does move `t`
-   is judged by the error test alone, however short, so the floor binds only on rejections.
+   last step. Since 3da8c2c the same rejection covers every non-final step below
+   `Clock.resolution t`: a step of a few ulps still moved the clock by a different amount than its
+   length, and the snap could push BDF2's step ratio past its zero-stability limit 1 + sqrt 2 (3 at
+   t0 = 1e15 with dt0 = 0.18), whereas a step at or above the floor is at least 16 ulps and the snap
+   changes it by at most half an ulp, 1/32 of it, so the ratio stays at most
+   2 (1 + 1/32) / (1 - 1/32) = 66/31, about 2.13. The run at t0 = 1e15 with dt_max = 0.19 now ends
+   `Error StepRejected 1`, that step being below the floor there (3.55). The controller decides
+   what a rejection does: [`Halving`](../../src/halving.ml) halves the step, which is below the
+   floor, so it gives up with `StepRejected`. A step at or above the floor is judged by the error
+   test alone, so the floor binds on rejections and on the driver's own short steps.
    Termination follows from two facts: every accepted non-final step strictly increases `t`, and the
    controller ends any run of rejections (FV report, T4); a new controller has to keep the second.
-   Corpus lines 25 to 27 pin the three cases. `Stepper.fixed` keeps the same rule on its grid
+   Corpus lines 25 to 27 pin the cases: one ulp from t = 1, `dt_max` below the resolution of `t`,
+   and snapping with steps just above it (3.7 at t0 = 1e15); no line pins the rejection of a short
+   step that does move `t` ([numerics/06-the-corpus.md](../numerics/06-the-corpus.md), section 10).
+   `Stepper.fixed` keeps the same rule on its grid
    (step k ends at t0 + k h, the last at `t_end`, and the method gets the difference of the end
    times; lines 29 to 31), and `Halving` also ends a run whose halved step is 0, which is how a
    run at t = 0, where the floor is 0, stops short of `max_rejects` (line 32).
@@ -156,7 +170,7 @@ precision, Fortran-level throughput.
 
 Corpus test: 1.4 s CPU; soak test: 12.4 s CPU on an idle machine (direct runs of the test
 executables; 1.8 s and 16.6 s were measured earlier) **[R]**. The corpus then had 23 lines (the
-9 original cases and 14 regression pins); it has 42 now, 33 of them regression pins, and the
+9 original cases and 14 regression pins); it has 47 now, 38 of them regression pins, and the
 soak test has 4. CPU times on the measuring machine vary by up to 2.5x with load (Apple
 silicon, other jobs running): ratios between runs made back to back are reliable, absolute
 times are not, so acceptance criteria below are stated in counts.
@@ -167,7 +181,7 @@ ms; n = 300: 24 vs 6.5 ms). The prototype LU agrees with the recursion to 1e-17 
 because its back substitution sums in a different order. An in-place LU that performs the same
 floating-point operations in the same order (elimination applied to the right-hand-side column stage
 by stage, back substitution as `(b_i - s) / pivot` with `s` the products rounded one by one and
-added left to right from 0) is bit-identical to [`Linalg.solve`](../../src/linalg.ml): 20 119
+added left to right from 0) is bit-identical to [`Linalg.solve`](../../src/numerics/linalg.ml): 20 119
 random, badly scaled, singular and Laplacian systems of sizes 1-120 gave no mismatch on an arm64
 build **[R]**. That is a property of this compiler's instruction selection (no fused multiply-add in
 either loop), not a language guarantee.
@@ -366,9 +380,9 @@ convergence failures in a row (both) or when h < 16 eps |t|. The floor rule alon
 is applied on rejection only, so at f6d9b4e [`Adaptive.integrate`](../../src/adaptive.ml) never
 returned when all proposed steps were below half an ulp of `t` (the accept-path cases of 1.3,
 criterion 4 **[R]**); DASSL tests its `HMIN` on retries only as well **[D]**. Since dc3bb67 the
-driver covers the accept path itself: a step that cannot move `t` (h <= 0 after snapping) is
-rejected as `Too_small` without calling the method, and the controller decides.
-[`Halving`](../../src/halving.ml) halves it, which is below its floor
+driver covers the accept path itself: a step that cannot move `t` (h <= 0 after snapping), and
+since 3da8c2c any non-final step below `Clock.resolution t`, is rejected as `Too_small` without
+calling the method, and the controller decides. [`Halving`](../../src/halving.ml) halves it, which is below its floor
 [`Clock.resolution t`](../../src/clock.ml) = 16 eps |t| (the same rule as before, now defined once
 in `Clock`), so it gives up with `StepRejected`. A new controller has to end every run of rejections
 in the same way (FV report, T4); at t = 0 the floor is 0, so it also has to give up on a halved
@@ -386,7 +400,7 @@ prototype shows no difference in rhs calls between PI34 and the discrete rule (w
 rtol 1e-6); the case for the discrete rule is stability and factorization reuse, which the
 prototype does not measure.
 
-**Contract change (required).** Today `acceptable : t -> y:Vec.t -> err:Vec.t -> bool` (here `t` is
+**Contract change (required).** Today `acceptable : t -> y:float array -> err:float array -> bool` (here `t` is
 the controller state) returns a bool and `accepted : t -> t` sees no error ratio, so an
 error-proportional controller cannot be written against the current
 [`Ode.Controller`](../../src/ode.mli). The prototype needed its own driver. Section 3 gives the new
@@ -454,8 +468,8 @@ and order.
 
 **Line search.** Not inside the integrator: the step-size cut plays that role, as in every
 production code **[M]**. The present damped Newton with Armijo backtracking stays as
-[`Newton.solve`](../../src/newton.ml) for consistent initial conditions (DAEs, Section 2.6) and for
-the unit tests.
+[`Newton.solve`](../../src/numerics/newton.ml), in the kernel, for consistent initial conditions (DAEs,
+Section 2.6) and for the unit tests.
 
 **User Jacobian.** `problem.jac : (float -> Vec.t -> fy:Vec.t -> Mat.t) option`; `None` means
 finite differences. Finite differences with column grouping (Curtis–Powell–Reid **[M]**):
@@ -487,7 +501,7 @@ Measured: pure recursion about 4x slower than in-place LU at every n; at n = 80 
 (solve 0.8 ms, forward-difference Jacobian 0.13-0.16 ms, forming I - gamma J 0.03 ms, idle
 machine); idle, the divided-difference prototype takes 0.4-1.3 s per run (1.2-3.6 s measured
 earlier) and the carried-J and library runs about 3 s, against 0.03-0.09 s for scipy, whose LU
-is LAPACK's **[E, R]**. Three steps, all standard-library:
+is LAPACK's **[E, R]**. Three steps, all standard-library and all in the kernel (`src/numerics/`, Section 3.6):
 
 1. **Dense LU behind a pure interface.** `Linalg.factor : matrix -> factored option` copies
    the matrix once and eliminates in place on the copy; `Linalg.solve : factored -> Vec.t ->
@@ -545,7 +559,7 @@ storage (M6), because the machinery is the same: the stage equation becomes
 
 and the error test excludes nothing for index 1 (Brenan–Campbell–Petzold **[M]**; for index 2 the
 algebraic components would have to be excluded, out of scope). Consistent initial conditions are the
-user's job; a helper that solves f_alg(y0) = 0 with [`Newton.solve`](../../src/newton.ml) is cheap.
+user's job; a helper that solves f_alg(y0) = 0 with [`Newton.solve`](../../src/numerics/newton.ml) is cheap.
 Radau IIA extends to index 1 with the same change **[M]**.
 
 ### 2.7 Radau IIA as a second method
@@ -569,10 +583,11 @@ methods agreeing is the best regression oracle the corpus can have (Section 4.2)
 
 Replace [`Instrument.count`](../../src/instrument.ml) by cost accounting as values: each step
 returns a `Cost.t = { rhs_calls; jac_evals; factorizations; solves; newton_iterations }` (a module
-of its own: `Ode` is interface-only and cannot hold `zero` and `add`) and the driver sums them.
+of its own, in the kernel since `Jac`, `Linalg` and `Newton` fill it in (Section 3.6): `Ode` is
+interface-only and cannot hold `zero` and `add`) and the driver sums them.
 Statistics then are pure data: steps, accepted, rejected by cause, cost, order histogram, min and
 max h, and they are deterministic and pinnable. The price is that every rhs call must be counted by
-hand through [`Stage`](../../src/stage.ml), [`Jac`](../../src/jac.ml) and the methods, where a
+hand through [`Stage`](../../src/stage.ml), [`Jac`](../../src/numerics/jac.ml) and the methods, where a
 wrapped rhs is exact by construction: keep `Instrument` (or Guard's own counter) in the tests as the
 oracle, and make "driver-summed `rhs_calls` equals the wrapped count on every corpus problem" a
 corpus line. `Instrument` can go from the library once no caller needs it (Guard keeps its own
@@ -589,7 +604,10 @@ could be swapped: `weights`, `order`, `gamma`, `mass`, `h` in `decide` and `fail
 none) and should be pruned when the signatures are implemented. A compile check against OCaml 5.5
 showed two constraints that the signatures respect: `val`s cannot live in
 [`ode.mli`](../../src/ode.mli), which has no implementation, and a module that holds only a module
-type (`linsolve.mli`) must be listed in `modules_without_implementation` too **[R]**.
+type (`linsolve.mli`) must be listed in `modules_without_implementation` too, in the dune file of
+its library **[R]**. The sketches write `Vec.t` and `Mat.t` for brevity; in `ode.mli` and in every
+signature a user of `Vstiff` sees they are written out, `float array` and `float array array`, as
+`ode.mli` writes `float array` today, and Section 3.6 says which library each new module belongs to.
 
 ### 3.1 Problems, tolerances, costs
 
@@ -735,8 +753,8 @@ beside `Halving`.
 ### 3.4 Stage solver, linear solver, Jacobian provider
 
 ```ocaml
-(* linsolve.mli: a linear solver for the iteration matrix; module types only, so it is listed in
-   `modules_without_implementation` next to `ode` *)
+(* linsolve.mli, in the kernel: a linear solver for the iteration matrix; module types only, so it is
+   listed in `modules_without_implementation` of src/numerics/dune, as `ode` is in src/dune *)
 module type Linsolve = sig
   type factored
   (** [factor ~gamma ~mass j] factors [mass - gamma j] (identity when [mass] is [None]). *)
@@ -762,18 +780,20 @@ val solve :
 ```
 
 ```ocaml
-(* jac.mli *)
+(* in the solver, internal, in or next to stage.ml: the kernel's jac.mli keeps the finite
+   differences (forward, and a variant grouped by a Mat.structure) *)
 (** [evaluate p t y ~fy] uses [p.jac] or finite differences grouped by [p.structure]. *)
 val evaluate : problem -> float -> Vec.t -> fy:Vec.t -> Mat.t * Cost.t
 ```
 
 ### 3.5 Purity, mutation and the performance plan
 
-Rule proposed for the kernels: a function may mutate only arrays it allocated itself in the same
-call, and only until it returns them; arguments and arrays returned earlier (the factorization kept
-in the cache) are never written; interfaces say nothing about it because nothing observable changes.
-[`Linalg`](../../src/linalg.ml), `Band` and [`Jac`](../../src/jac.ml) are the three modules that use
-the rule, and the rule is stated once in `docs/`. Everything above them stays as it is: immutable
+Rule proposed for the numerical kernels: a function may mutate only arrays it allocated itself in
+the same call, and only until it returns them; arguments and arrays returned earlier (the
+factorization kept in the cache) are never written; interfaces say nothing about it because nothing
+observable changes. [`Linalg`](../../src/numerics/linalg.ml), `Band` and
+[`Jac`](../../src/numerics/jac.ml), all three in the library `Numerics`, are the modules that use the
+rule, and the rule is stated once in `docs/`. Everything above them stays as it is: immutable
 `Vec.t`, records, lists.
 
 Performance plan, in order of expected payoff:
@@ -783,7 +803,7 @@ Performance plan, in order of expected payoff:
 2. In-place LU on a private copy: 4x on each factorization **[E]**.
 3. Banded storage and grouped finite differences for method-of-lines problems: O(n) instead
    of O(n^3) per factorization and l+u+2 instead of n+1 rhs calls per Jacobian.
-4. Allocation: [`Vec`](../../src/vec.ml) operations allocate one array each; at n <= 1000 that is
+4. Allocation: [`Vec`](../../src/numerics/vec.ml) operations allocate one array each; at n <= 1000 that is
    noise next to a dense factorization (not next to banded or Krylov work, where everything is O(n),
    and every array above 256 words is allocated straight in the major heap). Keep them. Avoid
    closures inside the LU loops (plain `for` loops over `float array`), which the non-flambda
@@ -793,13 +813,45 @@ Performance plan, in order of expected payoff:
 6. `-unsafe` on the kernel modules only (`Linalg`, `Band`), after their property tests exist
    (bounds checks cost 10-20 % in such loops **[M]**). dune has no per-module flag field in the
    documentation found (ocaml/dune#3551 is the feature request **[?]**), so this means a separate library
-   or explicit `Array.unsafe_get`.
+   or explicit `Array.unsafe_get`. `Numerics` is a library of its own now, but a flag applies to all
+   of it, and `Vec` documents an `Invalid_argument` for a shorter second vector, which is a bounds
+   check that `-unsafe` would remove: `Linalg` and `Band` would still need a library of their own.
 7. Bigarray: no (2.4).
 
 Bit-identical refactors: an in-place LU with the operation order of 2.0 is bit-identical to the
 recursive solve **[R]**, so the LU swap can land as a pure refactor; the prototype LU, whose back
 substitution sums differently, differs at the 1e-17 level **[E]**. Modified Newton, the
 tolerance-linked test and the new estimates are the numerical changes. Policy in 4.4.
+
+
+### 3.6 Which library: kernel or solver
+
+Since cc003b6 the repository has two libraries: the kernel `Numerics` in `src/numerics/` (`Fail`,
+`Vec`, `Linalg`, `Newton`, `Jac`), which knows nothing about ODEs, and the solver `Vstiff` in
+`src/`, which builds on it. A new module goes where its dependencies put it: what mentions an `Ode`
+type, a step, a history or a controller belongs to the solver; vectors, matrices, linear solves, the
+Newton iteration and differences of functions belong to the kernel.
+
+| new module | library | why |
+|---|---|---|
+| `Mat` (`Mat.t`, `Mat.structure`), `Band`, dense `Linalg.factor`, a complex LU for Radau, GMRES, `Linsolve` | kernel | linear algebra on arrays; `Linsolve.factor ~gamma ~mass` sees a scalar and a matrix |
+| `Cost` | kernel | counters that `Jac`, `Linalg` and `Newton` fill in and the solver sums |
+| grouped finite differences | kernel, in `Jac` | a function and a structure in, a matrix and its cost out; `evaluate` of 3.4 takes an `Ode.problem` to choose `p.jac`, so that choice lives in the solver, in or next to `Stage` |
+| modified Newton with the rate test, the Jacobian cache | solver, in `Stage` | they need `gamma`, the history and the step's cost; `Newton.solve` (damped, Armijo) stays in the kernel |
+| `Tol`, `Problem`, `Bdf`, `Dassl`, `Pi`, the `I` controller, `Radau`, dense output, events | solver | they use `Ode` types, the history or `Stage` |
+| the Illinois iteration of the events (2.5) | kernel, optionally | a scalar root finder; the interpolant it searches is the solver's |
+
+A kernel module is public as `Numerics.X` as soon as it exists, the library having no main module.
+A solver module is public only when `src/vstiff.ml` and `src/vstiff.mli` list it, which is how a new
+method or controller is made public; one that must stay internal, as `Stage` and `Check` are, is
+also named in `private_modules` in `src/dune`, so that it is not installed. An outside user can
+still write an `Ode.Method` or `Ode.Controller` of their own, without `Stage`. A kernel type that
+appears in a public signature must be reachable from `Vstiff` without `open Numerics`: `Vec.t` and
+`Mat.t` are `float array` and `float array array`, written out in `ode.mli` as `Vec.t` is today, and
+a type that is not an alias, such as `Mat.structure`, is re-exported with its equality, as
+`Vstiff.Fail` re-exports `Numerics.Fail`. A kernel module that holds only module types, as
+`Linsolve` does, goes into `modules_without_implementation` in `src/numerics/dune`, as `ode` does in
+`src/dune`. The test programs link both libraries.
 
 ---
 
@@ -897,7 +949,7 @@ is the first such table.
 - Mutation testing: `mutaml` 0.3 is on opam but cannot be installed with OCaml 5.5: it requires
   `ppxlib < 0.36.0`, and every ppxlib below 0.36.0 requires OCaml < 5.4 (`opam show`) **[R]**. The
   plan is therefore a 40-line script that applies a dozen sed mutations to `bdf.ml`,
-  [`stage.ml`](../../src/stage.ml) and [`linalg.ml`](../../src/linalg.ml) and requires the corpus to
+  [`stage.ml`](../../src/stage.ml) and [`linalg.ml`](../../src/numerics/linalg.ml) and requires the corpus to
   fail; it needs no dependency and runs in the CI. Run per milestone, not per commit.
 
 ### 4.6 How formal verification could fit
@@ -923,8 +975,9 @@ order of plausibility:
    [`Halving`](../../src/halving.ml), [`Adaptive`](../../src/adaptive.ml) and
    [`Bdf2`](../../src/bdf2.ml) together never attempt a ratio above 2 in real arithmetic, a final
    step within the clock's resolution aside (FV report, T2 and T3; at f6d9b4e the largest observed
-   ratio was exactly 2, and since dc3bb67 the snapping of steps allows rounding-level excursions
-   above it).
+   ratio was exactly 2, and since dc3bb67 the snapping of steps allows excursions above it, at most
+   66/31, about 2.13, since 3da8c2c rejects the non-final steps below the floor and the snap moves
+   a step at or above it by at most 1/32).
 3. **Driver and controller invariants**: with the controller as a function on floats and
    ints (3.3), its transition system can be modelled directly: the next proposal is never above
    dt_max (in real arithmetic; in binary64 a snapped step can exceed it by up to half an ulp of
@@ -960,18 +1013,18 @@ revised range; each milestone ends with its corpus lines, its pins and a work-pr
 | ID | scope | depends on | acceptance (measurable) | risks | effort (first estimate / revised range) |
 |---|---|---|---|---|---|
 | **M1** | Bench and references: `bench/` executable (rhs calls counted with an [`Instrument`](../../src/instrument.ml)-wrapped rhs; costs as values need the contract change of M2), references for Robertson, HIRES, van der Pol, Brusselator-80 with provenance, first golden table, a CI workflow (none exists today) | — | the `lib + Halving` rows of Appendix B reproduced from the repository (an independent re-run matched them to the digit **[R]**) and the scipy rows regenerated by scripts kept in the repository; `dune test` unchanged and run by CI | none | 2 / 2-3 |
-| **M2** | Tolerances and controller: `Tol`, WRMS weights, new `Controller` contract (3.3; D3, D13), [`Halving`](../../src/halving.ml) ported or retired with its lines re-pinned (D13), `Dassl` and a continuous `I` controller added, the clock rules already in the driver (snapped steps, `Ode.Too_small`, [`Clock.resolution`](../../src/clock.ml); dc3bb67) carried over to the new contract, an initial step-size heuristic in place of `dt0 = 1e-6 (t_end - t0)` (Hairer–Nørsett–Wanner I, II.4 **[M]**), driver updated | M1 | every existing corpus and soak line unchanged (D13); the I controller at rtol 1e-6: rhs calls <= 50k / 115k / 600k on Robertson / HIRES / van der Pol (prototype 49.1k / 110.9k / 592k: the margins are 1-4 %, fix them after the first run) and rejections < 2 % of accepted steps at rtol <= 1e-5; the discrete `Dassl` rule is judged at equal achieved error (-7 % to -29 % against Halving; at the same tolerance it costs 89.6k / 181k / 828k); the clock cases of 1.3 keep their pinned results (corpus lines 25 to 27) | the contract change touches every test: split it into three PRs (D3); Halving's pins cannot move | 3 / 4-6 |
-| **M3** | Linear algebra and modified Newton: in-place dense LU behind a pure interface (first PR, a bit-identical refactor), `Linsolve`, `Stage.cache`, Jacobian and factorization reuse, DASSL/CVODE convergence and refresh rules, failure returns history | M2 | LU: bit-identical to [`Linalg.solve`](../../src/linalg.ml) on the corpus and on 2e4 random systems, about 4x faster; with the I controller of M2, rhs calls at rtol 1e-6 <= 21k / 20k / 240k (carried-J prototype 20.1k / 18.9k / 231k); Brusselator-80 at rtol 1e-4 <= 7k rhs calls and at most one factorization per accepted step; average Newton iterations per step <= 3 (prototype 11 with the fixed test; the 3-4 iteration limits of CVODE and DASSL make 2-4 plausible, unmeasured **[M]**); Robertson at rtol 1e-3 with the corpus atol finishes, at rtol = atol = 1e-3 it returns `Ok` or `Error`; CPU informational (3.0 s idle at f6d9b4e on the Brusselator) | the tolerance-linked convergence test changes achieved errors slightly; two-PR policy (4.4) | 4 / 6-8 |
+| **M2** | Tolerances and controller, all in the solver (3.6): `Tol`, WRMS weights, new `Controller` contract (3.3; D3, D13), [`Halving`](../../src/halving.ml) ported or retired with its lines re-pinned (D13), `Dassl` and a continuous `I` controller added, the clock rules already in the driver (snapped steps, `Ode.Too_small` for a step below [`Clock.resolution`](../../src/clock.ml); dc3bb67, 3da8c2c) carried over to the new contract, an initial step-size heuristic in place of `dt0 = 1e-6 (t_end - t0)` (Hairer–Nørsett–Wanner I, II.4 **[M]**), driver updated | M1 | every existing corpus and soak line unchanged (D13); the I controller at rtol 1e-6: rhs calls <= 50k / 115k / 600k on Robertson / HIRES / van der Pol (prototype 49.1k / 110.9k / 592k: the margins are 1-4 %, fix them after the first run) and rejections < 2 % of accepted steps at rtol <= 1e-5; the discrete `Dassl` rule is judged at equal achieved error (-7 % to -29 % against Halving; at the same tolerance it costs 89.6k / 181k / 828k); the clock cases of 1.3 keep their pinned results (corpus lines 25 to 27) | the contract change touches every test: split it into three PRs (D3); Halving's pins cannot move | 3 / 4-6 |
+| **M3** | Linear algebra and modified Newton: in-place dense LU behind a pure interface (kernel; first PR, a bit-identical refactor), `Linsolve` (kernel), `Stage.cache`, Jacobian and factorization reuse, DASSL/CVODE convergence and refresh rules, failure returns history (solver) | M2 | LU: bit-identical to [`Linalg.solve`](../../src/numerics/linalg.ml) on the corpus and on 2e4 random systems, about 4x faster; with the I controller of M2, rhs calls at rtol 1e-6 <= 21k / 20k / 240k (carried-J prototype 20.1k / 18.9k / 231k); Brusselator-80 at rtol 1e-4 <= 7k rhs calls and at most one factorization per accepted step; average Newton iterations per step <= 3 (prototype 11 with the fixed test; the 3-4 iteration limits of CVODE and DASSL make 2-4 plausible, unmeasured **[M]**); Robertson at rtol 1e-3 with the corpus atol finishes, at rtol = atol = 1e-3 it returns `Ok` or `Error`; CPU informational (3.0 s idle at f6d9b4e on the Brusselator) | the tolerance-linked convergence test changes achieved errors slightly; two-PR policy (4.4) | 4 / 6-8 |
 | **M4** | BDF2 with the divided-difference error estimate (one solve per step), history as a point list, quadratic predictor | M3 | steps at rtol 1e-6 on Robertson <= 500 (from 2531; prototype 320); rhs calls at achieved error 1e-6 <= 9k / 6k / 120k (extrapolated from the rtol 1e-8 runs, whose errors are 1.9e-6 / 1.6e-6 / 8.9e-6: the prototype never reached 1e-6, and van der Pol extrapolates to about 112k); achieved error <= 100x tol (the prototype gives 6x-890x: a safety factor, or relax the criterion to scipy's level); A-stability canary lines unchanged | estimate constants for variable steps: unit-test against the 2/9 limit; the estimate is less conservative than the backward Euler gap, which is what lets Robertson wander negative at rtol = atol = 1e-3 (2.3) | 3 / 3-5 |
 | **M5** | Variable order 1-5: stage equation of order k from the point history, estimates at k-1 and k+1, DASSL order selection, startup phase, max order option, A(alpha) canaries | M4 | rhs calls at achieved error 1e-6 within 2x of scipy BDF's true counts (669 / 844 / 5400 at that error): <= 1.3k / 1.7k / 11k (36x-1250x at f6d9b4e); order histogram pins on Robertson and OREGO; the 60 and 80 degree canaries pass; the startup ramp is capped below the zero-stability limit of the order in use, or shown harmless by a corpus line (2.1.2) | order-selection tuning is the long tail; keep DASSL's rules verbatim (2.1.2) before tuning | 8 / 12-20 |
-| **M6** | Jacobian providers and banded storage: `problem.jac`, `Mat.structure`, grouped finite differences, `Band` LU | M3 | Brusselator with n = 2000 at rtol 1e-6: l + u + 1 = 5 rhs calls per Jacobian beyond f(t, y) (pinned) and O(n) work per factorization; a user Jacobian that is [`Jac.forward`](../../src/jac.ml) reproduces the finite-difference run bit for bit, an analytic one agrees to 1e-6 (the finite-difference Jacobian even of a linear problem is not bit-identical to the analytic one); CPU under 1 s informational | none | 4 / 4-6 |
+| **M6** | Jacobian providers and banded storage: `problem.jac` (solver), `Mat.structure`, grouped finite differences, `Band` LU (kernel) | M3 | Brusselator with n = 2000 at rtol 1e-6: l + u + 1 = 5 rhs calls per Jacobian beyond f(t, y) (pinned) and O(n) work per factorization; a user Jacobian that is [`Jac.forward`](../../src/numerics/jac.ml) reproduces the finite-difference run bit for bit, an analytic one agrees to 1e-6 (the finite-difference Jacobian even of a linear problem is not bit-identical to the analytic one); CPU under 1 s informational | none | 4 / 4-6 |
 | **M7** | Outputs: `interpolate`, output at times, step sequence API, events with Illinois | M5 | output at 100 times costs no extra steps (pinned step count); an event on van der Pol's zero crossing: the root of the interpolant located to 1e-10 in t (the true event time is only as accurate as the solution); discontinuity test restarts at order 1 | API shape (D7) | 4 / 4-6 |
 | **M8** | Corpus expansion and the work-precision gate: OREGO, Pollution, E5, Ring modulator, Medical Akzo, heat/Burgers MOL, Prothero–Robinson, nonstiff (Chemical Akzo Nobel is an index-1 DAE: M9); property tests; mutation script; nightly gate | M5, M6 | every robustness criterion of 1.3 holds on the ODE set; mutation script kills all seeded mutants | the n = 400 problems are slow until M6; every problem needs a reference from two solvers | 3 / 6-9 |
 | **M9** | Mass matrix and index-1 DAEs: `problem.mass`, stage equation with M, consistent-initial-condition helper, transistor amplifier, Chemical Akzo Nobel and Robertson-DAE in the corpus | M5, M6 | transistor amplifier scd >= 5 at rtol 1e-7; Robertson-DAE matches the ODE form to 1e-9 at rtol 1e-10 | error test on algebraic variables | 6 / 6-9 |
-| **M10** | Radau IIA (order 5) as a second `Embedded` method with the PI controller and collocation dense output | M3, M7 | van der Pol at achieved error 1e-8 within 2x of scipy Radau's true count (8.1k at that error): <= 16k; BDF-vs-Radau agreement line at 1e-10 on Robertson and HIRES | complex LU, the transformation constants (test against RADAU5 numbers) | 10 / 12-18 |
-| **M11** | Large n: matrix-free GMRES with user preconditioner, Jacobian-vector products by differences | M6 | heat MOL with n = 1e5 at rtol 1e-6 finishes with pinned iteration counts (target under 10 s, informational) | only if a user needs it | 5 / 5-8 |
+| **M10** | Radau IIA (order 5) as a second `Embedded` method in the solver, with the PI controller and collocation dense output, and its complex LU in the kernel | M3, M7 | van der Pol at achieved error 1e-8 within 2x of scipy Radau's true count (8.1k at that error): <= 16k; BDF-vs-Radau agreement line at 1e-10 on Robertson and HIRES | complex LU, the transformation constants (test against RADAU5 numbers) | 10 / 12-18 |
+| **M11** | Large n: matrix-free GMRES with user preconditioner, Jacobian-vector products by differences (kernel) | M6 | heat MOL with n = 1e5 at rtol 1e-6 finishes with pinned iteration counts (target under 10 s, informational) | only if a user needs it | 5 / 5-8 |
 | **M12** | Verification hooks: coefficient generators as separable pure functions, contracts as `.mli` comments, a hand-written Rocq mirror (not extraction) with a canonical-source tripwire and differential tests (FV report, Option A) | M5, FV report | the mirror evaluated on Rocq primitive floats agrees with `Bdf` coefficients on 1e4 random node sets to 1e-14 relative; the tripwire is green in CI. The proofs (FV pilot T1-T3: 1-2 weeks for an expert, 3-6 for a newcomer; T4 afterwards, its code fix being in dc3bb67) are not in the 3 days | a separate switch (dune < 3.24); toolchain churn | 3 plus the proof work / 3 plus the proof work |
-| **M13** | Release: odoc (not installed in the development switch), opam package (GPL-3.0-only), API freeze, README with the work-precision tables | M7, M8, and whichever of M9-M11 ship in the first release | `opam install vstiff` from the repository; docs build without warnings | none | 2 / 2 |
+| **M13** | Release: odoc (not installed in the development switch), opam package (GPL-3.0-only), API freeze (`src/vstiff.mli` and the interfaces of the kernel), README with the work-precision tables | M7, M8, and whichever of M9-M11 ship in the first release | `opam install vstiff` from the repository; docs build without warnings | none | 2 / 2 |
 
 Ordering rationale: M1-M4 are 12 days (revised: 15-22) for a 9x to 36x reduction in rhs calls at
 the error Halving reaches at rtol 1e-6 on the three small problems **[R]**, and for the removal
@@ -996,13 +1049,13 @@ the new values in its message, and never loosens a correctness bound.
 | **D1** | BDF representation: variable-coefficient over the point history (current style), fixed-leading-coefficient Nordsieck (CVODE), or divided differences (DASSL)? | Variable-coefficient over the point history: least distance from the code, best readability, the widest zero-stability limits of the two forms computed (2.1), best fit for the proof work; revisit only if factorization reuse measured after M5 is below 80 % of steps. |
 | **D2** | Stay standard-library only, including the tests? | Yes for the library, and yes for the tests (hand-rolled property generators on `Random`); allow `sundialsml` or scipy only as external oracles that produce the stored references, outside the build. |
 | **D3** | Change the `Controller` contract to `decide` returning a verdict with the next state, and `Method.step` to return the history on failure? | Yes in substance, not as one PR with the pins moved: the change bundles three separable ones (a verdict that sees the error vector, history on failure, costs as values) and Halving's pins cannot move (3.3). Three PRs, each bit-identical on the existing corpus; Halving ported through `err_vec` or frozen (D13). |
-| **D4** | Is local mutation of freshly allocated arrays, frozen once returned, in [`Linalg`](../../src/linalg.ml), `Band` and [`Jac`](../../src/jac.ml) compatible with "effects quarantined"? | Yes, with the rule written down in `docs/` and the three modules named; the interfaces stay pure. The soak test does not guard it (it compares ten runs of one binary): a random-system differential test and a hex dump of the corpus states do. |
+| **D4** | Is local mutation of freshly allocated arrays, frozen once returned, in [`Linalg`](../../src/numerics/linalg.ml), `Band` and [`Jac`](../../src/numerics/jac.ml) compatible with "effects quarantined"? | Yes, with the rule written down in `docs/` and the three modules named; the interfaces stay pure. The soak test does not guard it (it compares ten runs of one binary): a random-system differential test and a hex dump of the corpus states do. |
 | **D5** | Step policy for BDF: discrete (DASSL hold/double/shrink) or smooth (PI filters)? | Discrete for BDF (for the stability limits and factorization reuse; no rhs-call advantage was measured, 2.2), PI34 or H211b for Radau. |
 | **D6** | Default and maximum order. | Default 5, user-settable 1-5, no BDF6. |
 | **D7** | Output API: closures (`dense : float -> Vec.t`) or data (`Dense.t` with `eval`) and a lazy `Seq.t` of steps? | Data plus `Seq.t`; closures as one-line helpers on top. |
 | **D8** | DAEs in scope? | Index 1 and mass matrices after M6; no higher index. |
 | **D9** | Cost accounting as values (drop [`Instrument`](../../src/instrument.ml) from the library)? | Yes; the counts become deterministic pins, validated against an `Instrument`-wrapped rhs in the tests. |
-| **D10** | Newton inside the integrator: keep the Armijo line search? | No; modified Newton with the tolerance-linked rate test and step cuts, as every production code; [`Newton.solve`](../../src/newton.ml) stays for initial conditions and tests. |
+| **D10** | Newton inside the integrator: keep the Armijo line search? | No; modified Newton with the tolerance-linked rate test and step cuts, as every production code; [`Newton.solve`](../../src/numerics/newton.ml) stays for initial conditions and tests. |
 | **D11** | Should the n = 400 and n = 2000 problems run in the default `dune test`? | No: nightly gate. The default `dune test` took about 14 s at f6d9b4e (corpus 1.4 s, soak 12.4 s, idle), so the budget has to be stated for the whole run, not the corpus alone. |
 | **D12** | Priority of Radau IIA vs DAEs after M8. | DAEs first (M9) if circuit or chemistry users exist, Radau first (M10) if tight tolerances or the cross-check matter more. |
 | **D13** | Passing pins of a superseded algorithm ([`Bdf2`](../../src/bdf2.ml) + [`Halving`](../../src/halving.ml) + `Newton`/[`Stage`](../../src/stage.ml): `accepted 1109, rejected 374`, `StepRejected 46`, `max error 8.96e-08`, the Robertson error 7.2e-07): keep the old modules as a frozen baseline, or re-pin them in the PR that supersedes them? | Decided: re-pin in the superseding PR, old and new values in its message, correctness bounds unchanged. With no users there is nothing to keep stable, git history keeps the old numbers, and M1's work-precision table is the baseline to beat. |
