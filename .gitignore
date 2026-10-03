@@ -1,2 +1,4 @@
 _build/
 LICENSE
+__pycache__/
+bench/compare/.venv/

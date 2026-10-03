@@ -1,0 +1,8 @@
+(library
+ ; The pure part of the bench: problems, references, measurements and the golden table. Nothing here prints or times;
+ ; the executable's console.ml is the only module that does.
+ (name benchlib)
+ (libraries vstiff problems))
+
+; The Python scripts and their data live in compare/, outside the build.
+(dirs :standard \ compare)
