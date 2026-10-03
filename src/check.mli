@@ -10,4 +10,4 @@ val adaptive : dt0:float -> tol:float -> Ode.problem -> unit
 
 (** [output ~caller problem f0] checks [f0 = rhs t0 y0], which each driver evaluates once.
     @raise Invalid_argument, naming [caller], unless [f0] is as long as [y0]. *)
-val output : caller:string -> Ode.problem -> Vec.t -> unit
+val output : caller:string -> Ode.problem -> float array -> unit

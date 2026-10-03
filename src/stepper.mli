@@ -6,4 +6,4 @@
     what the clock does. [Error Nan] if [y0] or [rhs t0 y0] is not finite.
     @raise Invalid_argument unless [dt > 0] and [t_end >= t0], if [dt] is below {!Clock.resolution} of [t], or if
     [rhs t0 y0] is not as long as [y0]. *)
-val fixed : (module M : Ode.Method) -> dt:float -> Ode.problem -> (Vec.t, Fail.t) result
+val fixed : (module M : Ode.Method) -> dt:float -> Ode.problem -> (float array, Fail.t) result

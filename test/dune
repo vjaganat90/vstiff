@@ -4,4 +4,4 @@
  ; empty interface) is a dev-build error. Never dune promote a failure green: docs/testing.md.
  (names corpus soak)
  ; vstiff is the library built from src/.
- (libraries vstiff))
+ (libraries vstiff numerics))

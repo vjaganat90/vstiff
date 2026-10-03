@@ -2,7 +2,9 @@
    bookkeeping. A rejection leaves the point and the history alone and changes
    only [C]. Theory: docs/numerics/05-step-control.md. *)
 
-type 'stats solution = { t : float; y : Vec.t; stats : 'stats }
+module Vec = Numerics.Vec
+
+type 'stats solution = { t : float; y : float array; stats : 'stats }
 
 (* (module C : Ode.Controller) is a modular explicit: the result type names
    C.stats (docs/ocaml.md). *)

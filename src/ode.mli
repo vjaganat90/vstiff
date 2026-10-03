@@ -6,13 +6,13 @@
 (** The right-hand side [f] of [y' = f(t, y)]. [rhs t y] returns a fresh vector as
     long as [y] on every call and does not modify [y]: the library keeps earlier
     results while it calls [rhs] again. *)
-type rhs = float -> Vec.t -> Vec.t
+type rhs = float -> float array -> float array
 
 (** Integrate [y' = rhs t y] from [y(t0) = y0] up to [t_end]. *)
-type problem = { rhs : rhs; t0 : float; t_end : float; y0 : Vec.t }
+type problem = { rhs : rhs; t0 : float; t_end : float; y0 : float array }
 
 (** A point [(t, y)] on a solution. *)
-type point = { t : float; y : Vec.t }
+type point = { t : float; y : float array }
 
 (** Why an adaptive step was rejected. The controller is told so that it can
     treat the causes differently; [Halving] does not. *)
@@ -35,7 +35,7 @@ module type Method = sig
   (** [step rhs h history at] is the state at [at.t + h] and the history for the
       next step, or [Error] if the step cannot be taken (for BDF, Newton failed).
       [history] is [start] or the one returned by the step that reached [at]. *)
-  val step : rhs -> float -> history -> point -> (Vec.t * history, Fail.t) result
+  val step : rhs -> float -> history -> point -> (float array * history, Fail.t) result
 end
 
 (** A method that also estimates the local error of each step: the error the
@@ -45,7 +45,7 @@ module type Embedded = sig
   include Method
 
   (** As [step], with the error estimate in the middle: [(y, err, history)]. *)
-  val step_with_error : rhs -> float -> history -> point -> (Vec.t * Vec.t * history, Fail.t) result
+  val step_with_error : rhs -> float -> history -> point -> (float array * float array * history, Fail.t) result
 end
 
 (** A step-size policy for adaptive integration. For each attempt the driver
@@ -70,7 +70,7 @@ module type Controller = sig
 
   (** Whether a step that reached [y] with local error estimate [err] is good
       enough to keep. [y] and [err] have the same length. *)
-  val acceptable : t -> y:Vec.t -> err:Vec.t -> bool
+  val acceptable : t -> y:float array -> err:float array -> bool
 
   (** The state after a step was accepted. *)
   val accepted : t -> t

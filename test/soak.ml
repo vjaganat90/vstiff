@@ -3,6 +3,7 @@
    never equals itself). Identical turns false only if someone adds hidden state, randomness or parallelism.
    docs/testing.md *)
 open Vstiff
+open Numerics
 
 let rounds = 10
 
