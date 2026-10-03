@@ -4,8 +4,11 @@ open Fail.Syntax
 
 let fixed (module M : Ode.Method) ~dt (p : Ode.problem) =
   Check.fixed ~dt p;
+  let f0 = p.rhs p.t0 p.y0 in
+  Check.output ~caller:"Stepper.fixed" p f0;
   let span = p.t_end -. p.t0 in
-  if span = 0. then Ok p.y0
+  if not (Vec.finite p.y0 && Vec.finite f0) then Error Fail.Nan
+  else if span = 0. then Ok p.y0
   else
     let n = max 1 (Float.to_int (Float.round (span /. dt))) in
     let h = span /. float_of_int n in

@@ -10,10 +10,14 @@ let integrate (module M : Ode.Embedded) (module C : Ode.Controller) ?dt0 ?dt_max
     (p : Ode.problem) : (C.stats solution, Fail.t) result =
   let span = p.t_end -. p.t0 in
   (* ?dt_max arrives as an option; Option.value supplies the default (docs/ocaml.md). *)
-  let dt_max = Option.value dt_max ~default:(span /. 10.) in
+  (* A default that underflows to 0 on a tiny span falls back to the span. *)
+  let positive d = if d > 0. then d else span in
+  let dt_max = Option.value dt_max ~default:(positive (span /. 10.)) in
   (* Start small: how fast y changes is not known yet. Never above dt_max. *)
-  let dt0 = Float.min dt_max (Option.value dt0 ~default:(1e-6 *. span)) in
-  Check.adaptive ~dt0 p;
+  let dt0 = Float.min dt_max (Option.value dt0 ~default:(positive (1e-6 *. span))) in
+  Check.adaptive ~dt0 ~tol p;
+  let f0 = p.rhs p.t0 p.y0 in
+  Check.output ~caller:"Adaptive.integrate" p f0;
   (* go loops: every call to go is a tail call, so the stack does not grow (docs/ocaml.md). *)
   let rec go c history (at : Ode.point) =
     if at.t >= p.t_end then Ok { t = at.t; y = at.y; stats = C.stats c }
@@ -34,5 +38,5 @@ let integrate (module M : Ode.Embedded) (module C : Ode.Controller) ?dt0 ?dt_max
         | Error e -> retry (Ode.Solver e)
   in
   (* Without this check a non-finite start would only end as StepRejected. *)
-  if not (Vec.finite p.y0 && Vec.finite (p.rhs p.t0 p.y0)) then Error Fail.Nan
+  if not (Vec.finite p.y0 && Vec.finite f0) then Error Fail.Nan
   else go (C.init ~tol ~dt0 ~dt_max ~max_rejects) M.start { t = p.t0; y = p.y0 }

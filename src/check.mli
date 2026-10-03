@@ -5,5 +5,9 @@
     [|t0|] and [|t_end|]. *)
 val fixed : dt:float -> Ode.problem -> unit
 
-(** @raise Invalid_argument unless [t_end >= t0], and [dt0 > 0] when the span is not empty. *)
-val adaptive : dt0:float -> Ode.problem -> unit
+(** @raise Invalid_argument unless [t_end >= t0], [dt0 > 0] when the span is not empty, and [tol > 0]. *)
+val adaptive : dt0:float -> tol:float -> Ode.problem -> unit
+
+(** [output ~caller problem f0] checks [f0 = rhs t0 y0], which each driver evaluates once.
+    @raise Invalid_argument, naming [caller], unless [f0] is as long as [y0]. *)
+val output : caller:string -> Ode.problem -> Vec.t -> unit

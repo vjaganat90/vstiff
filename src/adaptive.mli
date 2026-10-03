@@ -12,7 +12,8 @@ type 'stats solution = { t : float; y : Vec.t; stats : 'stats }
     [tol] limits each step's estimate, not the final error. Defaults: [dt0 = 1e-6 (t_end - t0)], capped at
     [dt_max = (t_end - t0) / 10]; [max_rejects = 50]. [Error Nan] if [y0] or [rhs t0 y0] is not finite, and [C]'s
     [Error] when it gives up.
-    @raise Invalid_argument if [t_end < t0], or the span is not empty and [dt0] or [dt_max] is not positive. *)
+    @raise Invalid_argument if [t_end < t0], the span is not empty and [dt0] or [dt_max] is not positive, [tol] is
+    not positive, or [rhs t0 y0] is not as long as [y0]. *)
 val integrate :
   (module M : Ode.Embedded) ->
   (module C : Ode.Controller) ->
