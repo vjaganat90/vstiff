@@ -295,6 +295,23 @@ let zero_floor =
           bdf2_halving ~max_rejects:5000 ~tol:1e-6 (wall_at_0 ())) );
   ]
 
+(* The drivers' start: tol must be positive, rhs t0 y0 as long as y0 and
+   finite (a fixed-step run with nothing to do included), and the defaults must
+   not underflow on a tiny span. *)
+let arguments =
+  let decay ~t0 ~t_end = { Ode.rhs = Guard.budget (fun _ y -> Vec.scale (-1.) y); t0; t_end; y0 = [| 1. |] } in
+  let short = { Ode.rhs = Guard.budget (fun _ y -> [| -.y.(0) |]); t0 = 0.; t_end = 1.; y0 = [| 1.; 2. |] } in
+  let reached (s : _ Adaptive.solution) = Printf.sprintf "Ok at t=%g" s.t in
+  let state y = "Ok " ^ pp_vec y in
+  [
+    ("adaptive tol = 0", Guard.run reached (fun () -> bdf2_halving ~tol:0. (decay ~t0:0. ~t_end:1.)));
+    ("adaptive rhs of the wrong length", Guard.run reached (fun () -> bdf2_halving ~tol:1e-6 short));
+    ("bdf1 rhs of the wrong length", Guard.run state (fun () -> Stepper.fixed (module Bdf1) ~dt:0.1 short));
+    ( "bdf1 y0 = nan on an empty span",
+      Guard.run state (fun () -> Stepper.fixed (module Bdf1) ~dt:0.1 { (decay ~t0:1. ~t_end:1.) with y0 = [| Float.nan |] }) );
+    ("adaptive over a span of 1e-320", Guard.run reached (fun () -> bdf2_halving ~tol:1e-6 (decay ~t0:0. ~t_end:1e-320)));
+  ]
+
 (* Table order is output order, the order of the lines in corpus.expected. *)
 let corpus =
   List.concat
@@ -316,6 +333,7 @@ let corpus =
       too_small;
       fixed_clock;
       zero_floor;
+      arguments;
     ]
 
 let () = Report.lines corpus
