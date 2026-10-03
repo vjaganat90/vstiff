@@ -1,17 +1,20 @@
-(** Damped Newton for [f x = 0] with a caller-supplied Jacobian. *)
+(* Newton's method replaces f by its tangent at x and jumps to the tangent's root; the line search shortens a
+   jump that overshoots. docs/numerics/02-newton.md explains both. *)
 
-(* Converged once |dx|_inf <= tol (1 + |x|_inf). *)
+(* Converged once |dx|_inf <= tol (1 + |x|_inf): relative for large x, absolute near zero. This is Newton's
+   own tolerance, unrelated to the integrator's tol. *)
 let tol = 1e-10
 let max_iter = 50
 
 (* Smallest line-search factor tried before giving up. *)
 let min_damping = 1. /. 1024.
 
-(* Armijo constant: a damped step must shrink the residual by this fraction of
+(* Armijo constant: a damped step must shrink the residual by at least this fraction of
    the decrease the linear model promises. *)
 let armijo = 1e-4
 
 let solve (f : Vec.t -> Vec.t) (jac : Vec.t -> Linalg.matrix) (x0 : Vec.t) : (Vec.t, Fail.t) result =
+  (* iterate is a loop written as tail recursion; a match guard (when) adds a condition to a case: docs/ocaml.md. *)
   let rec iterate k x fx =
     let r = Vec.norm_inf fx in
     if not (Vec.finite x && Vec.finite fx) then Error Fail.Nan
@@ -21,9 +24,11 @@ let solve (f : Vec.t -> Vec.t) (jac : Vec.t -> Linalg.matrix) (x0 : Vec.t) : (Ve
       match Linalg.solve (jac x) (Vec.scale (-1.) fx) with
       | None -> Error Fail.Diverged
       | Some dx when not (Vec.finite dx) -> Error Fail.Diverged
+      (* The step test comes before the line search: near the root round-off keeps the residual from
+         decreasing, so the search would refuse every step and call a solved problem Diverged. *)
       | Some dx when Vec.norm_inf dx <= tol *. (1. +. Vec.norm_inf x) -> Ok (Vec.add x dx)
       | Some dx ->
-          (* Backtrack: halve the step until the residual drops enough. *)
+          (* Damping: far from the root the full step can overshoot; halve lambda until the Armijo test passes. *)
           let rec damp lambda =
             if lambda < min_damping then Error Fail.Diverged
             else

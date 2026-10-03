@@ -1,3 +1,5 @@
+(* Failures are values: docs/architecture.md. Variants, Result and binding operators: docs/ocaml.md. *)
+
 type t = Diverged | StepRejected of int | Nan
 
 let to_string = function

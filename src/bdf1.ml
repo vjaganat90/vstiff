@@ -1,5 +1,4 @@
-(** Backward Euler: [y_{n+1} = y_n + h f(t_{n+1}, y_{n+1})]. *)
-
+(* open Ode makes at.t mean Ode.point's t; Stage.t names a record type; history is unit: docs/ocaml.md, Records. *)
 open Ode
 
 type history = unit
