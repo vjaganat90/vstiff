@@ -188,6 +188,31 @@ for method, rtol in [("Radau", 1e-13), ("BDF", 1e-12), ("LSODA", 1e-12)]:
 
 It is **a tripwire, not extra coverage**, and what it watches is determinism within one build (H1). The library has no hidden state, so `identical` can only turn `false` if someone adds hidden state, randomness or parallelism, or if a `nan` appears in a result (`nan` is never equal to itself, and `=` treats `0.` and `-0.` as equal, so "identical" is slightly weaker than comparing every bit of the results). The soak cases restate the corpus criteria in their own code, so changing a criterion means changing it in both places. The adaptive cases, van der Pol and Robertson, run on the same call budget as the corpus lines (`on_budget` wraps their `rhs` with `Guard.budget`) and `repeat` runs every round through `Guard.bounded`, so a mistake that makes one of them crawl ends the round instead of stalling the soak test: with a transposed Jacobian the soak test ends in about 14 s and prints `soak robertson x10: passed 0/10, identical: true`, ten rounds that all ran out of budget (`None` equals `None`, which is why `identical` stays `true`). The fixed-step cases, the canary and the logistic order, have no budget and always end.
 
+## Properties
+
+[test/props.ml](../test/props.ml) checks properties: claims that must hold on every one of thousands of generated cases, such as "the backward error of `Linalg.solve` stays below n eps". It covers the kernel ([plans/plan.md](plans/plan.md), section 3.3) and shadows of theorems T1 and T2 of the [formal verification report](plans/formal-verification.md). [test/gen.ml](../test/gen.ml) builds the generators, [test/prop.ml](../test/prop.ml) runs a property and shrinks a failing case, and [test/dd.ml](../test/dd.ml) computes exact references in double-double arithmetic. `dune runtest` compares its output with [test/props.expected](../test/props.expected), like the other programs.
+
+A property is a module of type `Prop.Property`: a type `t` of cases, a `name`, a generator `gen`, `show` and `holds`. A generator draws a value together with a lazy tree of smaller values, so shrinking comes with it: `Gen.map`, `Gen.pair`, `Gen.array` and `Gen.bind` (`let*`) shrink what they build. `Prop.check` runs the cases in turn; at the first that fails, it walks greedily down that case's tree to a smaller case that still fails, trying at most 10,000 candidates. A case that raises fails too: `Guard.verdict` catches the exception and the failure names it. A statistical property (`Prop.Statistical`) adds a `threshold`, the share of the cases that must hold, for a claim that is likely rather than certain.
+
+**Adding a property.** Write a module in `test/props.ml`, next to those of the module it tests, and derive its bound in a short comment above it. Add `prop (module YourProperty) ~count:10000` to the list in `suite` (`share` for a statistical one): the name is part of the line and seeds the cases, so settle it first. `dune runtest` must then show your new line and no other; add it to `test/props.expected`. Measure the bound in a probe, as the ratio of the error to the bound over many cases: a bound much looser than the largest error it sees cannot catch a small regression. Then check that the property can fail, as for a corpus case: break what it protects in a scratch copy and see its line turn `FAILED`.
+
+**Seeds and scale.** Each property draws from `Random.State.make [| run_seed; Hashtbl.hash name |]`, so adding a property changes no other property's cases. The run seed is 2026 and the counts are those in `suite`, unless `VSTIFF_PROP_SEED` sets another run seed or `VSTIFF_PROP_SCALE` multiplies every count by a positive integer, as a nightly run does. `props.ml` reads both once, in its main, and `test/dune` lists them as dependencies, so dune runs the properties again when they change. Another seed leaves `props.expected` valid; another scale changes the counts in the lines, so run the program directly and look for lines that are not ok (no output means every property held):
+
+```sh
+dune build ./test/props.exe
+VSTIFF_PROP_SEED=1 VSTIFF_PROP_SCALE=10 ./_build/default/test/props.exe | grep -v ': ok'
+```
+
+A value that is not an integer, or a scale below 1, makes the program print one line instead, such as `prop settings: VSTIFF_PROP_SCALE=0 is not a valid setting`.
+
+**The lines.** A property that held prints `prop <name>: ok <count>`, and no generated value, so the line survives changes to the generators. A statistical property prints its threshold and its verdict, `prop newton converges from random starts on monotone cubics: ok, at least 99% of 10000`, and not how many cases held: that number can differ between platforms, whose math libraries can change the last bits of a generated case. A failure prints `FAILED`, which case failed (or, for a statistical property, how many held), the run seed, the shrink steps taken and the shrunk case, its floats to 17 significant digits so that they read back exactly. With Newton's tolerance `1e-6` for `1e-10`:
+
+```text
+prop newton Ok passes its own stopping test again: FAILED at case 1 of 10000, seed 2026, shrunk in 7 steps: m = [[1]], a = 0, e = 0, c = [0], x0 = [-4], j = 0.69999999999999996
+```
+
+Set `VSTIFF_PROP_SEED` to the printed seed, at the same scale, to see the failure again. The fix of a failure lands with a corpus line that pins its shrunk case.
+
 ## Probes
 
 A **probe** is a throwaway program that calls the library to answer a question: what does this return, how many steps does this case take, does that argument raise? Run one before you state a fact about behaviour in a comment or a document (H12). Keep probes outside the repository: every `dune` file in the tree is part of the project, so a probe inside it is built for everyone. From the repository root:
