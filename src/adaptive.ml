@@ -22,7 +22,7 @@ let ( let* ) = Result.bind
 let solution { at; accepted_steps; rejected_steps; _ } = { t = at.t; y = at.y; accepted_steps; rejected_steps }
 
 (* Largest component of [e], each measured against 1 + |y_i|. *)
-let scaled e y = Array.fold_left Float.max 0. (Vec.map2 (fun ei yi -> Float.abs ei /. (1. +. Float.abs yi)) e y)
+let scaled e y = Array.fold_left Float.max 0. (Array.map2 (fun ei yi -> Float.abs ei /. (1. +. Float.abs yi)) e y)
 
 (* The step's result and its local error estimate. Without history the
    estimate is half the gap between backward Euler and its explicit Euler

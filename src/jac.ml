@@ -9,7 +9,7 @@ let forward (f : Vec.t -> Vec.t) (y : Vec.t) : Linalg.matrix =
   let column j =
     let yp = Array.mapi (fun k yk -> if k = j then yk +. step yk else yk) y in
     (* Divide by the perturbation actually representable in [yp], not the nominal one. *)
-    Vec.scale (1. /. (yp.(j) -. y.(j))) (Vec.sub (f yp) fy)
+    (1. /. (yp.(j) -. y.(j)), f yp)
   in
   let cols = Array.init (Array.length y) column in
-  Array.init (Array.length fy) (fun i -> Array.map (fun col -> col.(i)) cols)
+  Array.mapi (fun i fyi -> Array.map (fun (inv, fp) -> inv *. (fp.(i) -. fyi)) cols) fy
