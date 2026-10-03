@@ -1,8 +1,15 @@
 (library
- ; The pure part of the bench: problems, references, measurements and the golden table. Nothing here prints or times;
- ; the executable's console.ml is the only module that does.
+ ; The pure part of the bench: problems, references, measurements and the table text. Nothing here prints or times;
+ ; console.ml, in the executable, is the only module that does.
  (name benchlib)
+ (modules :standard \ bench console)
  (libraries vstiff problems))
+
+(executable
+ ; Run by hand, never by dune runtest: bench/README.md.
+ (name bench)
+ (modules bench console)
+ (libraries benchlib))
 
 ; The Python scripts and their data live in compare/, outside the build.
 (dirs :standard \ compare)
