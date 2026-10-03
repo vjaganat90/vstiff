@@ -48,7 +48,7 @@ module Van_der_pol = struct
 
   let name = "van der Pol"
   let run () = Adaptive.integrate ~tol:1e-4 problem
-  let pass (s : t) = s.t = 2000. && s.rejected >= 1 && Vec.finite s.y
+  let pass (s : t) = s.t = 2000. && s.rejected_steps >= 1 && Vec.finite s.y
 end
 
 module Robertson = struct
