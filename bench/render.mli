@@ -1,12 +1,13 @@
 (** The text the bench prints, as strings: nothing here prints. *)
 
-(** One run, with its CPU time when it was asked for. *)
-type entry = { row : Measure.t; cpu : float option }
+(** One run, with its CPU time when it was asked for, and its verdict against the golden table. *)
+type entry = { row : Measure.t; cpu : float option; verdict : Gate.verdict }
 
 (** What the rows of the table are, as one line above the header. *)
 val title : string
 
-(** The header of the table, with a column for the CPU time if the options ask for it, and one line per entry. *)
+(** The header of the table, with a column for the CPU time if the options ask for it, and one line per entry, which
+    ends with the verdict. *)
 val table_header : Options.t -> string
 
 val table_line : entry -> string

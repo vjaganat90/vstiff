@@ -10,12 +10,16 @@ let rows (options : Options.t) =
   List.concat_map with_tols (List.filter wanted Suite.cases)
 
 let entry (options : Options.t) (case, tol) =
-  if options.cpu then
-    let row, seconds = Console.cpu (fun () -> Measure.run case ~tol) in
-    { Render.row; cpu = Some seconds }
-  else { Render.row = Measure.run case ~tol; cpu = None }
+  let row, cpu =
+    if options.cpu then
+      let row, seconds = Console.cpu (fun () -> Measure.run case ~tol) in
+      (row, Some seconds)
+    else (Measure.run case ~tol, None)
+  in
+  { Render.row; cpu; verdict = Gate.verdict Golden.rows row }
 
 let failed { Render.row; _ } = match row.Measure.outcome with Measure.Failed _ -> true | Done _ -> false
+let regressed { Render.verdict; _ } = verdict <> Gate.Within_band
 
 (* The rows appear as they finish: the longest takes a few seconds. *)
 let stream options line selected =
@@ -29,11 +33,18 @@ let stream options line selected =
 let table (options : Options.t) selected =
   Console.print Render.title;
   Console.print (Render.table_header options);
-  if List.exists failed (stream options Render.table_line selected) then Console.exit 1
+  if List.exists regressed (stream options Render.table_line selected) then Console.exit 1
 
 let csv (options : Options.t) selected =
   Console.print (Render.csv_header options);
   if List.exists failed (stream options Render.csv_line selected) then Console.exit 1
+
+let pin options selected =
+  match Gate.source (List.map (fun e -> e.Render.row) (List.map (entry options) selected)) with
+  | Some source -> Console.print source
+  | None ->
+      Console.warn "a run failed or gave a figure that is not finite: there is nothing to pin";
+      Console.exit 1
 
 let with_rows options run =
   match rows options with
@@ -52,4 +63,5 @@ let () =
       match options.mode with
       | Help -> Console.print Options.usage
       | Table -> with_rows options (table options)
-      | Csv -> with_rows options (csv options))
+      | Csv -> with_rows options (csv options)
+      | Pin -> with_rows options (pin options))
