@@ -22,7 +22,7 @@ module Logistic = struct
 end
 
 (** van der Pol, μ = 1000: slow drifts broken by jumps on a 1/μ time scale. *)
-module Van_der_pol = struct
+module VanDerPol = struct
   let mu = 1000.
   let rhs _t y = [| y.(1); (mu *. (1. -. (y.(0) *. y.(0))) *. y.(1)) -. y.(0) |]
   let y0 = [| 2.; 0. |]
