@@ -1,0 +1,14 @@
+prop vec norm_inf is invariant under permutation: ok 20000
+prop vec finite is false exactly when an entry is nan or infinite: ok 20000
+prop vec axpy is a x + y within its rounding: ok 20000
+prop linalg backward error <= n eps, condition up to 1e8: ok 10000
+prop linalg row permutation agrees within the backward-error bound: ok 10000
+prop linalg repeated row gives None: ok 20000
+prop linalg results are finite, scales 2^-960 to 2^960: ok 10000
+prop jac affine map within the forward-difference rounding bound: ok 10000
+prop jac orientation: n inputs and m outputs give m rows, M and not its transpose: ok 10000
+prop jac perturbing y_j moves only column j: ok 10000
+prop newton Ok is finite: ok 20000
+prop newton Ok passes its own stopping test again: ok 10000
+prop newton converges on linear problems, condition up to 1e4: ok 10000
+prop newton converges from random starts on monotone cubics: ok, at least 99% of 10000

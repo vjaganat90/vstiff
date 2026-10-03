@@ -2,6 +2,11 @@
  ; Each main module below (test/<name>.ml) runs as <name>.exe under dune runtest; dune diffs its stdout with
  ; <name>.expected. The other .ml files here are helpers: an unused top-level value in a main module (generated
  ; empty interface) is a dev-build error. Never dune promote a failure green (AGENTS.md, H2).
- (names corpus soak)
+ (names corpus soak props)
+ ; props reads its run seed and the multiplier on its counts from these; listing them makes dune run it again
+ ; when they change.
+ (deps
+  (env_var VSTIFF_PROP_SEED)
+  (env_var VSTIFF_PROP_SCALE))
  ; vstiff is the library built from src/.
  (libraries vstiff numerics))
