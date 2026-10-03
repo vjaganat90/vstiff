@@ -1,5 +1,7 @@
 (* Fixed-step driver; the method is passed as a modular explicit (docs/ocaml.md). *)
 
+module Vec = Numerics.Vec
+
 open Fail.Syntax
 
 let fixed (module M : Ode.Method) ~dt (p : Ode.problem) =

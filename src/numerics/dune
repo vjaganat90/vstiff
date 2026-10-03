@@ -1,0 +1,5 @@
+; The numerical kernel: vectors, dense linear solves, damped Newton and
+; forward-difference Jacobians, with the named failures they return. It knows
+; nothing about ODEs; the solver library in ../dune builds on it.
+(library
+ (name numerics))

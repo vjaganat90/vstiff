@@ -3,7 +3,11 @@
    x <- psi + gamma f(t, x), fixed-point iteration, which converges only for
    short steps; stiff problems need long ones. See docs/numerics/02-newton.md, section 7. *)
 
-type equation = { t : float; gamma : float; psi : Vec.t }
+module Vec = Numerics.Vec
+module Jac = Numerics.Jac
+module Newton = Numerics.Newton
+
+type equation = { t : float; gamma : float; psi : float array }
 
 let solve (rhs : Ode.rhs) { t; gamma; psi } guess =
   (* [rhs t] is [f] with the time fixed: partial application, docs/ocaml.md. *)

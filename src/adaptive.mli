@@ -3,7 +3,7 @@
 (** The end of a run: the state [y] at time [t], exactly [t_end], and what the
     controller reports in [stats]. The type depends on the controller, which is
     why [integrate] takes its modules as modular explicits (docs/ocaml.md). *)
-type 'stats solution = { t : float; y : Vec.t; stats : 'stats }
+type 'stats solution = { t : float; y : float array; stats : 'stats }
 
 (** [integrate (module M) (module C) ~tol problem] advances [problem.y0] from [t0] to [t_end], the last step cut to
     land on [t_end]. Every other step is snapped to the floats, [h = (t + dt) - t], so the state advances by exactly

@@ -2,6 +2,8 @@
    unknown [y_{n+1}] must satisfy the ODE at [t_{n+1}], which fixes the weights
    from [omega = h / h_prev] alone (docs/numerics/04-bdf.md). *)
 
+module Vec = Numerics.Vec
+
 open Ode
 
 (* let+ and let* take an Ok value and pass an Error through: docs/ocaml.md. *)

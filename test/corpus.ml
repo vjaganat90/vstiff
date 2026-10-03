@@ -3,6 +3,7 @@
    so the first changed line names the lowest layer that broke; regression pins follow. See
    docs/numerics/06-the-corpus.md and docs/glossary.md. *)
 open Vstiff
+open Numerics
 
 (* Twelve decimals hide last-bit noise, yet show a loose Newton tolerance (1e-6 instead of 1e-10) in the root
    of x^2 - 2. *)
