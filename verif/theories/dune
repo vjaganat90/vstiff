@@ -1,0 +1,15 @@
+; The proofs, as one Rocq theory. MathComp 2.6 needs its whole closure listed:
+; the standard library, micromega, Elpi and Hierarchy Builder, then MathComp.
+(rocq.theory
+ (name Vstiff)
+ (flags :standard -w -notation-overridden -w -ambiguous-paths)
+ (theories
+  Stdlib
+  micromega_plugin
+  elpi_elpi
+  elpi
+  HB
+  mathcomp.boot
+  mathcomp.order
+  mathcomp.finite_group
+  mathcomp.algebra))
