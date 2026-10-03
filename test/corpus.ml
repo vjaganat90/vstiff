@@ -238,9 +238,9 @@ let clock =
     ( "adaptive y' = 1 from t=1e10, dt_max = 5e-7 is below t's resolution",
       Guard.run (landed (1e10 +. 1.)) (fun () ->
           bdf2_halving ~dt_max:5e-7 ~tol:1e-6 (y_is_t ~t0:1e10 ~t_end:(1e10 +. 1.))) );
-    ( "adaptive y' = 1 from t=1e15 over 100, dt0 = dt_max = 0.19",
+    ( "adaptive y' = 1 from t=1e15 over 100, dt0 = dt_max = 3.7",
       Guard.run (landed (1e15 +. 100.)) (fun () ->
-          bdf2_halving ~dt0:0.19 ~dt_max:0.19 ~tol:1e-6 (y_is_t ~t0:1e15 ~t_end:(1e15 +. 100.))) );
+          bdf2_halving ~dt0:3.7 ~dt_max:3.7 ~tol:1e-6 (y_is_t ~t0:1e15 ~t_end:(1e15 +. 100.))) );
   ]
 
 (* A step that cannot move t is rejected before the method sees it: the only

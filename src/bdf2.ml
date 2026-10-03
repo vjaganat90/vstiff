@@ -28,8 +28,8 @@ let backward_euler rhs h at =
 
 let bdf2 rhs h ~h_prev ~y_prev at =
   (* Nothing checks omega against the zero-stability limit 1 + sqrt 2: the
-     controller must. Halving proposes at most 2; snapping a step of a few ulps
-     to the floats can push the taken ratio past it. *)
+     controller must. Halving proposes at most 2, and the driver's snapping
+     changes a step by at most 1/32. *)
   let omega = h /. h_prev in
   let { a1; a0; beta } = coeffs omega in
   let psi = Vec.add (Vec.scale a1 at.y) (Vec.scale a0 y_prev) in

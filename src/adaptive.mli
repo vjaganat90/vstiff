@@ -7,7 +7,7 @@ type 'stats solution = { t : float; y : Vec.t; stats : 'stats }
 
 (** [integrate (module M) (module C) ~tol problem] advances [problem.y0] from [t0] to [t_end], the last step cut to
     land on [t_end]. Every other step is snapped to the floats, [h = (t + dt) - t], so the state advances by exactly
-    what the clock does; a step that cannot move [t] is rejected as [Too_small] without calling [M].
+    what the clock does; a step below {!Clock.resolution} of [t] is rejected as [Too_small] without calling [M].
     [M] steps with an error estimate; [C] decides whether to keep a step and reports its [stats].
     [tol] limits each step's estimate, not the final error. Defaults: [dt0 = 1e-6 (t_end - t0)], capped at
     [dt_max = (t_end - t0) / 10]; [max_rejects = 50]. [Error Nan] if [y0] or [rhs t0 y0] is not finite, and [C]'s
