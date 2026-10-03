@@ -26,7 +26,7 @@ module Canary = struct
   type t = float
 
   let name = "canary"
-  let run () = Result.map (max_error (exact 1.)) (Bdf1.integrate ~rhs ~t0:0. ~t_end:1. ~dt:2e-6 y0)
+  let run () = Result.map (max_error (exact 1.)) (Bdf1.integrate ~dt:2e-6 problem)
   let pass e = e < 1e-6
 end
 
@@ -36,7 +36,7 @@ module Logistic_order = struct
   type t = float * float
 
   let name = "logistic order"
-  let error dt = Result.map (max_error (exact 5.)) (Bdf2.integrate ~rhs ~t0:0. ~t_end:5. ~dt y0)
+  let error dt = Result.map (max_error (exact 5.)) (Bdf2.integrate ~dt problem)
   let run () = Result.bind (error 0.01) (fun coarse -> Result.map (fun fine -> (coarse, fine)) (error 0.005))
   let pass (coarse, fine) = 3.5 <= coarse /. fine && coarse /. fine <= 4.5
 end
@@ -47,7 +47,7 @@ module Van_der_pol = struct
   type t = Adaptive.solution
 
   let name = "van der Pol"
-  let run () = Adaptive.integrate ~tol:1e-4 ~rhs ~t0:0. ~t_end:2000. y0
+  let run () = Adaptive.integrate ~tol:1e-4 problem
   let pass (s : t) = s.t = 2000. && s.rejected >= 1 && Vec.finite s.y
 end
 
@@ -57,7 +57,7 @@ module Robertson = struct
   type t = Adaptive.solution
 
   let name = "robertson"
-  let run () = Adaptive.integrate ~tol:1e-6 ~rhs ~t0:0. ~t_end:1e4 y0
+  let run () = Adaptive.integrate ~tol:1e-6 problem
 
   let pass (s : t) =
     Float.abs (s.y.(0) -. Refs.robertson_y1_at_1e4) < 1e-3

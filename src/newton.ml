@@ -12,8 +12,8 @@ let default = { tol = 1e-10; max_iter = 50; min_damping = 1. /. 1024. }
    the decrease the linear model promises. *)
 let armijo = 1e-4
 
-let solve ?(config = default) ~(f : Vec.t -> Vec.t) ~(jac : Vec.t -> float array array) (x0 : Vec.t)
-    : (Vec.t, Fail.t) result =
+let solve ?(config = default) (f : Vec.t -> Vec.t) (jac : Vec.t -> Linalg.matrix) (x0 : Vec.t) :
+    (Vec.t, Fail.t) result =
   let { tol; max_iter; min_damping } = config in
   let rec damp x r dx lambda =
     if lambda < min_damping then Error Fail.Diverged

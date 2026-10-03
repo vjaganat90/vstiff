@@ -13,10 +13,10 @@ let case name result = Printf.printf "%s: %s\n" name result
 let () =
   let a = [| [| 3.; 1. |]; [| 1.; 2. |] |] and b = [| 9.; 8. |] in
   let f x = Vec.sub (Array.map (fun row -> Vec.dot row x) a) b in
-  case "newton linear 2d" (show (Newton.solve ~f ~jac:(fun _ -> a) [| 0.; 0. |]));
+  case "newton linear 2d" (show (Newton.solve f (fun _ -> a) [| 0.; 0. |]));
   let f x = [| (x.(0) *. x.(0)) -. 2. |] and jac x = [| [| 2. *. x.(0) |] |] in
-  case "newton quadratic x0=1" (show (Newton.solve ~f ~jac [| 1. |]));
-  case "newton quadratic x0=0" (show (Newton.solve ~f ~jac [| 0. |]))
+  case "newton quadratic x0=1" (show (Newton.solve f jac [| 1. |]));
+  case "newton quadratic x0=0" (show (Newton.solve f jac [| 0. |]))
 
 let max_abs m = Array.fold_left (fun acc row -> Float.max acc (Vec.norm_inf row)) 0. m
 
@@ -44,14 +44,14 @@ let show_error name bound = function
 (* Step 3: backward Euler, fixed dt, on the canary. *)
 let () =
   let open Problems.Canary in
-  Bdf1.integrate ~rhs ~t0:0. ~t_end:1. ~dt:2e-6 y0
+  Bdf1.integrate ~dt:2e-6 problem
   |> Result.map (max_error (exact 1.))
   |> show_error "bdf1 canary t=1 dt=2e-6" 1e-6
 
 (* Step 4: BDF2 with a BDF1 startup is second order on the logistic equation. *)
 let () =
   let open Problems.Logistic in
-  let error dt = Result.map (max_error (exact 5.)) (Bdf2.integrate ~rhs ~t0:0. ~t_end:5. ~dt y0) in
+  let error dt = Result.map (max_error (exact 5.)) (Bdf2.integrate ~dt problem) in
   match (error 0.01, error 0.005) with
   | Ok coarse, Ok fine ->
       let ratio = coarse /. fine in
@@ -64,7 +64,7 @@ let () =
 (* Step 5: step rejection on van der Pol. *)
 let () =
   let open Problems.Van_der_pol in
-  match Adaptive.integrate ~tol:1e-4 ~rhs ~t0:0. ~t_end:2000. y0 with
+  match Adaptive.integrate ~tol:1e-4 problem with
   | Ok s ->
       case "vdp mu=1000 [0,2000] tol=1e-4"
         (Printf.sprintf "Ok at t=%g, rejected >= 1: %b, y finite: %b" s.t (s.rejected >= 1) (Vec.finite s.y))
@@ -73,7 +73,7 @@ let () =
 (* Step 6: Robertson to t = 1e4 against the reference, with mass conserved. *)
 let () =
   let open Problems.Robertson in
-  match Adaptive.integrate ~tol:1e-6 ~rhs ~t0:0. ~t_end:1e4 y0 with
+  match Adaptive.integrate ~tol:1e-6 problem with
   | Ok s ->
       let y1_error = Float.abs (s.y.(0) -. Refs.robertson_y1_at_1e4) in
       let mass_error = Float.abs (Array.fold_left ( +. ) 0. s.y -. 1.) in
@@ -88,7 +88,7 @@ let () =
    converges with the right Jacobian, and a swapped row makes it diverge. *)
 let () =
   let open Problems.Canary in
-  Bdf2.integrate ~rhs ~t0:0. ~t_end:1. ~dt:1e-3 y0
+  Bdf2.integrate ~dt:1e-3 problem
   |> Result.map (max_error (exact 1.))
   |> show_error "bdf2 canary t=1 dt=1e-3 (h lambda = 10)" 1e-6
 
@@ -129,20 +129,26 @@ let show_run name run =
     | exception Invalid_argument m -> "Invalid_argument " ^ m)
 
 let () =
-  let decay _ y = Vec.scale (-1.) y in
+  (* y' = -y from y = 1, on a fresh budget each time. *)
+  let decay ~t0 ~t_end = { Ode.rhs = budgeted (fun _ y -> Vec.scale (-1.) y); t0; t_end; y0 = [| 1. |] } in
   show_run "adaptive blow-up y' = y^2 from y(0)=1 to t=2" (fun () ->
-      Adaptive.integrate ~tol:1e-6 ~rhs:(budgeted (fun _ y -> [| y.(0) *. y.(0) |])) ~t0:0. ~t_end:2. [| 1. |]);
+      Adaptive.integrate ~tol:1e-6
+        { rhs = budgeted (fun _ y -> [| y.(0) *. y.(0) |]); t0 = 0.; t_end = 2.; y0 = [| 1. |] });
   show_run "adaptive rhs NaN past t=0.5" (fun () ->
       Adaptive.integrate ~dt0:0.25 ~dt_max:1e6 ~tol:1e-3
-        ~rhs:(budgeted (fun t y -> if t > 0.5 then [| Float.nan |] else Vec.scale (-1.) y))
-        ~t0:0. ~t_end:1. [| 1. |]);
+        {
+          rhs = budgeted (fun t y -> if t > 0.5 then [| Float.nan |] else Vec.scale (-1.) y);
+          t0 = 0.;
+          t_end = 1.;
+          y0 = [| 1. |];
+        });
   show_run "adaptive dt0 = dt_max = 1e30 on [0, 1]" (fun () ->
-      Adaptive.integrate ~dt0:1e30 ~dt_max:1e30 ~tol:1e-6 ~rhs:(budgeted decay) ~t0:0. ~t_end:1. [| 1. |]);
-  show_run "adaptive empty span" (fun () -> Adaptive.integrate ~tol:1e-6 ~rhs:(budgeted decay) ~t0:1. ~t_end:1. [| 1. |]);
-  show_run "adaptive t_end < t0" (fun () -> Adaptive.integrate ~tol:1e-6 ~rhs:(budgeted decay) ~t0:1. ~t_end:0. [| 1. |]);
-  show_run "adaptive dt0 = 0" (fun () -> Adaptive.integrate ~dt0:0. ~tol:1e-6 ~rhs:(budgeted decay) ~t0:0. ~t_end:1. [| 1. |]);
+      Adaptive.integrate ~dt0:1e30 ~dt_max:1e30 ~tol:1e-6 (decay ~t0:0. ~t_end:1.));
+  show_run "adaptive empty span" (fun () -> Adaptive.integrate ~tol:1e-6 (decay ~t0:1. ~t_end:1.));
+  show_run "adaptive t_end < t0" (fun () -> Adaptive.integrate ~tol:1e-6 (decay ~t0:1. ~t_end:0.));
+  show_run "adaptive dt0 = 0" (fun () -> Adaptive.integrate ~dt0:0. ~tol:1e-6 (decay ~t0:0. ~t_end:1.));
   case "bdf1 dt = 0"
-    (match Bdf1.integrate ~dt:0. ~rhs:(budgeted decay) ~t0:0. ~t_end:1. [| 1. |] with
+    (match Bdf1.integrate ~dt:0. (decay ~t0:0. ~t_end:1.) with
     | Ok y -> "Ok " ^ pp_vec y
     | Error e -> "Error " ^ Fail.to_string e
     | exception Invalid_argument m -> "Invalid_argument " ^ m)
@@ -153,14 +159,14 @@ let () =
 let () =
   let open Problems.Logistic in
   case "adaptive logistic [0,5] dt0=0.5 tol=1e-6"
-    (match Adaptive.integrate ~dt0:0.5 ~tol:1e-6 ~rhs ~t0:0. ~t_end:5. y0 with
+    (match Adaptive.integrate ~dt0:0.5 ~tol:1e-6 problem with
     | Ok s ->
         Printf.sprintf "accepted %d, rejected %d, max error %.2e" s.accepted s.rejected (max_error (exact 5.) s.y)
     | Error e -> "Error " ^ Fail.to_string e);
   (* Accuracy alone would allow steps several times longer than 1e-3 here, so
      the cap is what sets every step once dt has grown to it. *)
   case "adaptive logistic [0,5] dt_max=1e-3 tol=1e-6"
-    (match Adaptive.integrate ~dt_max:1e-3 ~tol:1e-6 ~rhs ~t0:0. ~t_end:5. y0 with
+    (match Adaptive.integrate ~dt_max:1e-3 ~tol:1e-6 problem with
     | Ok s -> Printf.sprintf "accepted %d, rejected %d" s.accepted s.rejected
     | Error e -> "Error " ^ Fail.to_string e)
 
@@ -168,7 +174,7 @@ let () =
 let () =
   let open Problems.Robertson in
   case "robertson t=1e4 tol=1e-6 accuracy"
-    (match Adaptive.integrate ~tol:1e-6 ~rhs ~t0:0. ~t_end:1e4 y0 with
+    (match Adaptive.integrate ~tol:1e-6 problem with
     | Ok s ->
         let e = Float.abs (s.y.(0) -. Refs.robertson_y1_at_1e4) in
         Printf.sprintf "|y1 - ref| = %.1e < 1e-5: %b" e (e < 1e-5)
