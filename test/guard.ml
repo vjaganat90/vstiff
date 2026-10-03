@@ -15,6 +15,10 @@ let budget rhs =
   let counted, calls = Instrument.count rhs in
   fun t y -> if calls () >= limit then raise Exhausted else counted t y
 
+(* bounded run is Some of what run returns, or None when a budget inside it ran
+   out: the soak's way to stop a round without catching anything itself. *)
+let bounded run = match run () with v -> Some v | exception Exhausted -> None
+
 (* run ok case is a table entry's function of (): ok formats an Ok; an Error, an
    exhausted budget and an Invalid_argument each print one line. A match case
    written exception catches what its expression raises (docs/ocaml.md). *)

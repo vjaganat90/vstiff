@@ -17,15 +17,17 @@ module type Case = sig
 end
 
 (* A modular explicit: the result type mentions C.t, which depends on the module
-   passed in, so the signature has to name that module (docs/ocaml.md). *)
-let repeat (module C : Case) : (C.t, Fail.t) result list = List.init rounds (fun _ -> C.run ())
+   passed in, so the signature has to name that module (docs/ocaml.md). A round
+   whose call budget ran out is None. *)
+let repeat (module C : Case) : (C.t, Fail.t) result option list =
+  List.init rounds (fun _ -> Guard.bounded C.run)
 
 (* The report line for a case, computed when Report prints it. *)
 let soak (module C : Case) =
   ( Printf.sprintf "soak %s x%d" C.name rounds,
     fun () ->
       let results = repeat (module C) in
-      let passed = List.length (List.filter (function Ok r -> C.pass r | Error _ -> false) results) in
+      let passed = List.length (List.filter (function Some (Ok r) -> C.pass r | _ -> false) results) in
       let identical = match results with [] -> true | first :: _ -> List.for_all (( = ) first) results in
       Printf.sprintf "passed %d/%d, identical: %b" passed rounds identical )
 
@@ -58,13 +60,17 @@ module LogisticOrder = struct
   let pass (coarse, fine) = 3.5 <= coarse /. fine && coarse /. fine <= 4.5
 end
 
+(* The adaptive runs are on Guard's call budget, so a bug that makes them crawl
+   ends a round instead of stalling the soak; the fixed-step runs always end. *)
+let on_budget (p : Ode.problem) = { p with rhs = Guard.budget p.rhs }
+
 (* Corpus step 5, ten times. s.t = 2000. compares floats exactly, which is safe:
    Adaptive assigns t_end to the last point instead of adding h. *)
 module VanDerPol = struct
   type t = Halving.stats Adaptive.solution
 
   let name = "van der Pol"
-  let run () = bdf2_halving ~tol:1e-4 Problems.VanDerPol.problem
+  let run () = bdf2_halving ~tol:1e-4 (on_budget Problems.VanDerPol.problem)
   let pass (s : t) = s.t = 2000. && s.stats.rejected_steps >= 1 && Vec.finite s.y
 end
 
@@ -73,7 +79,7 @@ module Robertson = struct
   type t = Halving.stats Adaptive.solution
 
   let name = "robertson"
-  let run () = bdf2_halving ~tol:1e-6 Problems.Robertson.problem
+  let run () = bdf2_halving ~tol:1e-6 (on_budget Problems.Robertson.problem)
 
   let pass (s : t) =
     Float.abs (s.y.(0) -. Refs.robertson_y1_at_1e4) < 1e-3 && Float.abs (Array.fold_left ( +. ) 0. s.y -. 1.) < 1e-8
