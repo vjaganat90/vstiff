@@ -32,7 +32,7 @@ Days 1 to 8 are foundations: setup, then the code from the smallest module to th
 
 - **Goal.** A working toolchain, a green test run, a map of the repository and a program of your own that calls the library.
 - **Read.** The [README](../README.md) at the repository root; the index in [README.md](README.md) of this folder; the tooling part of [ocaml.md](ocaml.md); the overview of [architecture.md](architecture.md) (skim the rest).
-- **Do.** Install OCaml 5.5.0 and dune as [ocaml.md](ocaml.md) describes. Clone, `git switch night/wip`, run `dune build` and `dune runtest`. Do A1 and A2, set up the probe project and run the README program. Skim every file of `src/` for a minute, one sentence each, then draw the call chain: `Adaptive.integrate` calls `Bdf2.step_with_error`, which calls `Bdf1.step` and (once there is history) a BDF2 step; both call `Stage.solve`, which hands `Newton.solve` a residual and a Jacobian built on `Jac.forward`; every Newton iteration calls that Jacobian and `Linalg.solve`; `Halving` judges the outcome.
+- **Do.** Install OCaml 5.5.0 and dune as [ocaml.md](ocaml.md) describes. Clone, `git switch night/wip`, run `dune build` and `dune runtest`. Do A1 and A2, set up the probe project and run the README program. Skim every file of `src/` for a minute, one sentence each, then draw the call chain: `Adaptive.integrate` calls `Bdf2.step_with_error`, which calls `Bdf1.step` and (once there is history) a BDF2 step; both call `Stage.solve`, which hands `Newton.solve` a residual and a Jacobian built on `Jac.forward`; every Newton iteration calls that Jacobian and `Linalg.solve`; `Halving` judges the outcome, and `Clock.resolution` tells both `Halving` and `Adaptive` how short a step `t` can still resolve.
 - **Self-check.**
   1. What does a silent `dune runtest` mean? *Every program's output matched its expected file; a failure prints a diff and exits with status 1.*
   2. What compares the test output with the expected files, `dune build` or `dune runtest`? *Only `dune runtest`. `dune build` runs the two programs, when their output is out of date, to record it and compares nothing.*
@@ -79,7 +79,7 @@ Days 1 to 8 are foundations: setup, then the code from the smallest module to th
   3. At `y0 = (1, 1, 1)` how far is the canary's `1e4` entry from exact, and why? *About 3.0e-5: round-off on values near `1e4`; half an ulp of `1e4` divided by the perturbation `2e-8` bounds it near 4.5e-5.*
   4. Why is the corpus bound absolute at the origin and relative at `y0`? *At the origin nothing cancels, so entries are essentially exact; at `y0` the rounding error scales with the entry.*
   5. Why does `Jac.forward` divide by `yp.(j) -. y.(j)` and not by the nominal perturbation? *The sum is rounded; the quotient must match the points where `f` was actually evaluated.*
-  6. What does `Vec.norm_inf` return when an entry is NaN, and what follows? *NaN. `Newton.solve` checks `Vec.finite` at the start of every iteration and returns `Error Nan`; `Halving.acceptable` rejects a NaN estimate because `nan <= tol` is false.*
+  6. What does `Vec.norm_inf` return when an entry is NaN, and what follows? *NaN. `Newton.solve` checks `Vec.finite` at the start of every iteration and on a converged `x + dx`, and returns `Error Nan`; `Halving.acceptable` rejects a NaN estimate because `nan <= tol` is false.*
 - **Done when.** Your C2 probe prints an error near 3.0e-5 and the matrix `[[5, 2], [1, 3]]`, and you can explain the first with half an ulp.
 
 ## Day 5. ODEs, stiffness, backward Euler and the contracts
@@ -110,23 +110,24 @@ Days 1 to 8 are foundations: setup, then the code from the smallest module to th
 
 ## Day 7. Step control and the adaptive loop
 
-- **Goal.** Narrate `Adaptive.integrate` from start to finish: error estimate, accept, reject, grow, give up.
-- **Read.** [numerics/05-step-control.md](numerics/05-step-control.md); [src/halving.mli](../src/halving.mli), [src/halving.ml](../src/halving.ml), [src/adaptive.mli](../src/adaptive.mli), [src/adaptive.ml](../src/adaptive.ml); the data-flow and error-flow parts of [architecture.md](architecture.md). Glossary: local truncation error, scaled error, rejection, `tol`, controller.
+- **Goal.** Narrate `Adaptive.integrate` from start to finish: choose and snap the step, error estimate, accept, reject, grow, give up.
+- **Read.** [numerics/05-step-control.md](numerics/05-step-control.md); [src/halving.mli](../src/halving.mli), [src/halving.ml](../src/halving.ml), [src/clock.mli](../src/clock.mli), [src/clock.ml](../src/clock.ml), [src/adaptive.mli](../src/adaptive.mli), [src/adaptive.ml](../src/adaptive.ml); the data-flow and error-flow parts of [architecture.md](architecture.md). Glossary: local truncation error, scaled error, rejection, step floor, snapping, `tol`, controller.
 - **Do.** B4, B1, B2, C4 and C5. Close `adaptive.ml` and write `go` from memory in plain words, then fix your version against the file.
 - **Self-check.**
   1. What does `Halving` compare with `tol`? *`max_i |err_i| / (1 + |y_i|)`.*
   2. What does the error estimate measure on the first step, and later? *First step: half the gap between backward Euler and explicit Euler. Later: the gap between BDF2 and backward Euler.*
-  3. When does the step double, and what does a rejection do? *After three accepts in a row, up to `dt_max`. A rejection, for either reason, halves the step that failed and restarts the count.*
+  3. When does the step double, and what does a rejection do? *After three accepts in a row, up to `dt_max`. A rejection, for any reason, halves the step that failed and restarts the count.*
   4. Which failures can `Adaptive.integrate` return with `Halving`? *`Nan` before the first step, from `Adaptive`; `StepRejected n` from `Halving`. A failed Newton solve is just a rejection.*
   5. Why does the NaN-wall corpus line say `StepRejected 46` when `max_rejects` is 50? *The floor `16 eps |t|` ends the run before the count does (C4).*
-  6. What are the two reasons for a rejection? *`Too_large`, the estimate exceeded `tol`; and `Solver e`, the method could not take the step (Newton failed). The controller sees which, and `Halving` treats them alike.*
+  6. What are the three reasons for a rejection? *`Too_large`, the estimate exceeded `tol`; `Solver e`, the method could not take the step (Newton failed); and `Too_small`, the driver found the step too short to move `t` and did not call the method. The controller sees which, and `Halving` treats them alike.*
+  7. What does the driver do with a step shorter than half an ulp of `t`? *It snaps the step to `h = (t + dt) - t = 0` and rejects it as `Too_small`; `Halving` halves 0, which is below the floor, so the run ends with `StepRejected 1`.*
 - **Done when.** Your B4 table matches, you have measured counts for three tolerances, and you can retell `go` without looking.
 
 ## Day 8. The corpus, the effect quarantine and the test policy
 
 - **Goal.** Know what every test line proves and cannot catch, which modules may have effects, and the rules for changing expectations.
 - **Read.** [numerics/06-the-corpus.md](numerics/06-the-corpus.md); [testing.md](testing.md); the contracts and effects parts of [architecture.md](architecture.md); the conventions in [CONTRIBUTING.md](../CONTRIBUTING.md); [test/problems.ml](../test/problems.ml), [test/refs.ml](../test/refs.ml), [test/guard.ml](../test/guard.ml), [test/report.ml](../test/report.ml), [test/corpus.ml](../test/corpus.ml), [test/soak.ml](../test/soak.ml) and both expected files. Glossary: corpus, canary, expect test, soak test, effect quarantine.
-- **Do.** Make a table with a row per corpus and soak line: problem, library code exercised, one defect it would catch and one it would not. Do D1 in a scratch copy. Read two commits that added corpus cases: `git log --oneline -- test/corpus.expected` lists them and `git show <hash> -- test/corpus.expected` shows the line one added. They use an older version of the API and of `corpus.ml`, so read them for the purpose of the case and its expected line, not for the code.
+- **Do.** Make a table with a row per corpus and soak line: problem, library code exercised, one defect it would catch and one it would not. Do D1 in a scratch copy. Read two commits that added corpus cases: `git log --oneline -- test/corpus.expected` lists them and `git show <hash> -- test/corpus.expected` shows the line one added. The recent ones add a fix together with its pins and use the current API; the older ones use an older version of the API and of `corpus.ml`, so read those for the purpose of the case and its expected line, not for the code.
 - **Self-check.**
   1. Why are reference values computed outside vstiff and never edited? *A reference computed by vstiff agrees with vstiff whatever it does.*
   2. What is the soak test for? *A tripwire: the library has no hidden state, so `identical` turns false only if hidden state, randomness, parallelism or a NaN appears.*

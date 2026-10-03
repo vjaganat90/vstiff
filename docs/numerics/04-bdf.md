@@ -217,11 +217,11 @@ With variable steps the coefficients change at every step, so the picture with f
 
 **Why the controller's `ω <= 2` is safe.** `Bdf2` does not check `ω`; it computes `h / h_prev` and uses it. The guarantee comes from how the adaptive driver and the `Halving` controller work together ([chapter 5](05-step-control.md) has the rules in full). The history the driver passes to the method always describes the last *accepted* step, so `ω` is the new attempt over the last accepted step, and the controller can only change the step in these ways:
 
-- After an accepted step it keeps its proposal or doubles it (at most once per three accepts). The step just taken was the previous proposal, so the next attempt is at most twice as long. (The one exception is the final step, which is cut short to land on `t_end`, and then the run ends.)
+- After an accepted step it keeps its proposal or doubles it (at most once per three accepts). The step just taken was the previous proposal, so the next attempt is at most twice as long. (The one exception is the final step, which takes whatever is left to reach `t_end`, and then the run ends.)
 - After a rejection it halves the step that failed, and the history stays what it was. The failed step was at most twice the last accepted step, so the retry is at most as long as that: `ω <= 1`.
 - A fixed-step run, `Stepper.fixed (module Bdf2)`, has `ω = 1` on every BDF2 step (its first step is backward Euler).
 
-So every ratio is at most 2, safely below `1 + √2 ≈ 2.414`. Any change to step control that lets the ratio exceed 2 must re-check it against `1 + √2` first, and the check belongs with the controller, because a different `Ode.Controller` can propose anything. Very small ratios are harmless: as `ω → 0` BDF2 approaches backward Euler (exercise 3).
+So every ratio of proposals is at most 2, safely below `1 + √2 ≈ 2.414`. (The driver also snaps each step to the floats, which moves it by at most an ulp of `t`; [chapter 5](05-step-control.md), section 9, shows that `ω` then stays below 2.2 for steps of 16 ulps or more, and that only shorter steps can pass the limit.) Any change to step control that lets the ratio exceed 2 must re-check it against `1 + √2` first, and the check belongs with the controller, because a different `Ode.Controller` can propose anything. Very small ratios are harmless: as `ω → 0` BDF2 approaches backward Euler (exercise 3).
 
 **Probe: watch the ratios.** This wrapper is an `Ode.Embedded` method made of `Bdf2` plus a note of the previous step in its history, and it records the largest `h / h_prev` it is ever asked to take. The driver drops the history of a rejected attempt, so the note always describes the last accepted step:
 
@@ -292,7 +292,7 @@ OCaml notes: `module Spy : Ode.Embedded = struct ... end` is a module that satis
    The line through the last two points, `y_n + ω (y_n - y_{n-1})`, which is `O(h²)` away for smooth solutions. Backward Euler starts from `y_n`, which is `O(h)` away.
 
 7. **What is the largest step ratio the adaptive integrator can produce, and why is that safe?**
-   2. It is below the zero-stability limit `1 + √2`. `Halving` doubles at most once per three accepts and halves on every rejection, so the ratio never exceeds 2. A controller with a larger growth factor would need the bound re-checked.
+   2 for the proposals, below the zero-stability limit `1 + √2`. `Halving` doubles at most once per three accepts and halves on every rejection, so the ratio of its proposals never exceeds 2. Snapping the steps to the floats changes each by at most an ulp of `t`, which lifts the ratio of the steps themselves to at most 2.2 for steps of 16 ulps or more (chapter 5, section 9). A controller with a larger growth factor would need the bound re-checked.
 
 8. **The corpus reports a ratio of 3.99 for the logistic test. What would a first-order method report, and what does the test check?**
    About 2. The test passes only for ratios between 3.5 and 4.5, i.e. orders from about 1.81 to 2.17.

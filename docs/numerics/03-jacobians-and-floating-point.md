@@ -151,7 +151,7 @@ y = 1e+06    relative difference between stored and nominal step:  2.1e-09
 y = 1e+10    relative difference between stored and nominal step: -1.0e-10
 ```
 
-Dividing by the nominal step would put those relative errors into the Jacobian.
+Dividing by the nominal step would put those relative errors into the Jacobian. `Adaptive.integrate` applies the same idea to time: the step it takes is the `(t + dt) - t` that the clock really made ([chapter 5](05-step-control.md), section 9).
 
 **Where the compromise is weak.** Near zero the step is absolute, so for a small variable it is a noticeable fraction of it, and the truncation error of a strongly curved function shows. Robertson's `y_2` never exceeds about `4e-5`. Its term `3e7 y_2²` has derivative `6e7 y_2 = 600` at `y_2 = 1e-5` and curvature `f'' = 6e7`, so the truncation error `(δ/2) f'' = 0.3` already appears in the fourth digit: `Jac.forward (fun y -> [| 3e7 *. y.(0) *. y.(0) |]) [| 1e-5 |]` returns `600.3000` where the exact derivative is `600`. This costs a little speed, not the answer: a slightly wrong Jacobian does not change the equation Newton solves ([chapter 2](02-newton.md)).
 
@@ -201,7 +201,7 @@ Two instruments, then: the first is a strict check of the structure, the second 
 
 ## 7. NaN and infinity
 
-**Where they come from.** Float arithmetic in OCaml never raises (integer division by zero does): `1. /. 0.` is `infinity`, `0. /. 0.` is `nan` ("not a number"), `exp 710.` overflows to `infinity`, `infinity -. infinity` and `0. *. infinity` are `nan`, `sqrt (-1.)` and `log (-1.)` are `nan`. In the integrator they come from a right-hand side that divides by a component that reaches zero, from a Newton trial point outside the function's domain (chapter 2's `sqrt x - 1` at `x = -3`), and from overflow when a trial state is huge (van der Pol squares `y_1`). The last row of section 2's table is another source, a step too small for its point, which the relative step avoids. `Float.is_finite x` is false for `nan` and both infinities, and `Vec.finite v` applies it to every component.
+**Where they come from.** Float arithmetic in OCaml never raises (integer division by zero does): `1. /. 0.` is `infinity`, `0. /. 0.` is `nan` ("not a number"), `exp 710.` overflows to `infinity`, `infinity -. infinity` and `0. *. infinity` are `nan`, `sqrt (-1.)` and `log (-1.)` are `nan`. In the integrator they come from a right-hand side that divides by a component that reaches zero, from a Newton trial point outside the function's domain (chapter 2's `sqrt x - 1` at `x = -3`), and from overflow when a trial state is huge (van der Pol squares `y_1`) or when a Newton step is added to an `x` near the largest float ([chapter 2](02-newton.md), section 6). The last row of section 2's table is another source, a step too small for its point, which the relative step avoids. `Float.is_finite x` is false for `nan` and both infinities, and `Vec.finite v` applies it to every component.
 
 **Comparisons with NaN are false.** `nan = nan`, `nan < 1.`, `nan <= 1.` and `nan >= 1.` are all `false`, and `<>` is simply the opposite of `=`: `nan <> x` is `true` for every `x`. So an acceptance test must be written as "accept if the comparison is true", so that NaN falls into the reject branch. The library does: `Halving.acceptable` keeps a step only if the weighted error is `<= tol`, so a NaN estimate is rejected; Newton's damping accepts a trial point only if `norm_inf fx' <= ...`. The mirror-image test, "reject if `est > tol`, otherwise accept", accepts NaN. It is a classic bug.
 
@@ -229,7 +229,7 @@ Vec.norm_inf [|nan; 1|] = nan
 1/0 = inf   0/0 = nan   inf - inf = nan   exp 710 = inf
 ```
 
-**What the library does with them.** `Newton.solve` returns `Error Nan` when `x` or `G(x)` is not finite at the start of an iteration; after the first iteration that does not happen in practice, because damping refuses any trial point whose residual is not finite and shortens the step instead (if every shortened step is refused, the result is `Error Diverged`, and so it is for a non-finite Newton step). `Adaptive.integrate` returns `Error Nan` if `y0` or `rhs t0 y0` is not finite, and treats a failed Newton solve like a bad error estimate: the step is rejected and halved ([chapter 5](05-step-control.md)). All numerical failures are `Fail.t` values, never exceptions.
+**What the library does with them.** `Newton.solve` returns `Error Nan` when `x` or `G(x)` is not finite at the start of an iteration; after the first iteration that does not happen in practice, because damping refuses any trial point whose residual is not finite and shortens the step instead (if every shortened step is refused, the result is `Error Diverged`, and so it is for a non-finite Newton step). It returns `Error Nan` too when a converged step `x + dx` overflows to infinity, which the stopping test, being relative, cannot see. `Adaptive.integrate` returns `Error Nan` if `y0` or `rhs t0 y0` is not finite, and treats a failed Newton solve like a bad error estimate: the step is rejected and halved ([chapter 5](05-step-control.md)). All numerical failures are `Fail.t` values, never exceptions.
 
 ## 8. Fused multiply-add and the last digits
 
@@ -267,7 +267,7 @@ What this means for changing the code:
 | The step `1e-8 (1 + abs y_j)` | the private function `step` in [`src/jac.ml`](../../src/jac.ml) |
 | The forward-difference Jacobian: perturb one component, divide by the stored perturbation, build the rows | `Jac.forward`, local function `column` |
 | The stage Jacobian `I - gamma J` | `Stage.solve` in [`src/stage.ml`](../../src/stage.ml): local `jacobian` calls `Jac.forward f x` and forms `(if i = j then 1. else 0.) -. gamma *. v` |
-| Finite checks | `Vec.finite`, `Vec.norm_inf` in [`src/vec.ml`](../../src/vec.ml); `Newton.solve` ([`src/newton.ml`](../../src/newton.ml)) at the start of an iteration, on the step and on each trial residual |
+| Finite checks | `Vec.finite`, `Vec.norm_inf` in [`src/vec.ml`](../../src/vec.ml); `Newton.solve` ([`src/newton.ml`](../../src/newton.ml)) at the start of an iteration, on the step, on each trial residual and on a converged `x + dx` |
 | The accept test that rejects NaN | `Halving.acceptable` in [`src/halving.ml`](../../src/halving.ml) |
 | `Error Nan` at the start of a run | `Adaptive.integrate`: `Vec.finite p.y0 && Vec.finite (p.rhs p.t0 p.y0)` in [`src/adaptive.ml`](../../src/adaptive.ml); `Fail.Nan` in [`src/fail.ml`](../../src/fail.ml) |
 | The Jacobian checks | the `jacobian` and `orientation` cases of [`test/corpus.ml`](../../test/corpus.ml); the `jac` lines of [`test/corpus.expected`](../../test/corpus.expected) |

@@ -2,7 +2,7 @@
 
 Chapter 6 of 6 in the numerical-methods track. Previous: [5. Error estimates and step-size control](05-step-control.md). Index and reading order: [docs/README.md](../README.md). Terms and symbols: [glossary](../glossary.md).
 
-**Summary.** The corpus is a table of 23 cases whose printed lines are pinned in [`test/corpus.expected`](../../test/corpus.expected). This chapter says, line by line, what each one proves, what a failure points at and what it cannot see: nine lines that climb from Newton to a stiff chemical system, and fourteen regression pins that each guard one rule. It introduces the four ODEs behind them (the canary, the logistic equation, van der Pol and Robertson), the external reference value and why it is never edited, the four soak lines, a table of deliberate bugs with the line that notices each, and an honest list of what the corpus does not catch, each item a possible contribution.
+**Summary.** The corpus is a table of 27 cases whose printed lines are pinned in [`test/corpus.expected`](../../test/corpus.expected). This chapter says, line by line, what each one proves, what a failure points at and what it cannot see: nine lines that climb from Newton to a stiff chemical system, and eighteen regression pins that each guard one rule. It introduces the four ODEs behind them (the canary, the logistic equation, van der Pol and Robertson), the external reference value and why it is never edited, the four soak lines, a table of deliberate bugs with the line that notices each, and an honest list of what the corpus does not catch, each item a possible contribution.
 
 Running the tests, reading a failure, adding a case and the policy for changing expectations are in [docs/testing.md](../testing.md), which this chapter does not repeat. The mathematics comes from chapters [1](01-odes-and-stiffness.md) to [5](05-step-control.md). Snippets run in the probe project (set up on day 1 from Setup in [exercises.md](../exercises.md), or "Running the snippets" in chapter 1); those that use `Refs` also need a link to `test/refs.ml`, made from the repository root next to the one for `problems.ml`:
 
@@ -20,7 +20,7 @@ OCaml notes for them ([docs/ocaml.md](../ocaml.md) has the details): `(module Bd
 Newton + Linalg  →  Jac  →  Stage + Bdf1  →  Bdf2  →  Adaptive + Halving  →  a stiff chemical system
 ```
 
-The other fourteen are regression pins, each added for a specific mistake (section 9 lists what catches what). The lines are numbered in the order of `corpus.expected`, which is the order of the named lists in `corpus.ml`: `newton` (1 to 3), `jacobian` (4 and 5), `backward_euler` (6), `bdf2_order` (7), `van_der_pol` (8), `robertson` (9), then the pins `stiff_canary` (10), `orientation` (11), `pivoting` (12 and 13), `give_up` (14 to 20), `step_control` (21 and 22) and `robertson_accuracy` (23). Two rules of thumb: when several lines differ, start with the first, which involves the fewest layers; and a case earns its place by pinning something the others do not.
+The other eighteen are regression pins, each added for a specific mistake (section 9 lists what catches what). The lines are numbered in the order of `corpus.expected`, which is the order of the named lists in `corpus.ml`: `newton` (1 to 3), `jacobian` (4 and 5), `backward_euler` (6), `bdf2_order` (7), `van_der_pol` (8), `robertson` (9), then the pins `stiff_canary` (10), `orientation` (11), `pivoting` (12 and 13), `give_up` (14 to 20), `step_control` (21 and 22), `robertson_accuracy` (23), `newton_overflow` (24) and `clock` (25 to 27). Two rules of thumb: when several lines differ, start with the first, which involves the fewest layers; and a case earns its place by pinning something the others do not.
 
 The problems live in [`test/problems.ml`](../../test/problems.ml). Each module exposes `rhs`, `y0`, a `problem` record and, where the exact solution has a formula, `exact`. None supplies a Jacobian: the solver must work for any black-box right-hand side. All four right-hand sides ignore their time argument (`rhs _t y`); section 10 comes back to that.
 
@@ -31,7 +31,7 @@ The problems live in [`test/problems.ml`](../../test/problems.ml). Each module e
 | Van der Pol, `μ = 1000` | 2 | slow drifts, jumps on `1/μ = 1e-3` | `[0, 2000]` | yes | no |
 | Robertson | 3 | rate constants 0.04 to 3e7 | `[0, 1e4]` | yes | no |
 
-## 2. Newton and Linalg: lines 1 to 3, 12 and 13
+## 2. Newton and Linalg: lines 1 to 3, 12, 13 and 24
 
 ```
 newton linear 2d: Ok [2.000000000000; 3.000000000000]
@@ -39,11 +39,14 @@ newton quadratic x0=1: Ok [1.414213562373]
 newton quadratic x0=0: Error Diverged
 linalg zero leading pivot: [1.000000000000; 2.000000000000; 3.000000000000]
 linalg tiny leading pivot: [1.000000000000; 1.000000000000]
+newton step that converges into an overflow: Error Nan
 ```
 
 Lines 1 to 3 test `Newton.solve` with a hand-written Jacobian, `Vec` and `Linalg`, and nothing above them. Line 1 is `G(x) = A x - b` with `A = [[3, 1], [1, 2]]`, `b = (9, 8)`, from `(0, 0)`: one Newton step ([chapter 2](02-newton.md)), printed with 12 decimals. Line 2 is `x² - 2` from 1, whose iterates are in chapter 2; 12 printed decimals make the line sensitive to Newton's tolerance. Line 3 is the same function from 0, where the 1×1 Jacobian is singular: `Linalg.solve` returns `None` and the failure comes back as the value `Error Diverged`. What they do not exercise: `A` is symmetric with its largest entry already in the corner, so neither orientation nor a row exchange is tested, and no step needs shortening.
 
 Lines 12 and 13 close the row-exchange gap, both worked by hand in chapter 2: a zero in the corner that only a row exchange gets past (without it the answer is `None`), and a tiny corner entry that elimination without the exchange turns into a first unknown of `0` instead of `1`.
+
+Line 24 closes a gap in the stopping test of chapter 2, which is relative, `|dx|_inf <= 1e-10 (1 + |x|_inf)`: next to the largest float, `max_float` (about `1.8e308`), a step of up to about `1.8e298` counts as tiny, and adding it can overflow. The case solves `x - max_float = 0` from `max_float - 1e297` and gives Newton a Jacobian of `0.25` where the true one is `1`, so the step comes out four times too long, about `4e297`. It passes the test, and `x + dx` lies beyond `max_float`, which is infinity. A solver must not call that a root, so `Newton.solve` checks the sum and returns `Error Nan`; without the check the line prints `Ok [inf]`.
 
 ## 3. The Jacobian: lines 4, 5 and 11
 
@@ -134,7 +137,7 @@ y1' = b - a,    y2' = a - b - c,    y3' = c,    y(0) = (1, 0, 0)
 
 **The sum.** The right-hand sides add up to zero, so `y1 + y2 + y3` is constant. Summing the three components of the stage equation `x = psi + gamma f(t_{n+1}, x)` gives `Σx = Σpsi + gamma Σf = Σpsi`, and `Σpsi = 1` because `psi` combines old states with weights that sum to one ([chapter 4](04-bdf.md)). Newton keeps this property: the columns of `J` sum to zero too (differentiate `Σf = 0`), so the columns of `I - gamma J` sum to one and a full Newton step lands on `Σpsi` (exactly for the exact Jacobian; the finite-difference one is accurate to about eight digits, and Newton iterates until its step is tiny). The sum therefore stays at 1 up to round-off, and the bound `1e-8` leaves room for round-off to accumulate over the steps. It tests a property of the method that no accuracy bound would find, though it cannot see an error that only moves amount from one species to another.
 
-## 8. Termination and argument checks: lines 14 to 20
+## 8. Termination, the clock and argument checks: lines 14 to 20 and 25 to 27
 
 Each right-hand side here runs under `Guard.budget`, a limit of 5,000,000 calls: a loop that never ends gives the text `no answer within 5e6 rhs calls` instead of hanging the run, and `Guard.run` turns an `Invalid_argument` into text too; `Report` prints it.
 
@@ -148,7 +151,19 @@ adaptive dt0 = 0: Invalid_argument Adaptive.integrate: dt0 and dt_max must be po
 bdf1 dt = 0: Invalid_argument Stepper.fixed: need dt > 0 and t_end >= t0
 ```
 
-The first two lines are runs with no way forward. `y' = y²` from `y(0) = 1` has the exact solution `1 / (1 - t)` and blows up at `t = 1`; in the second, the right-hand side is `nan` past `t = 0.5`, so every step that reaches beyond it fails in Newton. In both the controller halves the failed step until it is below `16 eps |t|`, where it gives up with `StepRejected n`, `n` being the rejections in a row (in the first, the very first rejection of the final streak already meets the floor; [chapter 5](05-step-control.md) derives both counts). Without that floor both runs would never end: the budget stops them and the lines show the budget text instead. The third line pins which step is halved: the first attempt is cut to the span `1`, and a rejection must halve that cut step, not the requested `1e30`, or the same failure repeats until `max_rejects` runs out (`Error StepRejected 51`). Line 17 says that a zero span is valid. The last three lines are the messages of `Check`: a span that runs backwards (line 18), a first step of zero (line 19) and a zero step for `Stepper.fixed` (line 20). Without the checks they print `Ok ...` or `Error StepRejected 51` instead (section 9).
+The first two lines are runs with no way forward. `y' = y²` from `y(0) = 1` has the exact solution `1 / (1 - t)` and blows up at `t = 1`; in the second, the right-hand side is `nan` past `t = 0.5`, so every step that reaches beyond it fails in Newton. In both the controller halves the failed step until it is below `16 eps |t|`, where it gives up with `StepRejected n`, `n` being the rejections in a row (in the first, the very first rejection of the final streak already meets the floor; [chapter 5](05-step-control.md) derives both counts). Without that floor both runs would still end, but late: only `max_rejects` is left to stop the halving, so the rejections in a row run up to 51 and both lines print `Error StepRejected 51` (section 9). The third line pins which step is halved: the first attempt is cut to the span `1`, and a rejection must halve that cut step, not the requested `1e30`, or the same failure repeats until `max_rejects` runs out (`Error StepRejected 51`). Line 17 says that a zero span is valid. The last three lines are the messages of `Check`: a span that runs backwards (line 18), a first step of zero (line 19) and a zero step for `Stepper.fixed` (line 20). Without the checks they print `Ok ...` or `Error StepRejected 51` instead (section 9).
+
+```
+adaptive y' = 1 over one ulp from t=1: Ok, at t_end: true, y = 2.22045e-16
+adaptive y' = 1 from t=1e10, dt_max = 5e-7 is below t's resolution: Error StepRejected 1
+adaptive y' = 1 from t=1e15 over 100, dt0 = dt_max = 0.19: Ok, at t_end: true, y = 100
+```
+
+Lines 25 to 27 pin the rules that keep the state and the clock together ([chapter 5](05-step-control.md), section 9). The problem is `y' = 1` from `y = 0`, so `y` is the time elapsed and a correct run ends with `y = t_end - t0`; each line prints whether the run landed on `t_end`, and `y`. The clock is a float, so near `t` it moves in whole ulps: a step below half an ulp of `t` does not move it, and a step of a few ulps moves it by a different amount than its length.
+
+Line 26 starts at `t = 1e10`, where the floats are `1.9e-6` apart ([chapter 3](03-jacobians-and-floating-point.md)), with steps of at most `5e-7`. Each snaps to `h = (t + dt) - t = 0`, is rejected as `Too_small` without calling the method, and `Halving` halves 0, which is below the floor, so the first rejection ends the run with `StepRejected 1`. Unsnapped, these steps are accepted without moving `t`, so the run never finishes and the budget text takes the line's place.
+
+Line 27 starts at `t = 1e15`, where the floats are `0.125` apart, so `t + 0.19` is `t + 0.25`. An unsnapped step advances the state by `0.19` and the clock by `0.25`: the clock reaches `t_end` after 400 steps with the state at `400 · 0.19 = 76`, an `Ok` with a wrong answer. Snapped, every step is `0.25` and the state ends at `100`. Line 25 pins the remainder rule. The span is one ulp of 1, `2.2e-16`, and the default first step, a millionth of the span, snaps to 0. A remainder of at most `Clock.resolution t`, that is `16 eps |t|` (`3.6e-15` at `t = 1`), is taken whole as the last step, so the run ends `Ok` on `t_end` with `y` equal to that one ulp; without the rule it ends with `StepRejected 1`. Section 9 lists what the three lines print when the rules are removed.
 
 ## 9. The soak, and what each pin catches
 
@@ -161,7 +176,7 @@ soak robertson x10: passed 10/10, identical: true
 
 [`test/soak.ml`](../../test/soak.ml) reruns the canary, the logistic order check, van der Pol and Robertson ten times each, with the same criteria as lines 6, 7, 8 and 9, and checks that every round passes and that all rounds are equal under `=`. The library has no hidden state, so `identical` can turn `false` only if someone adds hidden state, randomness or parallelism (or a NaN appears, since NaN is never equal to itself). It is a tripwire, not extra coverage. The mechanics are in [docs/testing.md](../testing.md).
 
-Each row is one deliberate change that you can repeat in a scratch copy of the repository, running the built test programs under a time limit; [docs/testing.md](../testing.md) has the method and a longer table. "Silent" means no line of either expected file changes.
+Each row is one deliberate change, an edit of a few lines at most, that you can repeat in a scratch copy of the repository, running the built test programs under a time limit; [docs/testing.md](../testing.md) has the method and a longer table. "Silent" means no line of either expected file changes.
 
 | Change | What the corpus does |
 |--------|----------------------|
@@ -170,18 +185,22 @@ Each row is one deliberate change that you can repeat in a scratch copy of the r
 | `Jac` step `1e-2` or `1e-14` instead of `1e-8` | line 11 prints `false` for both; line 5 also for `1e-14`; line 23 moves its digits for `1e-2` |
 | `Linalg`: pivot always on row 0 | line 12 prints `None`, line 13 prints `[0.000000000000; 1.000000000000]` |
 | Newton tolerance `1e-6` instead of `1e-10` | only the 12th decimal of line 2 |
-| Newton: no stopping test on the step | line 2 and every line that takes an integration step print `Error Diverged` or `Error StepRejected 51` |
-| Newton: the step test applied only after the line search accepts a step | lines 6, 7 and 10 print `Error Diverged`; lines 8, 16, 21 and 22 print `Error StepRejected`, lines 14 and 15 other counts; the soak lines for the canary, the logistic order and van der Pol pass 0/10 |
-| `Halving`: double after two accepts, not three | lines 21 and 22, and the count of the NaN wall (line 15) |
+| Newton: no stopping test on the step | line 2 and every line up to 23 that takes an integration step print `Error Diverged` or `Error StepRejected 51`; line 24 prints `Ok` with `max_float` in full (309 digits), line 27 `Error StepRejected 1`, and lines 25 and 26 do not change |
+| Newton: the step test applied only after the line search accepts a step | lines 6, 7 and 10 print `Error Diverged`; lines 8, 16, 21 and 22 print `Error StepRejected`, lines 14 and 15 other counts; line 24 prints `max_float` in full and line 27 `Error StepRejected 1`; the soak lines for the canary, the logistic order and van der Pol pass 0/10 |
+| Newton: no finiteness check on the converged `x + dx` | line 24 prints `Ok [inf]` |
+| `Halving`: double after two accepts, not three | lines 21 and 22, and the counts of the blow-up (line 14, `StepRejected 2`) and the NaN wall (line 15) |
 | `Bdf2`: startup estimate factor `1e-3` instead of `0.5` | line 21 |
 | `Halving`: no cap by `dt_max` | line 22 |
 | `Halving`: error weight 1 instead of `1 + abs(y_i)` | the blow-up and NaN-wall lines (14 and 15), lines 21 and 23 |
 | `Halving`: halve the requested step, not the failed one | the `1e30` line (16): `Error StepRejected 51` |
-| `Halving`: no `16 eps abs(t)` floor | the blow-up and NaN-wall lines (14 and 15) print the budget line |
-| `Adaptive`: do not shorten the last step | the `1e30` line (16) and line 23 |
+| `Halving`: no `16 eps abs(t)` floor | lines 14, 15 and 26 print `Error StepRejected 51` instead of 1, 46 and 1: only `max_rejects` is left to end the run |
+| `Adaptive`: do not shorten the last step (`h = dt` where it takes `t_end - t`) | the `1e30` line (16) and line 23; on the clock lines the state advances by `dt` instead of the remainder, `y = 2.22045e-22` on line 25 and `y = 96.69` on line 27 |
+| `Adaptive`: no snapping (`h = dt` for a step that is not the last) | line 26 prints the budget line and line 27 prints `y = 76.84` |
+| `Adaptive`: no remainder rule (`last = dt >= remaining`) | line 25 prints `Error StepRejected 1` |
+| `Adaptive`: neither snapping nor the remainder rule | lines 25 and 26 print the budget line and line 27 prints `y = 76` |
 | `Check`: remove the argument checks | the three `Invalid_argument` lines (18 to 20) print `Ok ...` or `Error StepRejected 51` |
-| `Bdf2`: return backward Euler's result, not BDF2's | line 23 prints `1.6e-04 < 1e-5: false` and line 21 changes, while line 9 still passes |
-| `Bdf2.coeffs`: `beta` off by 1 part in `1e5` times `(ω - 1)` | the digits of line 21 and the count of the blow-up line |
+| `Bdf2`: return backward Euler's result, not BDF2's | line 23 prints `1.6e-04 < 1e-5: false`, line 21 changes and the blow-up (line 14) prints `StepRejected 2`, while line 9 still passes |
+| `Bdf2.coeffs`: `beta` off by 1 part in `1e5` times `(ω - 1)` | the digits of line 21 and the count of the blow-up line; line 27 prints `Error StepRejected 1` |
 | `Halving`: a rejection does not reset the accept streak | line 21: the `rejected` count changes |
 | Newton: iteration limit 1 | the run does not finish in practice |
 
@@ -189,11 +208,12 @@ Each row is one deliberate change that you can repeat in a scratch copy of the r
 
 These changes leave every line of both expected files unchanged. Each suggested case gives a different result on the broken version (the Armijo constant is the one exception, as noted).
 
-- **Newton's safeguards.** Without damping (`min_damping = 1.`), with a NaN trial residual accepted, or with an iteration limit of 100 instead of 50, nothing changes. Cases from [chapter 2](02-newton.md): `atan` from 2 and `sqrt x - 1` from 9 fail without damping; `sqrt x - 1` from 9 ends in `Error Nan` if a NaN trial point is accepted; `x³` from 1 is `Error Diverged`, and `Ok` with a limit of 100; a start at `nan` is `Error Nan`, and `Error Diverged` without the check. None of these cases tells the Armijo constant from `0`. The finiteness test on the trial residual is redundant (`nan <= bound` is already false, [chapter 3](03-jacobians-and-floating-point.md)), and removing the one on the step changed no result either. The order of the step test and the line search is not a gap: reversing it moves many lines (section 9).
+- **Newton's safeguards.** Without damping (`min_damping = 1.`), with a NaN trial residual accepted, or with an iteration limit of 100 instead of 50, nothing changes. Cases from [chapter 2](02-newton.md): `atan` from 2 and `sqrt x - 1` from 9 fail without damping; `sqrt x - 1` from 9 ends in `Error Nan` if a NaN trial point is accepted; `x³` from 1 is `Error Diverged`, and `Ok` with a limit of 100; a start at `nan` is `Error Nan`, and `Error Diverged` without the check. None of these cases tells the Armijo constant from `0`. The finiteness test on the trial residual is redundant (`nan <= bound` is already false, [chapter 3](03-jacobians-and-floating-point.md)), and removing the one on the step changed no result either (the check on a converged `x + dx` is the exception: line 24 pins it). The order of the step test and the line search is not a gap: reversing it moves many lines (section 9).
 - **Jacobian details.** Neither the relative factor in the step nor the division by the stored perturbation is pinned. Cases: `Jac.forward (fun y -> y) [| 1e10 |]` must be `[[1]]` up to rounding (an absolute step gives `nan`, the nominal divisor `1 - 1e-10`), and at `[| 123.456 |]` the entry is off by about `3e-9` with the nominal divisor.
 - **The time argument.** Every problem ignores `t` (the NaN wall only uses it as a threshold), so passing `t_n` instead of `t_{n+1}` to the right-hand side in the stage equation changes no line. Case: `y' = -y + t`, `y(0) = 1`, exact `t - 1 + 2 e^-t`: halving `dt` divides BDF2's error by about 4, and by only about 2 with that mistake (first order); the program after this list measures it.
 - **Cost.** Starting Newton from the previous state instead of the extrapolated guess changes the number of right-hand-side calls but no line. A case could count them with `Instrument.count`.
 - **Step-control defaults and limits.** The default `dt_max` (`span / 10`), the `max_rejects` give-up (the NaN wall ends by the floor, at 46 rejections, below the default 50), accepting a NaN error estimate, and the `Error Nan` check on `y0` and `rhs t0 y0` are all silent. Cases: `y' = 0` on `[0, 1]` accepts every step, so the count follows from the rules alone, like line 22 (`dt0 = 1e-6` doubles every third accept up to `0.1`: `3 · 17 = 51` steps cover `0.39`, and 7 more finish, 58 in all; another `dt_max` or doubling rule gives another count); `~max_rejects:3` on the NaN wall gives `Error StepRejected 4`; `Halving.acceptable` with `err = [| nan |]` is `false`; a right-hand side that is `nan` at `t0` gives `Error Nan`.
+- **The `Too_small` rejection.** Snapping alone already gives lines 25 to 27. Without the rejection the method is called with `h = 0`; the second such step makes `ω = 0 / 0`, BDF2 fails as `Solver Nan` and the controller gives up with the same `StepRejected 1`, so no line changes. Case: wrap `Bdf2` in an `Ode.Embedded` that records the `h` of every call, as the probe of [chapter 4](04-bdf.md) does for `ω`. On the problem of line 26 the wrapper is never called; without the rejection it is called twice, the smallest `h` being 0.
 - **The fixed-step driver.** That `Stepper.fixed` takes at least one step and that its equal steps cover the span is silent. Cases: `dt = 4` on the canary's `[0, 1]` must take one step of size 1 (without that rule the state comes back unchanged); `dt = 0.3` must take three steps of `1/3`, not steps of `0.3`.
 - **Vectors.** `Vec` has no case of its own. `Vec.norm_inf [| nan; 1. |]` should be `nan`. A version built on the generic `max`, or on `if Float.abs v > m then Float.abs v else m`, returns `1.` (with the NaN last, `[| 1.; nan |]`, the generic `max` would still pass).
 - **What the lines cannot see.** Van der Pol is not compared with a reference; only `y_1` of Robertson is; a transposed Jacobian stalls the run instead of failing one line; the soak is a tripwire; `Instrument` counts right-hand-side calls only, not Newton iterations. The `500,000`-step canary dominates the run time.
@@ -226,7 +246,7 @@ BDF2 error ratio on halving dt: 4.0
 | The external Robertson reference | `Refs.robertson_y1_at_1e4` in [`test/refs.ml`](../../test/refs.ml), provenance in its doc comment |
 | The cases | the named lists of [`test/corpus.ml`](../../test/corpus.ml), mapped to line numbers in section 1; `corpus` concatenates them in output order |
 | Test effects | `Guard.budget` and `Guard.run` in [`test/guard.ml`](../../test/guard.ml); `Report.lines` in [`test/report.ml`](../../test/report.ml) |
-| The expected output | [`test/corpus.expected`](../../test/corpus.expected) (23 lines), [`test/soak.expected`](../../test/soak.expected) (4 lines) |
+| The expected output | [`test/corpus.expected`](../../test/corpus.expected) (27 lines), [`test/soak.expected`](../../test/soak.expected) (4 lines) |
 | The soak | [`test/soak.ml`](../../test/soak.ml): the module type `Case`, `repeat`, `soak` and four case modules |
 | How both run | [`test/dune`](../../test/dune): `(tests (names corpus soak) (libraries vstiff))` |
 
@@ -252,5 +272,11 @@ BDF2 error ratio on halving dt: 4.0
 
 7. **Name one bug the corpus cannot see, and a case that would.**
    Passing `t_n` instead of `t_{n+1}` to the right-hand side: every problem ignores `t`. The case `y' = -y + t` shows the error ratio falling from about 4 to about 2.
+
+8. **What does line 24 pin, and what does it print without the pin?**
+   That `Newton.solve` does not return an overflowed `x + dx` as a root: it prints `Error Nan`, where the unchecked sum prints `Ok [inf]`. The step test is relative, so near the largest float a step of `4e297` counts as tiny.
+
+9. **Line 26 ends in `StepRejected 1` although no step is ever computed. Why, and what happens to the run without snapping?**
+   At `t = 1e10` the floats are `1.9e-6` apart, so a step of `5e-7` snaps to `h = 0`: the driver rejects it as `Too_small` without calling the method, and `Halving` halves 0, below the floor, so the first rejection ends the run. Unsnapped, the steps are accepted without moving `t` and the run never ends: the budget stops it (`no answer within 5e6 rhs calls`).
 
 That is the end of the numerical-methods track. Next: [docs/testing.md](../testing.md) for running the tests and changing expectations, and [docs/exercises.md](../exercises.md) for exercises and starter contributions.

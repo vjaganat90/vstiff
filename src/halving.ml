@@ -1,5 +1,6 @@
-(* Every step is at most twice the last accepted one, so BDF2's step ratio
-   omega = h / h_prev stays at most 2, inside its limit 1 + sqrt 2. The estimate
+(* Every proposal is at most twice the last accepted step, so BDF2's step ratio
+   omega = h / h_prev stays at most 2, inside its limit 1 + sqrt 2, up to the
+   driver snapping steps of a few ulps to the floats. The estimate
    only decides accept or reject; production controllers also use its size.
    See docs/numerics/05-step-control.md. *)
 
@@ -38,7 +39,7 @@ let accepted c =
     stats = { c.stats with accepted_steps = c.stats.accepted_steps + 1 };
   }
 
-(* Either reason halves the step that failed, not the proposal: the driver may
+(* Every reason halves the step that failed, not the proposal: the driver may
    have cut the last step, and halving the proposal could retry the same one.
    A shorter step also eases a failed solve, as I - gamma J nears I. *)
 let rejected c (_ : Ode.rejection) ~at ~h =

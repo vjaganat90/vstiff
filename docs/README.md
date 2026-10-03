@@ -21,7 +21,7 @@ Throughout, `t` is time, `y` the state vector, `f` the right-hand side (called `
 | [numerics/02-newton.md](numerics/02-newton.md) | Newton's method, damping and the linear solves inside it. |
 | [numerics/03-jacobians-and-floating-point.md](numerics/03-jacobians-and-floating-point.md) | Floating point, finite-difference Jacobians, round-off and NaN. |
 | [numerics/04-bdf.md](numerics/04-bdf.md) | BDF1, BDF2, variable steps, the stage equation and stability. |
-| [numerics/05-step-control.md](numerics/05-step-control.md) | Error estimates and step-size control. |
+| [numerics/05-step-control.md](numerics/05-step-control.md) | Error estimates, step-size control, the clock that steps are snapped to, and why every run ends. |
 | [numerics/06-the-corpus.md](numerics/06-the-corpus.md) | The test problems and what each one proves. |
 
 ## Reading orders
@@ -41,7 +41,7 @@ Throughout, `t` is time, `y` the state vector, `f` the right-hand side (called `
 7. [src/stage.mli](../src/stage.mli): the implicit equation every BDF step solves.
 8. [src/check.mli](../src/check.mli) and [src/instrument.mli](../src/instrument.mli): the only effects in the library.
 9. [src/bdf1.mli](../src/bdf1.mli), [src/bdf2.mli](../src/bdf2.mli): the methods.
-10. [src/halving.mli](../src/halving.mli): the step-size controller.
+10. [src/clock.mli](../src/clock.mli) and [src/halving.mli](../src/halving.mli): the resolution of time, and the step-size controller.
 11. [src/stepper.mli](../src/stepper.mli), [src/adaptive.mli](../src/adaptive.mli): the two drivers.
 
 Then the tests: [test/problems.ml](../test/problems.ml), [test/refs.ml](../test/refs.ml), [test/guard.ml](../test/guard.ml), [test/report.ml](../test/report.ml), [test/corpus.ml](../test/corpus.ml) with [test/corpus.expected](../test/corpus.expected), and [test/soak.ml](../test/soak.ml) with [test/soak.expected](../test/soak.expected).
@@ -56,7 +56,7 @@ Then the tests: [test/problems.ml](../test/problems.ml), [test/refs.ml](../test/
 | `ode`, `stepper` | [architecture.md](architecture.md) (contracts), [ocaml.md](ocaml.md) (module types, modular explicits), [numerics/01-odes-and-stiffness.md](numerics/01-odes-and-stiffness.md) |
 | `stage`, `bdf1` | [numerics/01-odes-and-stiffness.md](numerics/01-odes-and-stiffness.md), [numerics/04-bdf.md](numerics/04-bdf.md) |
 | `bdf2` | [numerics/04-bdf.md](numerics/04-bdf.md) |
-| `halving`, `adaptive` | [numerics/05-step-control.md](numerics/05-step-control.md) |
+| `clock`, `halving`, `adaptive` | [numerics/05-step-control.md](numerics/05-step-control.md) |
 | `check`, `instrument` | [architecture.md](architecture.md) (effects) |
 | `test/` | [testing.md](testing.md), [numerics/06-the-corpus.md](numerics/06-the-corpus.md) |
 
@@ -83,3 +83,13 @@ Keep the [glossary](glossary.md) open for the terms you meet. To carry on, start
 | Add a method or a controller | [CONTRIBUTING.md](../CONTRIBUTING.md) and [architecture.md](architecture.md) |
 | Find something small to work on | the starter contributions in [exercises.md](exercises.md) |
 | Fix or add documentation | the documentation rules in [CONTRIBUTING.md](../CONTRIBUTING.md) |
+| See where the project is meant to go, or how parts of it could be proved correct | [plans/roadmap.md](plans/roadmap.md), [plans/formal-verification.md](plans/formal-verification.md) |
+
+## Plans
+
+Two documents look ahead instead of describing the code as it is:
+
+| Document | What it is |
+|---|---|
+| [plans/roadmap.md](plans/roadmap.md) | The roadmap from today's small BDF2 integrator to a general stiff solver, with milestones and decisions. |
+| [plans/formal-verification.md](plans/formal-verification.md) | How parts of vstiff could be verified in Rocq with MathComp, with a ranked list of theorems and a pilot plan. |

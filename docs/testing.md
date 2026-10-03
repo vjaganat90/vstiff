@@ -84,13 +84,13 @@ Fatal error: exception Invalid_argument("index out of bounds")
 
 ```text
 let newton = [ ("newton linear 2d", fun () -> show (Newton.solve ...)); ... ]
-let corpus = List.concat [ newton; jacobian; backward_euler; ...; robertson_accuracy ]
+let corpus = List.concat [ newton; jacobian; backward_euler; ...; robertson_accuracy; newton_overflow; clock ]
 let () = Report.lines corpus
 ```
 
 `Report.lines` runs the cases in order and prints `name: text` for each. Computing the text is separate from printing it, so a case is a pure function and `Report` is the only module that prints. Reading the file from the top, the first six groups (Newton, Jacobian, backward Euler, BDF2 order, van der Pol, Robertson) run the library from the bottom layer to the top. The remaining groups are regression pins: each pins down specific mistakes, listed under "Judging test strength by mutation" below. The helpers at the top of the file (`pp_vec`, `failure`, `show`, `max_abs`, `max_error`, `error_below`, `bdf2_halving`) keep the cases short and the printed lines uniform.
 
-`Guard.run ok compute` builds the function of a table entry so that every outcome a case can have on purpose becomes a line of text: `compute` returns a `result`, and `ok` renders an `Ok`. An `Error e` prints `Error` and the name of `e`; an `Invalid_argument m` prints `Invalid_argument m`; a right-hand side that exhausted its budget prints `no answer within 5e6 rhs calls`. `Guard.budget rhs` wraps a right-hand side (with `Instrument.count`) so that after 5,000,000 calls it raises instead of evaluating. The group `give_up` runs the termination and argument-check cases through both, so a loop that never ends prints a line, and the diff shows it, instead of hanging the run.
+`Guard.run ok compute` builds the function of a table entry so that every outcome a case can have on purpose becomes a line of text: `compute` returns a `result`, and `ok` renders an `Ok`. An `Error e` prints `Error` and the name of `e`; an `Invalid_argument m` prints `Invalid_argument m`; a right-hand side that exhausted its budget prints `no answer within 5e6 rhs calls`. `Guard.budget rhs` wraps a right-hand side (with `Instrument.count`) so that after 5,000,000 calls it raises instead of evaluating. The groups `give_up` and `clock` run their termination and argument-check cases through both, so a loop that never ends prints a line, and the diff shows it, instead of hanging the run.
 
 ## The rules
 
@@ -246,17 +246,21 @@ The regression pins, the groups after the first six in `corpus.ml`, are worked e
 | `Linalg.pivot`: always row 0 | the two `linalg` lines |
 | `Stage`: `I + γJ` for `I - γJ`; `Newton`: `max_iter = 1`; `Halving`: never double the step | the run does not finish (killed by the time limit) |
 | `Bdf2.coeffs`: the sign of any one coefficient flipped | the BDF2 order line, the stiff canary, the Robertson lines and most adaptive lines |
-| `Bdf2`: return backward Euler's result instead of BDF2's | the Robertson accuracy line (the loose `1e-3` line still passes) and the `dt0 = 0.5` line |
+| `Bdf2`: return backward Euler's result instead of BDF2's | the Robertson accuracy line (the loose `1e-3` line still passes), the `dt0 = 0.5` line and the blow-up count |
 | `Bdf2`: start-up estimate factor `1e-3` for `0.5` | the `dt0 = 0.5` line |
 | `Newton`: tolerance `1e-6` for `1e-10` | only `newton quadratic x0=1`, in its 12th decimal |
-| `Newton`: the step test applied only after the line search accepts a step, not before it | the backward Euler canary, the BDF2 order line and the stiff canary print `Error Diverged`; van der Pol, the `dt0 = dt_max = 1e30` line and both logistic count lines print `Error StepRejected`, the blow-up and NaN-wall lines other counts; `soak canary`, `soak logistic order` and `soak van der Pol` pass 0/10 |
-| `Halving`: double after two accepts, not three | both logistic count lines and the count on the NaN-wall line (the right-hand side that returns `nan` past `t = 0.5`) |
+| `Newton`: the step test applied only after the line search accepts a step, not before it | the backward Euler canary, the BDF2 order line and the stiff canary print `Error Diverged`; van der Pol, the `dt0 = dt_max = 1e30` line and both logistic count lines print `Error StepRejected`, the blow-up and NaN-wall lines other counts; the overflow line prints `max_float` in full and the `from t=1e15` line `Error StepRejected 1`; `soak canary`, `soak logistic order` and `soak van der Pol` pass 0/10 |
+| `Newton`: no finiteness check on the converged `x + dx` | the `newton step that converges into an overflow` line prints `Ok [inf]` |
+| `Halving`: double after two accepts, not three | both logistic count lines and the counts on the blow-up line (`StepRejected 2`) and the NaN-wall line (the right-hand side that returns `nan` past `t = 0.5`) |
 | `Halving`: no `dt_max` cap on doubling | the `dt_max = 1e-3` line |
-| `Halving`: no `16 eps abs(t)` floor | the blow-up and NaN-wall lines print the budget text |
+| `Halving`: no `16 eps abs(t)` floor | the blow-up, NaN-wall and `from t=1e10` lines print `Error StepRejected 51` instead of 1, 46 and 1: only `max_rejects` is left to end the run |
 | `Halving`: halve the proposal, not the step that failed | the `dt0 = dt_max = 1e30` line (`Error StepRejected 51`) |
-| `Halving`: accept every step | the two Robertson lines, the `dt0 = 0.5` line, the NaN-wall count and `soak robertson` (it stops passing) |
+| `Halving`: accept every step | the two Robertson lines, the `dt0 = 0.5` line, the blow-up and NaN-wall counts and `soak robertson` (it stops passing) |
 | `Check`: remove the argument checks | the three `Invalid_argument` lines |
-| `Adaptive`: do not shorten the last step | the `dt0 = dt_max = 1e30` line and the Robertson accuracy line |
+| `Adaptive`: do not shorten the last step (`h = dt` where it takes `t_end - t`) | the `dt0 = dt_max = 1e30` line, the Robertson accuracy line, and the `over one ulp` and `from t=1e15` lines, whose state advances by `dt` instead of the remainder |
+| `Adaptive`: no snapping (`h = dt` for a step that is not the last) | the `from t=1e10` line prints the budget text and the `from t=1e15` line `y = 76.84` instead of `y = 100` |
+| `Adaptive`: no remainder rule (`last = dt >= remaining`) | the `over one ulp` line prints `Error StepRejected 1` |
+| `Adaptive`: neither snapping nor the remainder rule | the `over one ulp` and `from t=1e10` lines print the budget text and the `from t=1e15` line `y = 76` |
 | `Bdf2`: start Newton from `y_n` instead of the extrapolation | silent: only the speed of Newton changes |
 | `Newton`: Armijo constant `0.`; `min_damping = 1.`; no check that the step, the line-search residual or the iterate is finite | each silent, and so is dropping the line search altogether (always taking the full step) |
 | `Adaptive`: default `dt_max` of `span` for `span / 10`; no finiteness check on `y0` and `rhs t0 y0` | each silent |
@@ -269,9 +273,10 @@ The corpus catches gross breakage (a wrong coefficient, a Jacobian that is plain
 
 The silent rows are gaps, and starting points for contributions; [numerics/06-the-corpus.md](numerics/06-the-corpus.md) (section 10) suggests a case for most of them.
 
-- **Newton's safeguards.** The line search (Armijo constant, minimum damping) and the non-finite checks can be removed without changing any line: `newton quadratic x0=1` converges with full steps, so no case needs damping. The order of the two tests is pinned, indirectly (table above); a direct pin would be `x² - 3` from 1, which converges today and gives `Error Diverged` when the line search comes first (check with a probe).
+- **Newton's safeguards.** The line search (Armijo constant, minimum damping) and the non-finite checks at the start of an iteration, on the step and on the trial residual can be removed without changing any line (the check on a converged `x + dx` is pinned): `newton quadratic x0=1` converges with full steps, so no case needs damping. The order of the two tests is pinned, indirectly (table above); a direct pin would be `x² - 3` from 1, which converges today and gives `Error Diverged` when the line search comes first (check with a probe).
 - **The time argument of `rhs`.** The four corpus problems are autonomous (their right-hand sides ignore `t`), and the NaN wall, the one right-hand side that reads `t`, does not notice a stage evaluated at the wrong time.
 - **Defaults and guards of the drivers:** the default `dt_max`, the finiteness check at the start, `max 1` in `Stepper.fixed`.
+- **The `Too_small` rejection.** Snapping alone gives the same lines: without the rejection the method is called with `h = 0`, the second such call fails on `ω = 0 / 0`, and the controller gives up with the same `StepRejected 1`. A case would wrap `Bdf2` and record the `h` of every call ([numerics/06-the-corpus.md](numerics/06-the-corpus.md), section 10).
 - **van der Pol** checks only `Ok` at `t = 2000`, a rejection and a finite state, not the values against a reference.
 - **A transposed Jacobian** is pinned by one line, but the mistake stalls the run before that line is reached.
 - **The soak test** is a tripwire. **Run time:** the backward Euler canary takes (t_end - t0) / dt = 1 / 2e-6 = 500,000 fixed steps, once in the corpus and ten times in the soak test, and dominates the run; measure it with `time`.

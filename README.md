@@ -10,10 +10,10 @@ An ordinary differential equation (ODE) `y' = f(t, y)` says how fast a state `y`
 
 - **Contracts** (OCaml module types) in [src/ode.mli](src/ode.mli): `Ode.Method` (one step), `Ode.Embedded` (a step plus an error estimate) and `Ode.Controller` (a step-size policy), with the types `Ode.problem`, `Ode.point` and `Ode.rhs`. Methods and controllers are modules that implement them.
 - **Methods:** `Bdf1` (backward Euler, an `Ode.Method`) and `Bdf2` (variable-step BDF2, an `Ode.Embedded` whose first step is backward Euler).
-- **Controller:** `Halving` rejects a step whose scaled error estimate exceeds `tol` (or whose solve fails), halves the step that failed, and doubles the step after three accepts in a row, up to `dt_max`.
-- **Drivers:** `Stepper.fixed` takes equal steps with any `Ode.Method`; `Adaptive.integrate` takes adaptive steps with any `Ode.Embedded` and `Ode.Controller`.
+- **Controller:** `Halving` rejects a step whose scaled error estimate exceeds `tol` (or whose solve fails, or that is too short to move `t`), halves the step that failed, and doubles the step after three accepts in a row, up to `dt_max`.
+- **Drivers:** `Stepper.fixed` takes equal steps with any `Ode.Method`; `Adaptive.integrate` takes adaptive steps with any `Ode.Embedded` and `Ode.Controller`, lands exactly on `t_end` and snaps every other step to the floats, `h = (t + dt) - t`, so that the state advances by exactly what the clock does.
 - **Named failures:** numerical trouble comes back as `Error` of `Fail.t` (`Diverged`, `StepRejected n` or `Nan`), never as an exception. Only `Check` raises on purpose: `Invalid_argument`, for arguments that make no sense.
-- **Building blocks:** `Newton`, `Jac` (forward-difference Jacobians), `Linalg`, `Stage`, `Vec`, and `Instrument` to count right-hand-side calls.
+- **Building blocks:** `Newton`, `Jac` (forward-difference Jacobians), `Linalg`, `Stage`, `Vec`, `Clock` (how short a step `t` can still resolve) and `Instrument` to count right-hand-side calls.
 
 ## A first program
 
@@ -71,7 +71,7 @@ dune runtest
 
 ```text
 src/        the library; every module has an .mli, ode.mli is interface only
-  fail  vec  linalg          failures, vectors, the linear solve
+  fail  vec  linalg  clock   failures, vectors, the linear solve, the resolution of time
   newton  jac  stage         the equation inside every implicit step
   ode.mli                    the contracts
   bdf1  bdf2  halving        methods and the step-size controller
@@ -96,7 +96,7 @@ vstiff is a work in progress. The known gaps double as starter contributions ([d
 - Newton rebuilds the finite-difference Jacobian at every iteration (`n + 1` right-hand-side calls each time); production codes reuse it across iterations and steps.
 - `Halving` is halve and double. Production controllers scale the step by a safety factor times `(tol / err)^(1/(p+1))`, where `p` is the order of the method whose error is estimated; that needs the error estimate when a step is accepted, which `Ode.Controller.accepted` does not receive, so it needs a contract change. The gap between backward Euler and BDF2 is a conservative estimate for BDF2.
 - One mixed absolute and relative weight `1 / (1 + |y_i|)`, no separate `rtol` and `atol`: tiny components such as Robertson's `y2` are controlled only loosely.
-- `Halving` counts both rejection reasons together; `Instrument` counts right-hand-side calls only, so Newton iterations per step are invisible from outside.
+- `Halving` counts every rejection together, whatever its reason; `Instrument` counts right-hand-side calls only, so Newton iterations per step are invisible from outside.
 - No dense output: the drivers return only the final state. `Linalg.solve` is dense Gaussian elimination, meant for small systems.
 - Tests: the backward Euler canary takes 500,000 steps and dominates the test time; van der Pol accuracy is not checked against a reference; a transposed Jacobian stalls the corpus run instead of failing one line; the soak test is a tripwire, not extra coverage.
 

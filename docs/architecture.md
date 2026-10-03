@@ -17,12 +17,12 @@ In one paragraph: an **implicit** step cannot compute the new state directly, be
  ------------------------------------------------------------------------------
  stage       Stage.solve     the equation  x = ψ + γ f(t_{n+1}, x)
  ------------------------------------------------------------------------------
- numerics    Newton.solve    Jac.forward    Linalg.solve    Vec
+ numerics    Newton.solve    Jac.forward    Linalg.solve    Vec    Clock
  ------------------------------------------------------------------------------
  support     Fail (failures, let*, let+)   Check (argument checks)   Instrument (counting)
 ```
 
-Read it upwards from the numerics row: `Vec` and `Linalg` do arithmetic on arrays, `Newton` solves nonlinear equations with them and `Jac` supplies its Jacobians, `Stage` turns a BDF step into such an equation, the methods set up the equation for their formula, and the drivers decide how steps are chained. The drivers never name a method or a controller: the caller passes them in as modules.
+Read it upwards from the numerics row: `Vec` and `Linalg` do arithmetic on arrays, `Newton` solves nonlinear equations with them and `Jac` supplies its Jacobians, `Stage` turns a BDF step into such an equation, `Clock` tells the controller and the adaptive driver how short a step `t` can still resolve, the methods set up the equation for their formula, and the drivers decide how steps are chained. The drivers never name a method or a controller: the caller passes them in as modules.
 
 ## The contracts in `Ode`
 
@@ -33,7 +33,7 @@ Read it upwards from the numerics row: `Vec` and `Linalg` do arithmetic on array
 | `Ode.rhs` | `float -> Vec.t -> Vec.t`: `rhs t y` is f(t, y) as a new vector |
 | `Ode.problem` | `{ rhs; t0; t_end; y0 }` |
 | `Ode.point` | `{ t; y }`, a point on a solution |
-| `Ode.rejection` | `Too_large` (the error estimate was over tolerance) or `Solver of Fail.t` (the method could not take the step) |
+| `Ode.rejection` | `Too_large` (the error estimate was over tolerance), `Solver of Fail.t` (the method could not take the step) or `Too_small` (the step cannot move `t`, so the method was not called) |
 
 | Module type | It provides | Implemented by | Used by |
 |---|---|---|---|
@@ -60,39 +60,43 @@ The project modules each file needs, from `dune describe workspace --with-deps` 
 | `Instrument` | counts calls of an `rhs` | `Ode` | this page |
 | `Bdf1` | backward Euler, a `Method` | `Ode` `Stage` | [numerics/04-bdf.md](numerics/04-bdf.md) |
 | `Bdf2` | variable-step BDF2, an `Embedded` | `Bdf1` `Fail` `Ode` `Stage` `Vec` | [numerics/04-bdf.md](numerics/04-bdf.md) |
-| `Halving` | the `Controller`: halve, double | `Fail` `Ode` | [numerics/05-step-control.md](numerics/05-step-control.md) |
+| `Clock` | the resolution of time as floats: `16 eps abs(t)` | | [numerics/05-step-control.md](numerics/05-step-control.md) |
+| `Halving` | the `Controller`: halve, double | `Clock` `Fail` `Ode` | [numerics/05-step-control.md](numerics/05-step-control.md) |
 | `Stepper` | the fixed-step driver | `Check` `Fail` `Ode` `Vec` | this page |
-| `Adaptive` | the adaptive driver | `Check` `Fail` `Ode` `Vec` | [numerics/05-step-control.md](numerics/05-step-control.md) |
+| `Adaptive` | the adaptive driver | `Check` `Clock` `Fail` `Ode` `Vec` | [numerics/05-step-control.md](numerics/05-step-control.md) |
 
 The tests use `Problems` (`Ode`), `Refs` and `Report` (nothing), `Guard` (`Fail`, `Instrument`), and the two programs: `Corpus` uses `Adaptive`, `Bdf1`, `Bdf2`, `Fail`, `Guard`, `Halving`, `Jac`, `Linalg`, `Newton`, `Ode`, `Problems`, `Refs`, `Report`, `Stepper`, `Vec`; `Soak` the same minus `Guard`, `Jac`, `Linalg`, `Newton` and `Ode`. Nothing in the library uses a test module.
 
-What the graph shows: `Stepper` and `Adaptive` depend only on `Ode`, `Check`, `Fail` and `Vec`, so they reach no method, no controller and no Newton code except through the modules they are given. `Bdf2` uses `Bdf1` for its first step and for its error estimate. Only `Stage` connects the methods to `Newton`, `Jac` and `Linalg`.
+What the graph shows: `Stepper` depends only on `Ode`, `Check`, `Fail` and `Vec`, and `Adaptive` also on `Clock`, so they reach no method, no controller and no Newton code except through the modules they are given. `Clock` depends on nothing; `Halving` and `Adaptive` both use it, so they share one floor for the shortest step. `Bdf2` uses `Bdf1` for its first step and for its error estimate. Only `Stage` connects the methods to `Newton`, `Jac` and `Linalg`.
 
 ## The life of one adaptive step
 
 `Adaptive.integrate (module M) (module C) ?dt0 ?dt_max ?max_rejects ~tol problem` first computes `span = t_end - t0`, takes `dt_max` (default `span / 10`) and `dt0` (default `1e-6 span`, capped at `dt_max`), calls `Check.adaptive` (it raises `Invalid_argument` if `t_end < t0`, or if the span is not empty and `dt0` is not positive), returns `Error Nan` if `y0` or `rhs t0 y0` is not finite, and starts the loop `go (C.init ~tol ~dt0 ~dt_max ~max_rejects) M.start { t = t0; y = y0 }`. One trip through `go c history at`:
 
 1. **Done?** If `at.t >= t_end`, return `Ok { t; y; stats = C.stats c }`.
-2. **Choose the step.** `dt = C.proposal c`. If `dt >= t_end - at.t` this is the last step and `h = t_end - at.t`; otherwise `h = dt`.
-3. **Attempt it.** `M.step_with_error p.rhs h history at`. For `Bdf2`:
+2. **Choose the step.** `dt = C.proposal c` and `remaining = t_end - at.t`. If `dt >= remaining`, or `remaining <= Clock.resolution at.t`, this is the last step: `h = remaining` and the new time is `t_end`. Otherwise the new time is `t_next = at.t + dt` and the step is snapped to the floats, `h = t_next - at.t`, so that the state advances by exactly the step the clock took.
+3. **Too short?** If `h <= 0` the step cannot move `t`: the method is not called, and the attempt goes to item 7 with `Ode.Too_small`.
+4. **Attempt it.** `M.step_with_error p.rhs h history at`. For `Bdf2`:
    - `backward_euler` calls `Bdf1.step`, which calls `Stage.solve rhs { Stage.t = at.t +. h; gamma = h; psi = at.y } at.y`. `Stage.solve` forms the residual G(x) = x - ψ - γ f(t_{n+1}, x) and the matrix I - γJ with J from `Jac.forward`, and `Newton.solve` iterates: `Linalg.solve` gives the step, a line search shortens it if the residual would grow.
    - With no history (`Start`, the first step and its retries) the result is the backward Euler state, and the error estimate is half its gap to the explicit Euler state `y + h f(t, y)`.
    - With history `After { h_prev; y_prev }`, `bdf2` takes ω = h / h_prev (`omega` in the code), the weights from `Bdf2.coeffs`, ψ = a1 y_n + a0 y_{n-1}, γ = beta h, and a starting guess extrapolated along the last two points, and calls `Stage.solve` again. The result is the BDF2 state, and the estimate is its gap to the backward Euler state from the same point.
    - Either way the new history is `After { h_prev = h; y_prev = at.y }`.
-4. **Judge it.** `C.acceptable c ~y ~err`; `Halving` accepts if max_i |err_i| / (1 + |y_i|) is at most `tol`.
-5. **Accepted:** `go (C.accepted c) next { t; y }` with `t = t_end` on the last step and `at.t + h` otherwise. `Halving` counts it, resets the failure count, and doubles `dt` (up to `dt_max`) at every third accept in a row.
-6. **Rejected** (`acceptable` said no, giving `Ode.Too_large`, or `step_with_error` returned `Error e`, giving `Ode.Solver e`): `C.rejected c reason ~at:at.t ~h`. `Halving` sets `dt = h / 2` and counts the failure, or gives up with `Error (StepRejected n)` when more than `max_rejects` rejections came in a row or the halved step is below 16 eps |t| (eps is `Float.epsilon`, about 2.2e-16). Otherwise `go` retries from the **same** `at` and `history`.
+5. **Judge it.** `C.acceptable c ~y ~err`; `Halving` accepts if max_i |err_i| / (1 + |y_i|) is at most `tol`.
+6. **Accepted:** `go (C.accepted c) next { t = t_next; y }`, where `t_next` is `t_end` on the last step. `Halving` counts it, resets the failure count, and doubles `dt` (up to `dt_max`) at every third accept in a row.
+7. **Rejected** (`Ode.Too_small` from item 3, `acceptable` said no, giving `Ode.Too_large`, or `step_with_error` returned `Error e`, giving `Ode.Solver e`): `C.rejected c reason ~at:at.t ~h`. `Halving` sets `dt = h / 2` and counts the failure, or gives up with `Error (StepRejected n)` when more than `max_rejects` rejections came in a row or the halved step is below `Clock.resolution at`, which is 16 eps |t| (eps is `Float.epsilon`, about 2.2e-16). Otherwise `go` retries from the **same** `at` and `history`.
 
 `go` calls itself last in every branch, so the number of steps is not limited by the stack. The calls, indented by who calls whom:
 
 ```text
 Adaptive.integrate        checks the arguments, then loops with go c history at
   go                      ends with Ok when at.t >= t_end
-    C.proposal c          the step to try; h is that, cut to land on t_end
+    C.proposal c          the step to try; h is that snapped to the floats, or what is left
+                          to land on t_end (Clock.resolution: a rest of at most 16 eps abs(t))
+                          h <= 0: C.rejected c Too_small ~at ~h, and no call of the method
     M.step_with_error     Bdf2.step_with_error
       backward_euler      Bdf1.step -> Stage.solve -> Newton.solve (Jac.forward, Linalg.solve)
       bdf2                Stage.solve -> Newton.solve      (every step after the first)
-    C.acceptable          yes: go (C.accepted c) next { t; y }
+    C.acceptable          yes: go (C.accepted c) next { t = t_next; y }
                           no, or Error e: C.rejected c reason ~at ~h
                             Ok c'   -> go c' history at    (the same point and history)
                             Error _ -> the run ends with that Error
@@ -145,15 +149,15 @@ Numerical failures are `Fail.t` values in a `result`; they enter at the bottom a
 |---|---|---|
 | `Linalg.solve` | an exactly zero pivot | `None` |
 | `Newton.solve` | `None`, a non-finite step, no acceptable line-search factor, or `max_iter` reached | `Error Diverged` |
-| `Newton.solve` | the iterate or its residual is not finite at the start of an iteration | `Error Nan` |
+| `Newton.solve` | the iterate or its residual is not finite at the start of an iteration, or a converged step `x + dx` overflows | `Error Nan` |
 | `Stage.solve`, `Bdf1.step`, `Bdf2.step_with_error` | pass it through | the same `Error` |
 | `Stepper.fixed` | any step fails | the first `Error`; no further step is taken |
-| `Adaptive.integrate` | a step fails, or its estimate is not acceptable | a rejection handed to `C.rejected` |
+| `Adaptive.integrate` | a step fails, its estimate is not acceptable, or it is too short to move `t` (`h <= 0`; the method is not called) | a rejection handed to `C.rejected` |
 | `Halving.rejected` | too many in a row, or the step floor | `Error (StepRejected n)`, which `Adaptive.integrate` returns |
 | `Adaptive.integrate` | `y0` or `rhs t0 y0` is not finite | `Error Nan` |
 | `Check` | arguments that make no sense | raises `Invalid_argument` |
 
-The same Newton failure means different things at different levels. In a fixed-step run it ends the run; in `Adaptive` a smaller step usually fixes it, so it is a routine rejection. The `n` in `StepRejected n` is the length of the final run of rejections: `max_rejects + 1` when that limit stopped the run, less when the step floor did. Both corpus lines that end this way are floor stops: `StepRejected 1` for a blow-up (the attempt before that rejection was accepted) and `StepRejected 46` for a right-hand side that turns into `nan` ([test/corpus.expected](../test/corpus.expected)). [numerics/05-step-control.md](numerics/05-step-control.md) (section 9) derives both counts and has a probe that ends on the limit.
+The same Newton failure means different things at different levels. In a fixed-step run it ends the run; in `Adaptive` a smaller step usually fixes it, so it is a routine rejection. The `n` in `StepRejected n` is the length of the final run of rejections: `max_rejects + 1` when that limit stopped the run, less when the step floor did. The three corpus lines that end this way are all floor stops: `StepRejected 1` for a blow-up (the attempt before that rejection was accepted), `StepRejected 46` for a right-hand side that turns into `nan`, and `StepRejected 1` for steps too short to move `t`, where the first `Too_small` rejection halves a step of 0 ([test/corpus.expected](../test/corpus.expected)). [numerics/05-step-control.md](numerics/05-step-control.md) (section 9) derives the counts and has a probe that ends on the limit.
 
 ## Effects
 
@@ -182,11 +186,12 @@ A change that breaks one is a bug even if every corpus line still passes.
 1. **Arrays are never mutated after creation** (above).
 2. **Jacobian orientation.** `J.(i).(j)` is ∂f_i/∂y_j: the row is the output, the column the input. `Jac.forward` builds the columns first and then reads rows from them, `Stage.solve` forms `I - γJ` entry by entry with the same indices, and `Linalg.solve a b` treats `a.(i)` as equation `i`. A transposed matrix still type-checks, and the canary's diagonal Jacobian is its own transpose. The root Newton converges to does not depend on the Jacobian, only the speed does, so a wrong Jacobian costs speed, not correctness: Newton converges slowly or not at all, `Adaptive` counts the failure as a rejection, and the run crawls ([testing.md](testing.md)).
 3. **`Adaptive` lands exactly on `t_end`.** The last step is cut to `t_end - at.t` and the new time is assigned `t_end` rather than computed as `at.t + h`, which could miss it by rounding. The fixed-step driver uses `h = span / n` and a running sum for `t`, which may differ from `t_end` in the last bits; `Stepper.fixed` returns only `y`, so that is not observable.
-4. **Determinism.** No randomness, hidden state or parallelism: the same arguments give identical results in the same build ([test/soak.ml](../test/soak.ml) checks it). Results may differ in the last bits between machines (see "Performance"), so the expected files print few digits.
-5. **Vector lengths agree.** `Vec.add`, `sub`, `axpy` and `dot` index by the length of their first vector argument: a shorter second argument raises `Invalid_argument` (index out of bounds), a longer one is ignored past that length. `Halving.acceptable` uses `Array.map2`, which raises if `y` and `err` differ in length. These are caller bugs, not numerical failures.
-6. **History convention.** `After { h_prev; y_prev }` pairs the step just taken with the state it started from. A rejection leaves the history alone, so ω = h / h_prev shrinks when `h` does.
-7. **Step ratios stay below the stability limit.** Variable-step BDF2 is zero-stable (earlier errors stay bounded) for ω < 1 + √2, about 2.414 ([numerics/04-bdf.md](numerics/04-bdf.md)). `Bdf2` does not check it; the controller must. `Halving` proposes at most twice the last accepted step, so ω stays at most 2. A new controller must keep it below the limit.
-8. **The solver sees f as a black box.** Jacobians are always forward differences inside `Stage.solve`, and corpus problems never supply analytic ones.
+4. **The state advances by exactly the clock's step.** A step that is not the last is snapped: the new time is `t_next = t + dt` and `h = t_next - t`, the difference of the two clock readings (computed without rounding when they are within a factor of 2 of each other, as they are for any step much shorter than `|t|`), and the method moves the state by `h`. An unsnapped `h = dt` would move the state by `dt` and the clock by `t_next - t`, which differs from `dt` by up to half an ulp of `t_next` (an ulp of `t` at most): at `t = 1e15` a step of `0.19` moves the clock by `0.25`. The price is that a snapped step may exceed `dt_max` by that much. A step with `h <= 0` never reaches a method.
+5. **Determinism.** No randomness, hidden state or parallelism: the same arguments give identical results in the same build ([test/soak.ml](../test/soak.ml) checks it). Results may differ in the last bits between machines (see "Performance"), so the expected files print few digits.
+6. **Vector lengths agree.** `Vec.add`, `sub`, `axpy` and `dot` index by the length of their first vector argument: a shorter second argument raises `Invalid_argument` (index out of bounds), a longer one is ignored past that length. `Halving.acceptable` uses `Array.map2`, which raises if `y` and `err` differ in length. These are caller bugs, not numerical failures.
+7. **History convention.** `After { h_prev; y_prev }` pairs the step just taken with the state it started from. A rejection leaves the history alone, so ω = h / h_prev shrinks when `h` does.
+8. **Step ratios stay below the stability limit.** Variable-step BDF2 is zero-stable (earlier errors stay bounded) for ω < 1 + √2, about 2.414 ([numerics/04-bdf.md](numerics/04-bdf.md)). `Bdf2` does not check it; the controller must. `Halving` proposes at most twice the last accepted step, so ω stays at most 2 for the proposals; snapping them to the floats keeps ω below 2.2 for steps of 16 ulps or more ([numerics/05-step-control.md](numerics/05-step-control.md), section 9). A new controller must keep it below the limit.
+9. **The solver sees f as a black box.** Jacobians are always forward differences inside `Stage.solve`, and corpus problems never supply analytic ones.
 
 ## Conventions
 
@@ -208,7 +213,7 @@ A change that breaks one is a bug even if every corpus line still passes.
 
 **A method.** Write `src/your_method.ml` and an `.mli` that says `include Ode.Method`, as [src/bdf1.mli](../src/bdf1.mli) does; dune picks up a new module in `src/` without a change to `src/dune`. An implicit method calls `Stage.solve rhs { Stage.t = at.t +. h; gamma; psi } guess` with its own ψ and γ, as `Bdf1` and `Bdf2` do; an explicit one needs no Newton. [numerics/01-odes-and-stiffness.md](numerics/01-odes-and-stiffness.md) ("Running the snippets") implements explicit Euler as an `Ode.Method` in a few lines and runs it with `Stepper.fixed`. To use a method adaptively it must also provide `step_with_error`, which returns the estimated local error vector in the middle: `Ode.Embedded`.
 
-**A controller.** Write `src/your_controller.ml` and an `.mli` like [src/halving.mli](../src/halving.mli): declare `stats` as a concrete type, then `include Ode.Controller with type stats := stats`, so that callers can read it. The example below keeps everything in one module, whose signature `Ode.Controller with type stats = int` shows callers the type of `stats`. It accepts a step if the largest error entry is at most `tol`, never changes the step, and gives up at the first rejection. Its `stats` is an `int`, so `Adaptive.integrate (module Bdf2) (module Give_up_at_once) ~tol problem` has type `(int Adaptive.solution, Fail.t) result`:
+**A controller.** Write `src/your_controller.ml` and an `.mli` like [src/halving.mli](../src/halving.mli): declare `stats` as a concrete type, then `include Ode.Controller with type stats := stats`, so that callers can read it. The example below keeps everything in one module, whose signature `Ode.Controller with type stats = int` shows callers the type of `stats`. It accepts a step if the largest error entry is at most `tol`, never changes the step, and gives up at the first rejection, which a controller must do in the end: `Adaptive.integrate` terminates only because every run of rejections ends ([numerics/05-step-control.md](numerics/05-step-control.md), section 9). Its `stats` is an `int`, so `Adaptive.integrate (module Bdf2) (module Give_up_at_once) ~tol problem` has type `(int Adaptive.solution, Fail.t) result`:
 
 ```ocaml
 open Vstiff
@@ -256,7 +261,7 @@ let () =
   Printf.printf "one Stage.solve: %d calls of rhs\n" (calls ())
 ```
 
-- **An adaptive attempt after the first step costs two stage solves**, one for BDF2 and one for backward Euler; the first step needs only the backward Euler solve and one `rhs` call for the explicit Euler state. An attempt rejected as too large costs as much as an accepted one.
+- **An adaptive attempt after the first step costs two stage solves**, one for BDF2 and one for backward Euler; the first step needs only the backward Euler solve and one `rhs` call for the explicit Euler state. An attempt rejected as too large costs as much as an accepted one; one rejected as `Too_small` costs nothing, because the method is not called.
 - **Dense, allocating linear algebra.** `Linalg.solve` recurses on the trailing submatrix: O(n³) arithmetic and, since every level builds fresh arrays, O(n³) allocation. It is meant for small systems.
 - **Fused multiply-add.** On arm64, `ocamlopt` fuses `a +. b *. c` and `a -. b *. c` into one instruction with a single rounding when the product is a direct operand; binding the product with `let` first rounds twice, and can give a different result. So moving a product into or out of a sum can change the last bits of a result, results may differ between machines, and the expected files print few digits. A change that is meant to leave the numbers alone must leave both expected files byte-identical, so run `dune runtest` after any arithmetic edit. [numerics/03-jacobians-and-floating-point.md](numerics/03-jacobians-and-floating-point.md) (section 8) has a program that shows it.
 
@@ -267,6 +272,6 @@ Stated as limits and as starting points for contributions ([exercises.md](exerci
 - Newton rebuilds the Jacobian at every iteration.
 - `Halving` is halve/double. Production controllers scale `h` by a safety factor times (tol / err)^(1/(p+1)), p being the order of the method whose error is estimated; that needs the error estimate when a step is accepted, which `Ode.Controller.accepted` does not receive, so it needs a contract change ([numerics/05-step-control.md](numerics/05-step-control.md), section 11). The BDF1/BDF2 gap used as the estimate is conservative for BDF2.
 - One mixed absolute/relative weight, 1 / (1 + |y_i|), controls the error: there is no separate rtol and atol (relative and absolute tolerance), so tiny components such as Robertson's y2 are controlled only loosely.
-- `Halving` counts both rejection reasons together; a controller could count Newton failures separately, since `Ode.rejection` says which it was.
+- `Halving` counts every rejection together, whatever its reason; a controller could count Newton failures separately, since `Ode.rejection` says which it was.
 - `Instrument` counts `rhs` calls only; Newton iterations per step are not visible from outside.
 - No dense output (values between the steps): the drivers return only the final state.
