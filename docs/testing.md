@@ -84,7 +84,7 @@ Fatal error: exception Invalid_argument("index out of bounds")
 
 ```text
 let newton = [ ("newton linear 2d", fun () -> show (Newton.solve ...)); ... ]
-let corpus = List.concat [ newton; jacobian; backward_euler; ...; robertson_accuracy; newton_overflow; clock ]
+let corpus = List.concat [ newton; jacobian; backward_euler; ...; robertson_accuracy; newton_overflow; clock; too_small ]
 let () = Report.lines corpus
 ```
 
@@ -261,6 +261,7 @@ The regression pins, the groups after the first six in `corpus.ml`, are worked e
 | `Adaptive`: no snapping (`h = dt` for a step that is not the last) | the `from t=1e10` line prints the budget text and the `from t=1e15` line `y = 76.84` instead of `y = 100` |
 | `Adaptive`: no remainder rule (`last = dt >= remaining`) | the `over one ulp` line prints `Error StepRejected 1` |
 | `Adaptive`: neither snapping nor the remainder rule | the `over one ulp` and `from t=1e10` lines print the budget text and the `from t=1e15` line `y = 76` |
+| `Adaptive`: no `Too_small` rejection (call the method with `h = 0`) | the `never reaches the method` line prints `rhs calls: 5` instead of `1` |
 | `Bdf2`: start Newton from `y_n` instead of the extrapolation | silent: only the speed of Newton changes |
 | `Newton`: Armijo constant `0.`; `min_damping = 1.`; no check that the step, the line-search residual or the iterate is finite | each silent, and so is dropping the line search altogether (always taking the full step) |
 | `Adaptive`: default `dt_max` of `span` for `span / 10`; no finiteness check on `y0` and `rhs t0 y0` | each silent |
@@ -276,7 +277,6 @@ The silent rows are gaps, and starting points for contributions; [numerics/06-th
 - **Newton's safeguards.** The line search (Armijo constant, minimum damping) and the non-finite checks at the start of an iteration, on the step and on the trial residual can be removed without changing any line (the check on a converged `x + dx` is pinned): `newton quadratic x0=1` converges with full steps, so no case needs damping. The order of the two tests is pinned, indirectly (table above); a direct pin would be `x² - 3` from 1, which converges today and gives `Error Diverged` when the line search comes first (check with a probe).
 - **The time argument of `rhs`.** The four corpus problems are autonomous (their right-hand sides ignore `t`), and the NaN wall, the one right-hand side that reads `t`, does not notice a stage evaluated at the wrong time.
 - **Defaults and guards of the drivers:** the default `dt_max`, the finiteness check at the start, `max 1` in `Stepper.fixed`.
-- **The `Too_small` rejection.** Snapping alone gives the same lines: without the rejection the method is called with `h = 0`, the second such call fails on `ω = 0 / 0`, and the controller gives up with the same `StepRejected 1`. A case would wrap `Bdf2` and record the `h` of every call ([numerics/06-the-corpus.md](numerics/06-the-corpus.md), section 10).
 - **van der Pol** checks only `Ok` at `t = 2000`, a rejection and a finite state, not the values against a reference.
 - **A transposed Jacobian** is pinned by one line, but the mistake stalls the run before that line is reached.
 - **The soak test** is a tripwire. **Run time:** the backward Euler canary takes (t_end - t0) / dt = 1 / 2e-6 = 500,000 fixed steps, once in the corpus and ten times in the soak test, and dominates the run; measure it with `time`.

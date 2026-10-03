@@ -25,3 +25,4 @@ newton step that converges into an overflow: Error Nan
 adaptive y' = 1 over one ulp from t=1: Ok, at t_end: true, y = 2.22045e-16
 adaptive y' = 1 from t=1e10, dt_max = 5e-7 is below t's resolution: Error StepRejected 1
 adaptive y' = 1 from t=1e15 over 100, dt0 = dt_max = 0.19: Ok, at t_end: true, y = 100
+adaptive step that cannot move t never reaches the method: Error StepRejected 1, rhs calls: 1
