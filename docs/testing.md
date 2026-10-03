@@ -96,8 +96,8 @@ let () = Report.lines corpus
 
 These keep the expected files worth trusting. Each has a reason.
 
-1. **Never weaken or rewrite a passing expectation to get green.** The expected file records what correct output looks like. A run made green by editing the file, loosening a bound, deleting a case or skipping a test proves nothing. A changed line is a regression (fix the code) or a deliberate change of behaviour, which is explained in its commit message and reviewed as a diff of the `.expected` file.
-2. **`dune promote` only records.** It is legitimate for the line of a newly added case, or for a deliberate, reviewed change of output format. It overwrites the `.expected` file with whatever the program printed, wrong answers included. Read the diff first, and read `git diff test/corpus.expected` afterwards.
+1. **Never weaken an expectation or edit one to get green.** The expected file records what correct output looks like. A run made green by editing the file, loosening a bound, deleting a case or skipping a test proves nothing. A changed line is a regression (fix the code) or a deliberate change of behaviour. A deliberate change of algorithm re-pins the lines it moves (counts, digits) in the same commit, with the old and the new values in its message and the `.expected` diff reviewed; the correctness bounds themselves never loosen.
+2. **`dune promote` only records.** It is legitimate for the line of a newly added case, a deliberate re-pin (rule 1), or a reviewed change of output format. It overwrites the `.expected` file with whatever the program printed, wrong answers included. Read the diff first, and read `git diff test/corpus.expected` afterwards.
 3. **Reference values are never edited.** The values in [test/refs.ml](../test/refs.ml) are computed outside vstiff. A new reference is a new definition with its provenance; an existing one never changes to make a test pass.
 4. **Every behaviour change comes with a test.** A new feature gets a case; a bug fix gets a case that failed before the fix.
 5. **Cases are added deliberately, one at a time, each with a stated purpose** in a comment above it. A case costs run time and reading time.
