@@ -1,0 +1,8 @@
+; Report is the corpus's only module that prints: this test uses it as it is, copied at build time.
+(copy_files ../../test/report.ml)
+
+(test
+ ; The pure modules of the bench, checked like test/corpus.ml: dune runs check.exe and diffs its output with
+ ; check.expected. The bench itself is run by hand, never here: bench/README.md.
+ (name check)
+ (libraries benchlib vstiff))

@@ -1,0 +1,36 @@
+error of (1.1, 100) against (1, 100): 5.000e-02
+scd of (1.001, 100) against (1, 100): 3.00
+scd of an exact answer: inf
+scd with a zero reference component, off by 1e-3: 3.00
+error with a nan state is nan: true
+a row equal to its pin: ok
+exactly 10 % more rhs calls: ok
+one call more than that: REGRESSED: rhs calls +10.1%
+fewer calls and more digits: ok
+0.04 digits lost: ok
+0.06 digits lost: REGRESSED: scd 3.94, pinned 4.00
+both worse: REGRESSED: rhs calls +50.0%; scd 3.00, pinned 4.00
+a failed run: REGRESSED: failed with StepRejected 51
+a tolerance that is not pinned: UNPINNED: run bench --pin
+a problem that is not pinned: UNPINNED: run bench --pin
+source of one row: let rows = |   [ |     { |       problem = "p"; |       tol = 1e-06; |       outcome = Done { steps = 100; rejected = 10; rhs_calls = 1000; error = 1.000e-06; scd = 4.00 }; |     };
+source with a failed row: none
+source with an exact answer, scd infinite: none
+a row: p,bdf2+halving,1e-06,100,10,1000,,,1.000e-06,4.00
+a row with its CPU time: p,bdf2+halving,1e-06,100,10,1000,,,1.000e-06,4.00,1.50
+fields of the header, a row and a failed run: 10, 10, 10
+fields with the CPU time: 11, 11
+no flag: table, cpu false, only none
+--csv --cpu --only hires: csv, cpu true, only hires
+--pin: pin, cpu false, only none
+--pin --only hires: error: --pin covers every problem and takes neither --cpu nor --only
+--pin --cpu: error: --pin covers every problem and takes neither --cpu nor --only
+--csv --pin: error: give at most one of --csv, --pin, --help
+--only without a name: error: --only needs a problem name
+--only twice: error: give --only once
+an unknown flag: error: unknown argument --fast
+every case has a reference of its length: true
+every row is pinned: true
+brusselator right-hand side at (1, 3): max |f| = 0
+brusselator state has 80 components: 80
+hires right-hand side at y0: -1.7093; 1.7100; 0.0000; 0.0000; 0.0000; 0.0000; 0.0000; 0.0000
