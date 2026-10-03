@@ -19,6 +19,11 @@ let budget rhs =
    out: the soak's way to stop a round without catching anything itself. *)
 let bounded run = match run () with v -> Some v | exception Exhausted -> None
 
+(* verdict holds x is Ok of holds x, or Error with the exception it raised: a
+   property case that raises fails like one that does not hold, and the run goes
+   on (Prop). *)
+let verdict holds x = match holds x with b -> Ok b | exception e -> Error (Printexc.to_string e)
+
 (* run ok case is a table entry's function of (): ok formats an Ok; an Error, an
    exhausted budget and an Invalid_argument each print one line. A match case
    written exception catches what its expression raises (docs/ocaml.md). *)
