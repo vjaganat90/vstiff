@@ -146,3 +146,30 @@ let () =
     | Ok y -> "Ok " ^ pp_vec y
     | Error e -> "Error " ^ Fail.to_string e
     | exception Invalid_argument m -> "Invalid_argument " ^ m)
+
+(* Step control: from dt0 = 0.5, which is also the default dt_max here, the
+   startup estimate rejects the first attempts; after that the halve and double
+   rules and the cap decide every step, so these counts move if any of them do. *)
+let () =
+  let open Problems.Logistic in
+  case "adaptive logistic [0,5] dt0=0.5 tol=1e-6"
+    (match Adaptive.integrate ~dt0:0.5 ~tol:1e-6 ~rhs ~t0:0. ~t_end:5. y0 with
+    | Ok s ->
+        Printf.sprintf "accepted %d, rejected %d, max error %.2e" s.accepted s.rejected (max_error (exact 5.) s.y)
+    | Error e -> "Error " ^ Fail.to_string e);
+  (* Accuracy alone would allow steps several times longer than 1e-3 here, so
+     the cap is what sets every step once dt has grown to it. *)
+  case "adaptive logistic [0,5] dt_max=1e-3 tol=1e-6"
+    (match Adaptive.integrate ~dt_max:1e-3 ~tol:1e-6 ~rhs ~t0:0. ~t_end:5. y0 with
+    | Ok s -> Printf.sprintf "accepted %d, rejected %d" s.accepted s.rejected
+    | Error e -> "Error " ^ Fail.to_string e)
+
+(* Robertson accuracy at tol = 1e-6, far tighter than the 1e-3 acceptance bound. *)
+let () =
+  let open Problems.Robertson in
+  case "robertson t=1e4 tol=1e-6 accuracy"
+    (match Adaptive.integrate ~tol:1e-6 ~rhs ~t0:0. ~t_end:1e4 y0 with
+    | Ok s ->
+        let e = Float.abs (s.y.(0) -. Refs.robertson_y1_at_1e4) in
+        Printf.sprintf "|y1 - ref| = %.1e < 1e-5: %b" e (e < 1e-5)
+    | Error e -> "Error " ^ Fail.to_string e)
