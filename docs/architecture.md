@@ -192,7 +192,7 @@ The same Newton failure means different things at different levels. In a fixed-s
 
 ## Effects
 
-OCaml does not record effects in types (a function's type does not say whether it raises, mutates or prints), so the discipline is by module: a function outside these four modules neither raises on purpose, nor mutates, nor prints.
+OCaml does not record effects in types (a function's type does not say whether it raises, mutates or prints), so the discipline is by module ([AGENTS.md](../AGENTS.md), H6): a function outside these four modules neither raises on purpose, nor mutates, nor prints, and a new effect goes into one of them or into a new module that exists for it.
 
 | Module | Effect | Why there |
 |---|---|---|
@@ -208,8 +208,6 @@ Everything else is pure: methods, controllers, the whole kernel (`Newton`, `Jac`
 - **Results are reproducible**, which the soak test relies on, and a test case is a pure function from `()` to text.
 - **Effect types stay easy to annotate**: if effects are ever tracked in types, only these modules carry them.
 
-New effects go into these modules or into a new dedicated one, never into a method, a controller, a driver or the kernel.
-
 ## Invariants
 
 A change that breaks one is a bug even if every corpus line still passes.
@@ -218,29 +216,33 @@ A change that breaks one is a bug even if every corpus line still passes.
 2. **Jacobian orientation.** `J.(i).(j)` is ∂f_i/∂y_j: the row is the output, the column the input. `Jac.forward` builds the columns first and then reads rows from them, `Stage.solve` forms `I - γJ` entry by entry with the same indices, and `Linalg.solve a b` treats `a.(i)` as equation `i`. A transposed matrix still type-checks, and the canary's diagonal Jacobian is its own transpose. The root Newton converges to does not depend on the Jacobian, only the speed does, so a wrong Jacobian costs speed, not correctness: Newton converges slowly or not at all, `Adaptive` counts the failure as a rejection, and the run crawls ([testing.md](testing.md)).
 3. **Both drivers land exactly on `t_end`.** `Adaptive` cuts the last step to `t_end - at.t` and assigns the new time `t_end` rather than computing `at.t + h`, which could miss it by rounding. `Stepper.fixed` ends step `k` at `t0 + k h` and the last one at `t_end` itself, with no running sum of steps: nine additions of `1/9` give `1.0000000000000002`, and a right-hand side that is undefined past `t_end` (corpus line 29) returned `nan` at the last stage.
 4. **The state advances by exactly the clock's step.** A step that is not the last is snapped: the new time is `t_next = t + dt` and `h = t_next - t`, the difference of the two clock readings (computed without rounding when they are within a factor of 2 of each other, as they are for any step much shorter than `|t|`), and the method moves the state by `h`. An unsnapped `h = dt` would move the state by `dt` and the clock by `t_next - t`, which differs from `dt` by up to half an ulp of `t_next` (an ulp of `t` at most): at `t = 1e15`, where the floats are `0.125` apart, a step of `3.7` moves the clock by `3.75`, and corpus line 27, which runs steps of that length, ends at `y = 98.7` unsnapped and at `y = 100` snapped. The price is that a snapped step may exceed `dt_max` by that much. A non-final step below `Clock.resolution` of `t` never reaches a method (it is rejected as `Too_small`, as is every step with `h <= 0`), and above the resolution snapping changes a step by at most 1/32 of its length (half an ulp against at least 16 ulps). `Stepper.fixed` keeps the invariant with its grid: the step handed to the method is the difference of the two grid times, not `h`.
-5. **Determinism.** No randomness, hidden state or parallelism: the same arguments give identical results in the same build ([test/soak.ml](../test/soak.ml) checks it). Results may differ in the last bits between machines (see "Performance"), so the expected files print few digits.
+5. **Determinism within one build** ([AGENTS.md](../AGENTS.md), H1). No randomness, hidden state or parallelism: the same arguments give identical results in the same build ([test/soak.ml](../test/soak.ml) checks it). Results may differ in the last bits between machines (see "Performance"), so the expected files print few digits.
 6. **Vector lengths agree.** `Vec.add`, `sub`, `axpy` and `dot` index by the length of their first vector argument: a shorter second argument raises `Invalid_argument` (index out of bounds), a longer one is ignored past that length. `Halving.acceptable` uses `Array.map2`, which raises if `y` and `err` differ in length. These are caller bugs, not numerical failures. The drivers check one length, that of `rhs t0 y0` against `y0`, with `Invalid_argument` naming the driver; a right-hand side whose length changes later is not checked.
 7. **History convention.** `After { h_prev; y_prev }` pairs the step just taken with the state it started from. A rejection leaves the history alone, so ω = h / h_prev shrinks when `h` does.
 8. **Step ratios stay below the stability limit.** Variable-step BDF2 is zero-stable (earlier errors stay bounded) for ω < 1 + √2, about 2.414 ([numerics/04-bdf.md](numerics/04-bdf.md)). `Bdf2` does not check it; the controller must. `Halving` proposes at most twice the last accepted step, so ω stays at most 2 for the proposals. The driver snaps them to the floats, which changes a step by at most 1/32, so the ω it takes is at most 2 (1 + 1/32) / (1 - 1/32) = 66/31, about 2.13, inside the limit ([numerics/05-step-control.md](numerics/05-step-control.md), section 9). A new controller must keep it below the limit.
-9. **The solver sees f as a black box.** Jacobians are always forward differences inside `Stage.solve`, and corpus problems never supply analytic ones.
+9. **The solver sees f as a black box (H7).** Jacobians are always forward differences inside `Stage.solve`, and corpus problems never supply analytic ones.
 
 ## Conventions
 
-- **Contracts are module types in `Ode`; methods and controllers are modules that implement them**, passed to the drivers as modular explicits. Prefer modular explicits to functors and to first-class modules packed into values: the result type can name the module's own types, and nothing has to be packed or applied ([ocaml.md](ocaml.md)). Share a type between signatures (`with type`) only when a caller must see it: `Halving` does so for `stats`, so that the tests can read the counts.
-- **Names.** Module types are CamelCase (`Method`, `Controller`), values snake_case. `dt` is a requested step size (`~dt`, `dt0`, `dt_max`, `Controller.proposal`), `h` a step taken or attempted. Labels appear only where two arguments of one type could be swapped (`~at ~h`, `~y ~err`), or to name a bare literal at a call site (`~dt:2e-6`).
-- **Failures and mistakes.** A numerical failure is a `Fail.t` in a `result`; an invalid argument raises `Invalid_argument` from `Check`.
-- **Two libraries, one public API.** The kernel in `src/numerics/` knows nothing about ODEs, the solver offers only what `src/vstiff.ml` and `src/vstiff.mli` list, and a vector is a `float array` in public signatures (above).
-- **Standard library only.** `src/numerics/dune` lists no libraries, `src/dune` only `numerics` and `test/dune` `vstiff` and `numerics`.
+The conventions are in [AGENTS.md](../AGENTS.md): the hard rules H5 (failures are values, invalid arguments raise), H6 (effects live in named modules, above), H9 (standard library only) and H10 (two libraries, one public API), and its "Design defaults", which cover the first two items below. This is how they show in the code.
+
+- **Contracts and implementations.** Contracts are module types in `Ode`; methods and controllers are modules that implement them, passed to the drivers as modular explicits. That is the default because the result type can name the module's own types, and nothing has to be packed or applied ([ocaml.md](ocaml.md)). A functor, a first-class module in a data structure (when the method comes from a list at run time, say), a GADT or an effect handler is the better tool where it gives the clearer design. Types are shared between signatures (`with type`) only where a caller must see them: `Halving` does so for `stats`, so that the tests can read the counts.
+- **Names.** Module types are CamelCase (`Method`, `Controller`), values snake_case. `dt` is a requested step size (`~dt`, `dt0`, `dt_max`, `Controller.proposal`), `h` a step taken or attempted. Labels go where two arguments of one type could be swapped (`~at ~h`, `~y ~err`), or name a bare literal at a call site (`~dt:2e-6`); other arguments are positional.
+- **Failures and mistakes (H5).** A numerical failure is a `Fail.t` in a `result`; an invalid argument raises `Invalid_argument` from `Check`.
+- **Two libraries, one public API (H10).** The kernel in `src/numerics/` knows nothing about ODEs, the solver offers only what `src/vstiff.ml` and `src/vstiff.mli` list, and a vector is a `float array` in public signatures (above).
+- **Standard library only (H9).** `src/numerics/dune` lists no libraries, `src/dune` only `numerics` and `test/dune` `vstiff` and `numerics`.
 
 ## Adding things
+
+The checklists are in [AGENTS.md](../AGENTS.md), under "Tests": adding a corpus case, a soak case, a method or a controller. The table and the notes after it say what to edit and why.
 
 | You want to | Edit | Also |
 |---|---|---|
 | add a method | a module implementing `Ode.Method` (see below) | `include Ode.Method` in its `.mli`; list it in `src/vstiff.ml` and `src/vstiff.mli`; a corpus case; [numerics/04-bdf.md](numerics/04-bdf.md) if it is a BDF-type method |
 | add a controller | a module implementing `Ode.Controller` (see below) | list it in `src/vstiff.ml` and `src/vstiff.mli`; pass it to `Adaptive.integrate`; a corpus case |
-| make an internal module public | [src/vstiff.ml](../src/vstiff.ml) and [src/vstiff.mli](../src/vstiff.mli) | one `module X = X` line in each, with a doc comment in the `.mli`; take the module out of `private_modules` in `src/dune` if it is listed there |
+| make an internal module public (H10) | [src/vstiff.ml](../src/vstiff.ml) and [src/vstiff.mli](../src/vstiff.mli) | one `module X = X` line in each, with a doc comment in the `.mli`; take the module out of `private_modules` in `src/dune` if it is listed there |
 | add a numerical building block | a module in `src/numerics/`, which must not name `Ode` | an `.mli`; a corpus case (the `newton` and `jacobian` groups call the kernel directly) |
-| add a corpus problem | a module in [test/problems.ml](../test/problems.ml) with `rhs`, `y0`, `problem` and, if a closed form exists, `exact`; no Jacobian | a case in [test/corpus.ml](../test/corpus.ml) by the steps in [testing.md](testing.md) |
+| add a corpus problem | a module in [test/problems.ml](../test/problems.ml) with `rhs`, `y0`, `problem` and, if a closed form exists, `exact`; no Jacobian (H7) | a case in [test/corpus.ml](../test/corpus.ml) by the steps in [testing.md](testing.md) |
 | add a kind of failure | `Fail.t` and `Fail.to_string` in [src/numerics/fail.ml](../src/numerics/fail.ml) and its `.mli` | every `match` on `Fail.t` without a catch-all stops compiling until it handles the new case, which is the point; `Vstiff.Fail` follows by itself, being a re-export |
 | change Newton's tuning constants | the constants at the top of [src/numerics/newton.ml](../src/numerics/newton.ml) | [testing.md](testing.md) lists what notices each |
 | change how the Jacobian is perturbed | `Jac.step` in [src/numerics/jac.ml](../src/numerics/jac.ml) | [numerics/03-jacobians-and-floating-point.md](numerics/03-jacobians-and-floating-point.md) |
@@ -273,7 +275,7 @@ let () =
 
 Run it as a probe ([testing.md](testing.md)). With `~dt0:0.1` the first estimate, h² / (2 (1 + h)) for this problem, already exceeds `tol`, and `rejected` ends the run with `Error (StepRejected 1)`.
 
-**A corpus problem.** Add a module to [test/problems.ml](../test/problems.ml) with `rhs`, `y0`, `problem = { Ode.rhs; t0; t_end; y0 }` and, if a closed form exists, `exact`, and a doc comment saying what it is and why the corpus needs it. Give it no Jacobian: the solver must work for any black-box `rhs`. With no closed form, the reference answer is computed outside vstiff and goes into [test/refs.ml](../test/refs.ml) ([testing.md](testing.md), "Reference values"). A problem changes no output until a case in [test/corpus.ml](../test/corpus.ml) uses it ([testing.md](testing.md), "Adding a case, step by step").
+**A corpus problem.** Add a module to [test/problems.ml](../test/problems.ml) with `rhs`, `y0`, `problem = { Ode.rhs; t0; t_end; y0 }` and, if a closed form exists, `exact`, and a doc comment saying what it is and why the corpus needs it. Give it no Jacobian (H7): the solver must work for any black-box `rhs`. With no closed form, the reference answer is computed outside vstiff and goes into a new module, since [test/refs.ml](../test/refs.ml) is never edited (H4; [testing.md](testing.md), "Reference values"). A problem changes no output until a case in [test/corpus.ml](../test/corpus.ml) uses it ([testing.md](testing.md), "Adding a case, step by step").
 
 ## Performance
 
@@ -297,7 +299,7 @@ let () =
 
 - **An adaptive attempt after the first step costs two stage solves**, one for BDF2 and one for backward Euler; the first step needs only the backward Euler solve and one `rhs` call for the explicit Euler state. An attempt rejected as too large costs as much as an accepted one; one rejected as `Too_small` costs nothing, because the method is not called.
 - **Dense, allocating linear algebra.** `Linalg.solve` recurses on the trailing submatrix: O(n³) arithmetic and, since every level builds fresh arrays, O(n³) allocation. It is meant for small systems.
-- **Fused multiply-add.** On arm64, `ocamlopt` fuses `a +. b *. c` and `a -. b *. c` into one instruction with a single rounding when the product is a direct operand; binding the product with `let` first rounds twice, and can give a different result. So moving a product into or out of a sum can change the last bits of a result, results may differ between machines, and the expected files print few digits. That is allowed: checks are about correctness, not bits ([testing.md](testing.md), rule 9), and `Float.fma` is welcome wherever it makes a result more accurate. Run `dune runtest` after any arithmetic edit all the same. [numerics/03-jacobians-and-floating-point.md](numerics/03-jacobians-and-floating-point.md) (section 8) has a program that shows it.
+- **Fused multiply-add.** On arm64, `ocamlopt` fuses `a +. b *. c` and `a -. b *. c` into one instruction with a single rounding when the product is a direct operand; binding the product with `let` first rounds twice, and can give a different result. So moving a product into or out of a sum can change the last bits of a result, results may differ between machines, and the expected files print few digits. That is allowed: no check may depend on the last bits ([AGENTS.md](../AGENTS.md), H1; [testing.md](testing.md) says what to do when a line moves), and `Float.fma` is welcome wherever it makes a result more accurate. Run `dune runtest` after any arithmetic edit all the same. [numerics/03-jacobians-and-floating-point.md](numerics/03-jacobians-and-floating-point.md) (section 8) has a program that shows it.
 
 ## Limits of the design
 

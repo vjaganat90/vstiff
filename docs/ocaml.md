@@ -1,6 +1,6 @@
 # OCaml and tooling primer
 
-This page covers the OCaml and the tools that vstiff and its tests use, and no more. It assumes you program in another language (Python or JavaScript, say) and have never used OCaml. Part 1 gets the toolchain running. Part 2 tours the language one feature at a time: a tiny example, then where the code uses it. [README.md](README.md) indexes the other pages, [architecture.md](architecture.md) maps the modules and [testing.md](testing.md) explains the tests. Official documentation: <https://ocaml.org/docs> (language and standard library), <https://dune.readthedocs.io> (build system), <https://opam.ocaml.org/doc/> (package manager).
+This page covers the OCaml and the tools that vstiff and its tests use, and no more. Part 1 gets the toolchain running. Part 2 tours the language one feature at a time: a tiny example, then where the code uses it. [README.md](README.md) indexes the other pages, [architecture.md](architecture.md) maps the modules and [testing.md](testing.md) explains the tests. Official documentation: <https://ocaml.org/docs> (language and standard library), <https://dune.readthedocs.io> (build system), <https://opam.ocaml.org/doc/> (package manager).
 
 **Reading the snippets.** Every `ocaml` snippet compiles on its own; `text` blocks hold excerpts and compiler messages. A comment `(* val f : ... *)` shows the type the compiler infers, and `(* = v *)` a value. You seldom write types yourself, but reading them is the most useful OCaml skill: a function's type says most of what it does, and editors show it on hover. To try a snippet, save it and run `ocaml snippet.ml` (the plain toplevel that comes with the compiler), or type `#use "snippet.ml";;` inside `ocaml` to see the type of every definition. `utop` or a probe ([testing.md](testing.md)) work too, but the main module of a probe rejects unused top-level definitions, so print what you define.
 
@@ -14,6 +14,8 @@ This page covers the OCaml and the tools that vstiff and its tests use, and no m
 | ocaml-lsp-server | editor integration (a language server) | pyright, tsserver |
 | utop | an interactive prompt (optional) | the Python or Node REPL |
 
+Install opam first: on macOS with Homebrew, `brew install opam`; on Linux and WSL, follow <https://opam.ocaml.org/doc/Install.html>. Then:
+
 ```sh
 opam init                        # first time only: creates ~/.opam
 opam switch create 5.5.0         # a switch holding OCaml 5.5.0
@@ -25,7 +27,7 @@ ocaml -version                   # The OCaml toplevel, version 5.5.0
 dune --version                   # 3.x
 ```
 
-These commands assume macOS, Linux or WSL (Windows Subsystem for Linux). The project is built and tested with OCaml 5.5.0; `Stepper.fixed` and `Adaptive.integrate` use modular explicits (below), which older releases reject. It uses only the standard library, so nothing else has to be installed. `opam switch list` shows your switches; `opam exec --switch=NAME -- dune runtest` runs one command in a switch without changing the shell (NAME may be the path of a switch kept in a directory).
+These commands are for macOS, Linux and WSL (Windows Subsystem for Linux). The project is built and tested with OCaml 5.5.0; `Stepper.fixed` and `Adaptive.integrate` use modular explicits (below), which older releases reject. It uses only the standard library, so no other OCaml package has to be installed. `opam switch list` shows your switches; `opam exec --switch=NAME -- dune runtest` runs one command in a switch without changing the shell (NAME may be the path of a switch kept in a directory).
 
 ### What dune reads
 
@@ -60,7 +62,7 @@ Run these from the repository root. Dune builds in its **dev profile** by defaul
 | `dune exec ./test/corpus.exe` | Runs one program and shows its output unfiltered. |
 | `dune build @check` | Type-checks without linking or running: the quickest way to see compile errors. (`@check` is an alias, dune's name for a group of targets.) |
 | `dune build --watch` | Rebuilds when a file changes (`dune runtest --watch` reruns the tests). |
-| `dune promote` | Overwrites `.expected` files with the output of the last run. Read the next section first. |
+| `dune promote` | Overwrites `.expected` files with the output of the last run. For a new case, a deliberate re-pin or a line rewritten to print its check only, never for a failure (see below). |
 | `dune clean` | Deletes `_build/`. |
 | `dune build @doc-private` | Renders the `.mli` comments as HTML under `_build/default/_doc/_html/`; needs `opam install odoc`. (`@doc` alone builds nothing for a private library.) |
 
@@ -73,7 +75,7 @@ Run these from the repository root. Dune builds in its **dev profile** by defaul
 
 [testing.md](testing.md) shows the whole diff and how to read it.
 
-**Why `dune promote` is rarely the right move.** It copies the program's actual output over the `.expected` file, and from then on `dune runtest` is silent whatever the output was, wrong answers included. A red test is information; promoting it away destroys that. The legitimate uses are recording the line of a newly added case and a deliberate, reviewed change of format ([testing.md](testing.md) has the rules).
+**Why `dune promote` is rarely the right move.** It copies the program's actual output over the `.expected` file, and from then on `dune runtest` is silent whatever the output was, wrong answers included. A red test is information; promoting it away destroys that. The legitimate uses are recording the line of a newly added case, a deliberate re-pin and a line rewritten to print its check ([AGENTS.md](../AGENTS.md), H2; [testing.md](testing.md) explains each).
 
 **Editor and prompt.** Install `ocaml-lsp-server` and use an editor with Language Server support (VS Code with the OCaml Platform extension, Emacs, Vim or Neovim with an LSP client). You want type on hover, jump to definition and inline errors; open the editor at the repository root and run `dune build` once if they do not work at first. The repository has no `.ocamlformat`, so there is no formatter to run: follow the layout of the file you edit. `dune utop src` starts `utop` with the library and its dependencies loaded; type `open Vstiff;;` first, and `open Numerics;;` for the kernel's modules (phrases end with `;;`), and `#show Newton;;` prints a module's interface.
 
@@ -130,7 +132,7 @@ let capped ?limit x =                        (* with no default, limit arrives a
   match limit with None -> x | Some l -> Float.min x l
 ```
 
-**The labels rule.** A label appears only where two arguments of one type could be swapped, or to name a bare literal at a call site: `~y ~err` (two vectors) and `~at ~h` (two floats) in `Ode.Controller`, `~dt:2e-6` and `~tol:1e-6` at call sites. An optional parameter needs an unlabelled one after it, so that the call can settle it: `Adaptive.integrate ?dt0 ?dt_max ?max_rejects ~tol problem` ends with `problem`. Partial application keeps the optional parameters, which is how the corpus calls `bdf2_halving ~dt0:0.5 ~tol:1e-6 problem`. Without a default, an optional parameter is an option inside the function: `Option.value dt_max ~default:(positive (span /. 10.))` in [src/adaptive.ml](../src/adaptive.ml).
+**Where this code uses labels.** The default ([AGENTS.md](../AGENTS.md), "Design defaults") is a label where two arguments of one type could be swapped, or to name a bare literal at a call site, and positional arguments otherwise: `~y ~err` (two vectors) and `~at ~h` (two floats) in `Ode.Controller`, `~dt:2e-6` and `~tol:1e-6` at call sites. An optional parameter needs an unlabelled one after it, so that the call can settle it: `Adaptive.integrate ?dt0 ?dt_max ?max_rejects ~tol problem` ends with `problem`. Partial application keeps the optional parameters, which is how the corpus calls `bdf2_halving ~dt0:0.5 ~tol:1e-6 problem`. Without a default, an optional parameter is an option inside the function: `Option.value dt_max ~default:(positive (span /. 10.))` in [src/adaptive.ml](../src/adaptive.ml).
 
 ### Floats, equality and `Printf`
 
@@ -433,7 +435,7 @@ val integrate :
 
 The result type names `C.stats`: `Adaptive.integrate (module Bdf2) (module Halving) ~tol problem` returns `(Halving.stats Adaptive.solution, Fail.t) result`, so the tests read `s.stats.rejected_steps`, and another controller with another stats type gives another result type. `repeat (module C : Case) : (C.t, Fail.t) result option list` in [test/soak.ml](../test/soak.ml) has the same shape. `Stepper.fixed (module M : Ode.Method)` takes a module the same way.
 
-**Why this code prefers modular explicits** to functors and to first-class modules packed into values. The result type names the module's own types (`C.stats`), without the `with type` plumbing that a packed module needs. A functor (a function from modules to a module) would turn every combination into a named module (`module Run = Adaptive.Make (Bdf2) (Halving)`) before it could be called; here the call site just writes `(module Bdf2) (module Halving)`, and partial application works. The cost is that the argument must be written out in the source, so the choice of method cannot come from a runtime list; a first-class module is the tool for that.
+**Why modular explicits are the default here** ([AGENTS.md](../AGENTS.md), "Design defaults"). The result type names the module's own types (`C.stats`), without the `with type` plumbing that a packed module needs. A functor (a function from modules to a module) would turn every combination into a named module (`module Run = Adaptive.Make (Bdf2) (Halving)`) before it could be called; here the call site just writes `(module Bdf2) (module Halving)`, and partial application works. The cost is that the argument must be written out in the source, so the choice of method cannot come from a runtime list. That is a job for a first-class module in a list or a record; a functor is the tool for building a module out of other modules, as `Set.Make` does; a GADT or an effect handler can be the clearer design elsewhere. All of them are legitimate, and the default gives way wherever another tool is clearly cleaner.
 
 ### Exceptions and mutable cells
 
@@ -451,7 +453,7 @@ let counter () =
   ((fun () -> incr calls), fun () -> !calls)         (* incr adds one; ! reads the cell *)
 ```
 
-`invalid_arg msg` raises `Invalid_argument msg`; a `match` case written `| exception ...` catches an exception raised while the matched expression is evaluated. These tools are quarantined. Invalid arguments are programming errors, and in the library only `Check` ([src/check.ml](../src/check.ml)) raises on purpose; in the tests only [test/guard.ml](../test/guard.ml) raises (`Exhausted`, when a call budget runs out) or catches. The only mutable state in the library is the `ref` in `Instrument.count`, whose shape `counter` copies. A `ref` is read with `!` (not a negation) and written with `:=`. [architecture.md](architecture.md) gives the reasons.
+`invalid_arg msg` raises `Invalid_argument msg`; a `match` case written `| exception ...` catches an exception raised while the matched expression is evaluated. These tools are quarantined ([AGENTS.md](../AGENTS.md), H6). Invalid arguments are programming errors, and in the library only `Check` ([src/check.ml](../src/check.ml)) raises on purpose; in the tests only [test/guard.ml](../test/guard.ml) raises (`Exhausted`, when a call budget runs out) or catches. The only mutable state in the library is the `ref` in `Instrument.count`, whose shape `counter` copies. A `ref` is read with `!` (not a negation) and written with `:=`. [architecture.md](architecture.md) gives the reasons.
 
 ### Tail recursion
 
@@ -475,4 +477,4 @@ In the dev profile most compiler warnings stop the build. The ones you will meet
 - **33, 39, 11, 16**: unused `open`, unused `rec`, an unused match case, an optional argument that can never be defaulted.
 - **50: a documentation comment in the wrong place**: `Error (warning 50 [unexpected-docstring]): unattached documentation comment (ignored)`.
 
-Fix the code; never loosen the flags. Three habits break the build when you write comments: comments nest, so the two characters `(*` inside a comment open another one (write `( *. )` with spaces); string literals are lexed inside comments, so a double quote must belong to a closed string (avoid it; the same goes for the two characters `{|`); and a `(** ... *)` comment must sit directly before or after the item it documents (a definition, a constructor or a record field), while inside a function body only `(* ... *)` is allowed. Documentation comments use the odoc markup: `[code]`, `{[ ... ]}` for a block, `{b bold}`, `{!Module.name}` for a link and `-` for list items. Dune files use `;` for comments.
+Fix the code, never the flags ([AGENTS.md](../AGENTS.md), "Build and test"). Three habits break the build when you write comments (AGENTS.md has them under "Comment pitfalls"): comments nest, so the two characters `(*` inside a comment open another one (write `( *. )` with spaces); string literals are lexed inside comments, so a double quote must belong to a closed string (avoid it; the same goes for the two characters `{|`); and a `(** ... *)` comment must sit directly before or after the item it documents (a definition, a constructor or a record field), while inside a function body only `(* ... *)` is allowed. Documentation comments use the odoc markup: `[code]`, `{[ ... ]}` for a block, `{b bold}`, `{!Module.name}` for a link and `-` for list items. Dune files use `;` for comments.
