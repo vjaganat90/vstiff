@@ -125,7 +125,7 @@ let stiff_canary =
 
 (* Orientation: this Jacobian is not symmetric, so Jac.forward returning the transpose fails the line (bound 1e-6
    as in step 2); the diagonal canary cannot show that. The y3^2 term is curved, so a coarse step shows too. The
-   transpose also makes the Robertson run so slow that a full run needs a timeout to reach this line. *)
+   transpose also makes the Robertson runs exhaust their call budget, so their lines print the budget text. *)
 let orientation =
   let f y = [| y.(1); -.y.(0) -. (3. *. y.(1)); (5. *. y.(0)) +. (y.(2) *. y.(2)) |] in
   let y = [| 1.; 2.; 3. |] in
