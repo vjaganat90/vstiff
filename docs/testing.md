@@ -1,24 +1,26 @@
 # Testing
 
-vstiff is tested by two programs that print text and a file of expected text next to each: a test passes when the program prints exactly what the file says. This page explains the mechanics, the structure of the test code, what the rules about the expected files protect, how to add a case, where reference values come from, how to run probes, and how to judge the strength of the tests by breaking the code on purpose. The rules themselves are in [AGENTS.md](../AGENTS.md): H1 to H4, H6 and H7, and its "Tests" section. What each corpus case means mathematically is in [numerics/06-the-corpus.md](numerics/06-the-corpus.md). [ocaml.md](ocaml.md) explains the OCaml the tests use and [architecture.md](architecture.md) the modules they call.
+vstiff is tested by three programs that print text and a file of expected text next to each: a test passes when the program prints exactly what the file says. This page explains the mechanics, the structure of the test code, what the rules about the expected files protect, how to add a case, how the property suite works, where reference values come from, how to run probes, and how to judge the strength of the tests by breaking the code on purpose. The rules themselves are in [AGENTS.md](../AGENTS.md): H1 to H4, H6 and H7, and its "Tests" section. What each corpus case means mathematically is in [numerics/06-the-corpus.md](numerics/06-the-corpus.md). [ocaml.md](ocaml.md) explains the OCaml the tests use and [architecture.md](architecture.md) the modules they call.
 
 ## What is in `test/`
 
 | File | What it is |
 |---|---|
-| [test/dune](../test/dune) | declares the two test programs, `corpus` and `soak`, linked against both libraries |
+| [test/dune](../test/dune) | declares the three test programs, `corpus`, `soak` and `props`, linked against both libraries, and the two environment variables `props` reads |
 | [test/corpus.ml](../test/corpus.ml), [test/corpus.expected](../test/corpus.expected) | the **corpus**: a table of cases, one printed line each, and the text it must print |
 | [test/soak.ml](../test/soak.ml), [test/soak.expected](../test/soak.expected) | the **soak** test: four cases, ten rounds each, and its expected text |
+| [test/props.ml](../test/props.ml), [test/props.expected](../test/props.expected) | the **properties**: the suite of generated-case checks, one printed line each, and the text it must print ("Properties", below) |
+| [test/gen.ml](../test/gen.ml), [test/prop.ml](../test/prop.ml), [test/dd.ml](../test/dd.ml) | the generators with their shrinking, the runner of a property, and double-double arithmetic for exact references; each has an `.mli` |
 | [test/problems.ml](../test/problems.ml) | the corpus problems: `Canary` (three independent decays at very different rates), `Logistic`, `VanDerPol`, `Robertson` |
 | [test/refs.ml](../test/refs.ml) | a reference value computed outside vstiff; the file is never edited, and a new reference goes into a new module (H4) |
-| [test/guard.ml](../test/guard.ml) | `Guard.run`, `Guard.budget` and `Guard.bounded`: the only test module that raises or catches |
+| [test/guard.ml](../test/guard.ml) | `Guard.run`, `Guard.budget`, `Guard.bounded` and `Guard.verdict`: the only test module that raises or catches |
 | [test/report.ml](../test/report.ml) | `Report.lines`: the only module that prints |
 
-`problems.ml`, `refs.ml`, `guard.ml` and `report.ml` are ordinary modules, not tests: dune compiles each once and links it into the programs that use it, so editing one can change an output. `corpus.ml` and `soak.ml` are main modules and cannot use each other (dune gives each an empty interface), which is why `soak.ml` carries its own copies of three small helpers (`max_error`, `bdf2_halving` and `on_budget`). Both start with `open Vstiff` and then `open Numerics`, because the cases call the solver and the kernel (`Newton`, `Jac`, `Linalg`, `Vec`) directly.
+`problems.ml`, `refs.ml`, `guard.ml`, `report.ml`, `gen.ml`, `prop.ml` and `dd.ml` are ordinary modules, not tests: dune compiles each once and links it into the programs that use it, so editing one can change an output. `corpus.ml`, `soak.ml` and `props.ml` are main modules and cannot use each other (dune gives each an empty interface), which is why `soak.ml` carries its own copies of three small helpers (`max_error`, `bdf2_halving` and `on_budget`). The three start with `open Vstiff` and then `open Numerics`, because the cases call the solver and the kernel (`Newton`, `Jac`, `Linalg`, `Vec`) directly.
 
 ## How an expect test works
 
-`test/dune` declares `(tests (names corpus soak) (libraries vstiff numerics))`. For each name dune builds `NAME.exe` from `NAME.ml`, runs it, captures standard output and compares it with `NAME.expected`. There are no assertions: a check fails by printing something other than the expected file says. The point of text: a failing check does not stop the run, so one run reports every line that changed, with the new value next to the old. The price is that the comparison is exact, so a line must print only what its check needs ("The rules behind the expected files", below).
+`test/dune` declares `(tests (names corpus soak props) (deps ...) (libraries vstiff numerics))`; the `deps` are the two variables of "Properties". For each name dune builds `NAME.exe` from `NAME.ml`, runs it, captures standard output and compares it with `NAME.expected`. There are no assertions: a check fails by printing something other than the expected file says. The point of text: a failing check does not stop the run, so one run reports every line that changed, with the new value next to the old. The price is that the comparison is exact, so a line must print only what its check needs ("The rules behind the expected files", below).
 
 - **Everything matches:** `dune runtest` is silent and exits with status 0. Dune remembers a pass, so a repeat with nothing changed does nothing; a failing comparison is reported again every time.
 - **Output differs:** a diff and exit status 1 (next section).
@@ -30,11 +32,11 @@ vstiff is tested by two programs that print text and a file of expected text nex
 | run everything and compare | `dune runtest` |
 | compare again although nothing changed | `dune runtest --force` (repeats the comparison, not the run) |
 | run the programs again from scratch | `dune clean`, then `dune runtest` |
-| see a program's raw output | `dune exec ./test/corpus.exe` (or `./test/soak.exe`) |
+| see a program's raw output | `dune exec ./test/corpus.exe` (or `./test/soak.exe`, `./test/props.exe`) |
 | compare by hand | `dune build`, then `./_build/default/test/corpus.exe \| diff test/corpus.expected -` (`<` lines are expected, `>` lines were printed) |
 | time a program | `time ./_build/default/test/soak.exe` |
 
-The recorded output of each program is `_build/default/test/corpus.exe.output` and `_build/default/test/soak.exe.output`.
+The recorded output of each program is `_build/default/test/corpus.exe.output`, `_build/default/test/soak.exe.output` and `_build/default/test/props.exe.output`.
 
 ### Reading a failure
 
@@ -194,7 +196,7 @@ It is **a tripwire, not extra coverage**, and what it watches is determinism wit
 
 A property is a module of type `Prop.Property`: a type `t` of cases, a `name`, a generator `gen`, `show` and `holds`. A generator draws a value together with a lazy tree of smaller values, so shrinking comes with it: `Gen.map`, `Gen.pair`, `Gen.array` and `Gen.bind` (`let*`) shrink what they build. `Prop.check` runs the cases in turn; at the first that fails, it walks greedily down that case's tree to a smaller case that still fails, trying at most 10,000 candidates. A case that raises fails too: `Guard.verdict` catches the exception and the failure names it. A statistical property (`Prop.Statistical`) adds a `threshold`, the share of the cases that must hold, for a claim that is likely rather than certain.
 
-**Adding a property.** Write a module in `test/props.ml`, next to those of the module it tests, and derive its bound in a short comment above it. Add `prop (module YourProperty) ~count:10000` to the list in `suite` (`share` for a statistical one): the name is part of the line and seeds the cases, so settle it first. `dune runtest` must then show your new line and no other; add it to `test/props.expected`. Measure the bound in a probe, as the ratio of the error to the bound over many cases: a bound much looser than the largest error it sees cannot catch a small regression. Then check that the property can fail, as for a corpus case: break what it protects in a scratch copy and see its line turn `FAILED`.
+**Adding a property.** Write a module in `test/props.ml`, next to those of the module it tests, and derive its bound in a short comment above it. Add `prop (module YourProperty) ~count:10000` to the list in `suite` (`share` for a statistical one): the name is part of the line and seeds the cases, so settle it first. `dune runtest` must then show your new line and no other; add it to `test/props.expected`. Measure the bound in a probe, as the ratio of the error to the bound over many cases: a bound much looser than the largest error it sees cannot catch a small regression. Then check that the property can fail, as for a corpus case: break what it protects in a scratch copy and see its line turn `FAILED`. The fix of a failure the suite finds lands with a corpus line that pins its shrunk case (H3), so the case stays checked whatever the seed.
 
 **Seeds and scale.** Each property draws from `Random.State.make [| run_seed; Hashtbl.hash name |]`, so adding a property changes no other property's cases. The run seed is 2026 and the counts are those in `suite`, unless `VSTIFF_PROP_SEED` sets another run seed or `VSTIFF_PROP_SCALE` multiplies every count by a positive integer, as a nightly run does. `props.ml` reads both once, in its main, and `test/dune` lists them as dependencies, so dune runs the properties again when they change. Another seed leaves `props.expected` valid; another scale changes the counts in the lines, so run the program directly and look for lines that are not ok (no output means every property held):
 

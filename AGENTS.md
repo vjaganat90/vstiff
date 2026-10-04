@@ -222,18 +222,20 @@ start".
 | `dune build` | Compile everything, and run the test programs to record their output |
 | `dune runtest` | Diff that output against the `.expected` files; silent when green |
 | `dune exec ./test/corpus.exe` | Run the corpus and print its output unfiltered |
+| `dune exec ./test/props.exe` | Run the property suite alone |
 | `dune promote` | Record a new case, a re-pin or a reformatted line (H2); never a failure |
 
 - **Warnings.** The dev profile turns warnings into errors. Fix the code, never the flags.
-- **Runs that may not finish.** `dune build` and `dune runtest` run both test programs with no
-  time limit, and stopping dune can leave a program running. After an edit to `Newton`, `Jac`,
+- **Runs that may not finish.** `dune build` and `dune runtest` run the three test programs with
+  no time limit, and stopping dune can leave a program running. After an edit to `Newton`, `Jac`,
   `Halving`, `Adaptive` or anything they call, build the programs alone, then run each under a
   limit:
 
   ```sh
-  dune build ./test/corpus.exe ./test/soak.exe
+  dune build ./test/corpus.exe ./test/soak.exe ./test/props.exe
   perl -e 'alarm 120; exec @ARGV' ./_build/default/test/corpus.exe
   perl -e 'alarm 120; exec @ARGV' ./_build/default/test/soak.exe
+  perl -e 'alarm 120; exec @ARGV' ./_build/default/test/props.exe
   ```
 - **Trying things out.** Experiment outside the repository, in the probe project or in a scratch
   copy of the working tree ([docs/exercises.md](docs/exercises.md), "Setup"). Nothing stray then
@@ -245,8 +247,8 @@ start".
 [docs/numerics/06-the-corpus.md](docs/numerics/06-the-corpus.md) explains what each corpus line
 proves.
 
-- **Expect tests.** `test/corpus.ml` and `test/soak.ml` print one line per case, and dune diffs
-  each output against its `.expected` file.
+- **Expect tests.** `test/corpus.ml`, `test/soak.ml` and `test/props.ml` print one line per case,
+  and dune diffs each output against its `.expected` file.
   - A line says what it checks, as in `max error 3.68e-07 < 1e-06: true`.
   - It prints only what its check needs, so the same files pass on every platform (H1).
 - **Adding a corpus case.**
@@ -264,6 +266,13 @@ proves.
      [docs/numerics/06-the-corpus.md](docs/numerics/06-the-corpus.md) and [README.md](README.md).
 - **Adding a soak case.** Write a module of type `Case` in `test/soak.ml`, and wrap an adaptive
   run with `on_budget`.
+- **Properties.** [docs/testing.md](docs/testing.md), "Properties", explains them.
+  - A property is a module of type `Prop.Property`, added to the suite in `test/props.ml`. Derive
+    its bound in a comment above it.
+  - Its line prints a verdict, never a generated value.
+  - `VSTIFF_PROP_SEED` sets the run seed and `VSTIFF_PROP_SCALE` multiplies every count, for
+    nightly runs.
+  - The fix of a failure lands with a corpus line that pins its shrunk case (H3).
 - **Adding a method or a controller.**
   1. Implement the `Ode` contract in `src/`, with an `.mli` that includes it.
      [src/bdf2.mli](src/bdf2.mli) and [src/halving.mli](src/halving.mli) are the models.
@@ -276,7 +285,7 @@ proves.
 |---|---|
 | `Check` (library, internal) | Raises `Invalid_argument`, on purpose, for arguments that make no sense |
 | `Instrument` (library) | A mutable counter of right-hand-side calls |
-| `Guard` (tests) | Raises `Exhausted` past its call budget. Turns `Exhausted` and `Invalid_argument` into text (`run`), or `Exhausted` into `None` (`bounded`) |
+| `Guard` (tests) | Raises `Exhausted` past its call budget. Turns `Exhausted` and `Invalid_argument` into text (`run`), `Exhausted` into `None` (`bounded`), or any exception a property case raises into a failing case (`verdict`) |
 | `Report` (tests) | Prints one line per case |
 | Everything else | Pure. A standard-library function that raises on misuse, such as an out-of-bounds index, signals a bug in the caller |
 

@@ -21,7 +21,7 @@ dune build
 dune runtest
 ```
 
-`dune build` compiles both libraries and the tests and also runs the two test programs to record their output, so it takes a little while. `dune runtest` compares that output with [test/corpus.expected](../test/corpus.expected) and [test/soak.expected](../test/soak.expected): silence means it matches, otherwise dune prints a diff ("Reading a failure" in [testing.md](testing.md) explains it).
+`dune build` compiles both libraries and the tests and also runs the three test programs to record their output, so it takes a little while. `dune runtest` compares that output with [test/corpus.expected](../test/corpus.expected) and [test/soak.expected](../test/soak.expected) and [test/props.expected](../test/props.expected): silence means it matches, otherwise dune prints a diff ("Reading a failure" in [testing.md](testing.md) explains it).
 
 **Which document needs which.**
 
@@ -71,7 +71,7 @@ dune runtest
 11. [src/clock.mli](../src/clock.mli) and [src/halving.mli](../src/halving.mli): the resolution of time, and the step-size controller.
 12. [src/stepper.mli](../src/stepper.mli), [src/adaptive.mli](../src/adaptive.mli): the two drivers.
 
-Then the tests: [test/problems.ml](../test/problems.ml), [test/refs.ml](../test/refs.ml), [test/guard.ml](../test/guard.ml), [test/report.ml](../test/report.ml), [test/corpus.ml](../test/corpus.ml) with [test/corpus.expected](../test/corpus.expected), and [test/soak.ml](../test/soak.ml) with [test/soak.expected](../test/soak.expected).
+Then the tests: [test/problems.ml](../test/problems.ml), [test/refs.ml](../test/refs.ml), [test/guard.ml](../test/guard.ml), [test/report.ml](../test/report.ml), [test/corpus.ml](../test/corpus.ml) with [test/corpus.expected](../test/corpus.expected), [test/soak.ml](../test/soak.ml) with [test/soak.expected](../test/soak.expected), and [test/props.ml](../test/props.ml) with [test/props.expected](../test/props.expected), which uses [test/gen.ml](../test/gen.ml), [test/prop.ml](../test/prop.ml) and [test/dd.ml](../test/dd.ml).
 
 **Where each module is explained.**
 

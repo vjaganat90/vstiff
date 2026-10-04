@@ -102,12 +102,13 @@ to five decimals with the reference in [test/refs.ml](test/refs.ml).
 ## How correctness is checked
 
 No solver is right on every input, so vstiff aims to state what it promises and to check each
-promise. The checks are *expect tests*: two programs, the corpus and the soak test, print one line
+promise. The checks are *expect tests*: three programs, the corpus, the soak test and the properties, print one line
 per case, and `dune runtest` compares what they print with the `.expected` file beside each. The
 corpus ([test/corpus.expected](test/corpus.expected)) has 47 lines, one per case (Newton's method,
 Jacobians, the order of BDF2, the stiff problems above, step control, the named failures); a line
 reads like `max error 3.68e-07 < 1e-06: true`. The soak test ([test/soak.ml](test/soak.ml)) runs
-four of the cases ten times; every round must pass and equal the first. A check is a bound, a typed
+four of the cases ten times; every round must pass and equal the first. The properties
+([test/props.ml](test/props.ml)) run claims such as "the backward error of `Linalg.solve` stays below n eps" on thousands of generated cases, and shrink a failing case. A check is a bound, a typed
 outcome, a value printed to the digits its bound needs, or a pin (a count or a digit string that
 fixes one rule of the algorithm), so that a compiler or a platform changing the last bits of a
 result fails no test (rule H1 in [AGENTS.md](AGENTS.md)).
@@ -133,7 +134,7 @@ clone.
 ```text
 src/numerics/   kernel library numerics: Fail, Vec, Linalg, Newton, Jac; knows nothing about ODEs
 src/            solver library vstiff: ode.mli holds the contracts, vstiff.mli the public API
-test/           corpus.ml and soak.ml with their .expected files, and their helper modules
+test/           corpus.ml, soak.ml and props.ml with their .expected files, and their helper modules
 docs/           README.md is the index; numerics/ explains the mathematics
 ```
 
