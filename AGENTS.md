@@ -262,6 +262,10 @@ proves.
   5. The diff must show your line and nothing else. Check the line by reasoning, then promote it.
   6. In the same commit, update every document that counts or cites corpus lines, such as
      [docs/numerics/06-the-corpus.md](docs/numerics/06-the-corpus.md) and [README.md](README.md).
+- **Mutation testing.** [tools/mutate/](tools/mutate/README.md) runs the tests against small edits
+  of a module and lists the edits no test notices. Run it on the modules a change to numerical code
+  touches. A surviving edit needs a test, unless it behaves exactly like the original; then say why
+  in the pull request.
 - **Adding a soak case.** Write a module of type `Case` in `test/soak.ml`, and wrap an adaptive
   run with `on_budget`.
 - **Adding a method or a controller.**
