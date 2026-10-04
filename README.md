@@ -136,6 +136,7 @@ src/            solver library vstiff: ode.mli holds the contracts, vstiff.mli t
 test/           corpus.ml and soak.ml with their .expected files, and their helper modules
 docs/           README.md is the index; numerics/ explains the mathematics
 verif/          Rocq and MathComp proofs about the numerics; a separate dune project
+sync/           the tripwire between the mirrored modules and their Rocq mirrors
 ```
 
 ## Where to go next

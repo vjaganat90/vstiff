@@ -91,6 +91,9 @@ vstiff is a stiff ODE solver in OCaml that puts correctness first.
     `Print Assumptions` reports it closed under the global context.
   - A Rocq definition that mirrors OCaml code names the function it mirrors
     ([verif/README.md](verif/README.md)).
+  - A code change to a mirrored module changes its mirror and the proofs in the same commit. The
+    tripwire enforces it: `dune runtest` diffs the comment-free form of each mirrored module
+    against its `sync/*.canon`. Promote a new canon only after re-checking the mirror.
 
 ### Structure
 
