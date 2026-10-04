@@ -1,24 +1,56 @@
 # vstiff
 
-GPL-3.0-only. Work happens on night/wip. Do not merge.
+A stiff ODE solver in OCaml that puts correctness first, using only the standard library.
 
-vstiff is a small OCaml library (OCaml 5.5, standard library only, built with dune) that integrates stiff ordinary differential equations with a variable-step BDF2 method. It is built as two dune libraries: the solver, `vstiff`, and the numerical kernel it rests on, `numerics`.
+An ordinary differential equation (ODE) `y' = f(t, y)` says how fast a state `y` (a vector of
+numbers, such as three concentrations) changes with time `t`; solving it means computing the state
+at a later time from the state at the start. It is *stiff* when part of the state changes on a very
+short time scale while the part you care about changes slowly, so an explicit method, which
+computes each new state directly from values it already has, needs tiny steps just to stay stable.
+vstiff uses implicit methods, which solve an equation for each new state and stay stable at long
+steps, and it estimates the derivative matrices that equation needs (Jacobians) from `f` alone, so
+`f` is the only code you write.
 
-An ordinary differential equation (ODE) `y' = f(t, y)` says how fast a state `y` (a vector of numbers, for example three concentrations) changes with time `t`; integrating it means computing the state at a later time from the state at the start. It is *stiff* when some parts of the state change on very short time scales while the part you care about changes slowly. Explicit methods then need tiny steps to stay stable, even when accuracy alone would allow long ones. vstiff uses implicit methods, backward Euler and BDF2 (backward differentiation formulas): every step solves an equation for the new state with Newton's method, and stays stable at long steps. The ideas are explained from scratch in [docs/numerics/01-odes-and-stiffness.md](docs/numerics/01-odes-and-stiffness.md) and the five chapters after it; [docs/glossary.md](docs/glossary.md) defines the terms.
+vstiff is early work: the API will change, it returns only the final state, and at equal accuracy it
+needs far more right-hand-side calls than SciPy's BDF (section 0 of
+[docs/plans/roadmap.md](docs/plans/roadmap.md) has prototype measurements). It suits small
+systems and learning how a stiff solver works; for speed or large systems use a mature solver such
+as SciPy (`solve_ivp`) or SUNDIALS. The status table below says what is missing and what is planned.
 
-## What it provides
+## What it does today
 
-- **Contracts** (OCaml module types) in [src/ode.mli](src/ode.mli): `Ode.Method` (one step), `Ode.Embedded` (a step plus an error estimate) and `Ode.Controller` (a step-size policy), with the types `Ode.problem`, `Ode.point` and `Ode.rhs`. Methods and controllers are modules that implement them. A vector is a plain `float array` in every public signature.
-- **Methods:** `Bdf1` (backward Euler, an `Ode.Method`) and `Bdf2` (variable-step BDF2, an `Ode.Embedded` whose first step is backward Euler).
-- **Controller:** `Halving` rejects a step whose scaled error estimate exceeds `tol` (or whose solve fails, or that is below the resolution of `t`), halves the step that failed, and doubles the step after three accepts in a row, up to `dt_max`.
-- **Drivers:** `Stepper.fixed` takes about `(t_end - t0) / dt` steps of one length `h` with any `Ode.Method`, step `k` ending at `t0 + k h` and the last one at `t_end` itself; `Adaptive.integrate` takes adaptive steps with any `Ode.Embedded` and `Ode.Controller`, lands exactly on `t_end`, snaps every other step to the floats, `h = (t + dt) - t`, and rejects one below the resolution of `t` without calling the method. Both hand the method the difference of a step's end times, so that the state advances by exactly what the clock does.
-- **Named failures:** numerical trouble comes back as `Error` of `Fail.t` (`Diverged`, `StepRejected n` or `Nan`, which both drivers also return for a start that is not finite), never as an exception. Only the internal `Check` raises on purpose: `Invalid_argument`, for arguments that make no sense (`dt`, `dt0`, `dt_max` or `tol` not positive, `t_end < t0`, a `dt` below the resolution of `t`, an `rhs t0 y0` of the wrong length).
-- **Public API:** `Vstiff` ([src/vstiff.mli](src/vstiff.mli)) lists `Ode`, `Fail`, `Clock` (how short a step `t` can still resolve), `Instrument` (counts right-hand-side calls), `Bdf1`, `Bdf2`, `Halving`, `Stepper` and `Adaptive`. `Stage` (the equation inside every implicit step) and `Check` are internal.
-- **Numerical kernel:** the library `numerics` (`src/numerics/`): `Newton`, `Jac` (forward-difference Jacobians), `Linalg`, `Vec` and `Fail`. It knows nothing about ODEs. `Vstiff.Fail` is its `Fail`, re-exported; a program that calls `Newton`, `Jac`, `Linalg` or `Vec` itself links `numerics` too.
+- **Method and drivers.** Variable-step BDF2 (a backward differentiation formula of order 2) with a
+  backward Euler first step; each step solves its equation by damped Newton's method with a
+  forward-difference Jacobian. `Adaptive.integrate` chooses step sizes with a controller
+  (`Halving`); `Stepper.fixed` takes equal steps.
+- **Long steps on stiff problems.** The test corpus has a stiff canary: three independent decays
+  with rates 1, 100 and 1e4, so explicit Euler is stable only for steps up to 2 / 1e4 = 2e-4. BDF2
+  with a fixed step of 1e-3 ends within 1e-6 of the exact solution at t = 1. On Robertson's chemical
+  kinetics (the first program below) at `~tol:1e-6`, `y1` at t = 1e4 is within 1e-5 of a reference
+  computed with three SciPy solvers that agree to 4e-12. Van der Pol with mu = 1000 runs to t = 2000
+  at `~tol:1e-4` and ends in a finite state; no reference checks its accuracy yet.
+- **Failures are values.** A solve that cannot finish returns `Error` of `Fail.t` (`Diverged`,
+  `StepRejected n` or `Nan`); arguments that make no sense raise `Invalid_argument`.
+
+## Quick start
+
+Install the toolchain first ([docs/README.md](docs/README.md), "Before you start"), then:
+
+```sh
+git clone https://github.com/vjaganat90/vstiff
+cd vstiff
+dune build     # compiles both libraries and the tests, and records what the test programs print
+dune runtest   # compares that output with the .expected files; silent when every check passes
+```
+
+`dune runtest` prints nothing when every check passes. If it prints a diff, a check failed:
+[docs/testing.md](docs/testing.md) ("Reading a failure") shows how to read it. Do not run
+`dune promote` to silence it; [AGENTS.md](AGENTS.md) says when promoting is right.
 
 ## A first program
 
-Robertson's chemical kinetics is a classic stiff problem: three species with rate constants from 0.04 to 3e7. This program integrates it from `t = 0` to `t = 1e4`:
+Robertson's chemical kinetics is a classic stiff problem: three species with rate constants from
+0.04 to 3e7. This program follows it from `t = 0` to `t = 1e4`:
 
 ```ocaml
 open Vstiff
@@ -38,73 +70,85 @@ let () =
   | Error e -> Printf.printf "failed: %s\n" (Fail.to_string e)
 ```
 
-`Adaptive.integrate` takes a method and a controller as modules, then `~tol` and the problem, and returns `Ok solution` or `Error failure`; the solution holds the final `t`, `y` and the controller's `stats`. Optional `?dt0`, `?dt_max` and `?max_rejects` have defaults ([src/adaptive.mli](src/adaptive.mli)); `~tol` must be positive. `rhs t y` must return a new array on every call and leave `y` alone, because the library keeps earlier results while it calls `rhs` again ([src/ode.mli](src/ode.mli)). Only the final state comes back, not the path. If the syntax is new, [docs/ocaml.md](docs/ocaml.md) explains each construct.
+`rhs t y` must return a new array and leave `y` alone ([src/ode.mli](src/ode.mli) says why).
+`Adaptive.integrate` takes a method and a controller as modules (modular explicits, see
+[docs/ocaml.md](docs/ocaml.md)), then `~tol` and the problem; a method or controller of your own
+plugs in the same way, by implementing a contract from `src/ode.mli`. It returns `Ok` with the final
+`t`, the state `y` and the step counts, or `Error`; `~tol` limits each step's error estimate, not
+the final error.
 
-To run it, create the probe project: a throwaway dune project outside the repository that links the library's `src/` and the corpus problems, with your program saved as `p/probe.ml`. From the repository root, with your opam switch active:
+To run it, make a throwaway dune project next to your clone that links the clone's `src/`, so that
+nothing is written inside the repository. From the repository root, with your opam switch active:
 
 ```sh
-REPO=$(pwd)
-mkdir -p ../vstiff-scratch/p && cd ../vstiff-scratch
+mkdir -p ../vstiff-scratch/p && ln -sfn "$PWD/src" ../vstiff-scratch/src && cd ../vstiff-scratch
 printf '(lang dune 3.0)\n' > dune-project
-ln -sfn "$REPO/src" src
-ln -sfn "$REPO/test/problems.ml" p/problems.ml   # the corpus problems, which the exercises use
 printf '(executable (name probe) (libraries vstiff))\n' > p/dune
-# save the program above as p/probe.ml, then build and run it
+```
+
+Save the program above as `p/probe.ml`, then build and run it (`--root .` makes dune ignore any
+enclosing dune project):
+
+```sh
 dune build --root . ./p/probe.exe && ./_build/default/p/probe.exe
 ```
 
-(`--root .` keeps dune from treating an enclosing directory as the project; a program that calls `Newton`, `Jac`, `Linalg` or `Vec` needs `(libraries vstiff numerics)` and `open Numerics`, see [docs/testing.md](docs/testing.md).) The first line is `t = 10000`, and `y1` prints as `0.10730`, the reference value in [test/refs.ml](test/refs.ml) to five decimals (the corpus pins the error below `1e-5`). The step counts on the last line are yours to measure: they are not in the expected files and depend on the tolerance. [docs/exercises.md](docs/exercises.md) builds on this setup.
+It prints `t = 10000`, `y1 = 0.10730`, `y2 = 0.00000` and `y3 = 0.89270`, then the numbers of
+accepted and rejected steps, which no test pins: change `~tol` and watch them move. `y1` agrees to
+five decimals with the reference in [test/refs.ml](test/refs.ml).
 
-## Quick start
+## How correctness is checked
 
-You need OCaml 5.5.0 and dune 3.x (`ocaml -version` and `dune --version` show what you have; [docs/ocaml.md](docs/ocaml.md) explains how to install them) on macOS, Linux or WSL (Windows Subsystem for Linux): the shell recipes in these documents use `ln`, `tar`, `git` and `perl`. `Stepper.fixed` and `Adaptive.integrate` take modules as arguments (modular explicits, explained in [docs/ocaml.md](docs/ocaml.md)), which older OCaml releases reject. Nothing else is needed. `<repository-url>` is the address of the project's repository, which you were given with your access.
+No solver is right on every input, so vstiff aims to state what it promises and to check each
+promise. The checks are *expect tests*: two programs, the corpus and the soak test, print one line
+per case, and `dune runtest` compares what they print with the `.expected` file beside each. The
+corpus ([test/corpus.expected](test/corpus.expected)) has 47 lines, one per case (Newton's method,
+Jacobians, the order of BDF2, the stiff problems above, step control, the named failures); a line
+reads like `max error 3.68e-07 < 1e-06: true`. The soak test ([test/soak.ml](test/soak.ml)) runs
+four of the cases ten times; every round must pass and equal the first. A check is a bound, a typed
+outcome, a value printed to the digits its bound needs, or a pin (a count or a digit string that
+fixes one rule of the algorithm), so that a compiler or a platform changing the last bits of a
+result fails no test (rule H1 in [AGENTS.md](AGENTS.md)).
 
-```sh
-git clone <repository-url> vstiff && cd vstiff
-git switch night/wip
-dune build
-dune runtest
-```
+## Status and known limits
 
-`dune build` compiles both libraries and the tests and also runs the two test programs to record their output, so it is not instant. `dune runtest` compares that output with [test/corpus.expected](test/corpus.expected) and [test/soak.expected](test/soak.expected): silence and exit status 0 mean it matches, otherwise dune prints a diff (`-` is the expected line, `+` what was printed) and exits with status 1. A failing test is information: never run `dune promote` to silence it ([CONTRIBUTING.md](CONTRIBUTING.md) says when promoting is legitimate).
+The Planned column is the plan in [docs/plans/plan.md](docs/plans/plan.md), not the code.
+
+| Area | Today | Planned |
+|---|---|---|
+| Method, step size | variable-step BDF2; halve a rejected step, double after three accepts | variable-order BDF (orders 1 to 5), Radau IIA (an implicit Runge-Kutta method); a controller that sets each step from the size of the error estimate instead of halving and doubling |
+| Tolerance | one `~tol` on each step's error estimate (absolute for small components, relative for large), not the final error | separate `rtol` and `atol`; an optional global error estimate |
+| Jacobian, linear algebra | forward differences rebuilt at every Newton iteration; dense Gaussian elimination | reuse; a Jacobian you supply; banded and sparse |
+| Problems, result | `y' = f(t, y)` forward in time; the final state only | index-1 differential-algebraic equations (DAEs); backward in time; dense output; events |
+| Assurance | the expect tests above | property tests, mutation testing, proofs in Rocq (a theorem prover), a scorecard against SciPy and SUNDIALS |
+
+Two gaps in the tests are known: van der Pol's accuracy is not checked against a reference, and no
+line pins the constant of Newton's line search. There is no opam package yet, so use vstiff from a
+clone.
 
 ## Layout
 
 ```text
-src/        the solver library, vstiff; every module has an .mli, ode.mli is interface only
-  vstiff                     the main module: the public API (vstiff.ml, vstiff.mli)
-  fail  clock                failures (the kernel's, re-exported), the resolution of time
-  stage                      the equation inside every implicit step (internal)
-  ode.mli                    the contracts
-  bdf1  bdf2  halving        methods and the step-size controller
-  stepper  adaptive          the two drivers
-  check  instrument          the only effects: raising (internal), counting
-  numerics/                  the kernel, a library of its own that knows nothing about ODEs
-    fail  vec  linalg        failures, vectors, the linear solve
-    newton  jac              damped Newton, forward-difference Jacobians
-test/       corpus.ml (the cases) with corpus.expected, soak.ml with soak.expected,
-            problems.ml, refs.ml (reference values), guard.ml, report.ml
-docs/       documentation; docs/README.md is the index
+src/numerics/   kernel library numerics: Fail, Vec, Linalg, Newton, Jac; knows nothing about ODEs
+src/            solver library vstiff: ode.mli holds the contracts, vstiff.mli the public API
+test/           corpus.ml and soak.ml with their .expected files, and their helper modules
+docs/           README.md is the index; numerics/ explains the mathematics; plans/ looks ahead
 ```
 
-## Where to start reading
+## Where to go next
 
-- **New to OCaml or numerical analysis?** Follow [docs/onboarding.md](docs/onboarding.md), ten working days from setup to a first contribution.
-- **Looking for something?** [docs/README.md](docs/README.md) indexes every document, with reading orders and a one-hour path.
-- **Want the code first?** Read the `.mli` files of `src/` and `src/numerics/` in the order of [docs/README.md](docs/README.md), then `test/corpus.ml` and `test/corpus.expected`.
-- **Ready to change something?** Read [CONTRIBUTING.md](CONTRIBUTING.md), then pick an item from [docs/exercises.md](docs/exercises.md).
-
-## Status and limitations
-
-vstiff is a work in progress. The known gaps double as starter contributions ([docs/exercises.md](docs/exercises.md)):
-
-- Newton rebuilds the finite-difference Jacobian at every iteration (`n + 1` right-hand-side calls each time); production codes reuse it across iterations and steps.
-- `Halving` is halve and double. Production controllers scale the step by a safety factor times `(tol / err)^(1/(p+1))`, where `p` is the order of the method whose error is estimated; that needs the error estimate when a step is accepted, which `Ode.Controller.accepted` does not receive, so it needs a contract change. The gap between backward Euler and BDF2 is a conservative estimate for BDF2.
-- One mixed absolute and relative weight `1 / (1 + |y_i|)`, no separate `rtol` and `atol`: tiny components such as Robertson's `y2` are controlled only loosely.
-- `Halving` counts every rejection together, whatever its reason; `Instrument` counts right-hand-side calls only, so Newton iterations per step are invisible from outside.
-- No dense output: the drivers return only the final state. `Linalg.solve` is dense Gaussian elimination, meant for small systems.
-- Tests: the backward Euler canary takes 500,000 steps and dominates the test time; van der Pol accuracy is not checked against a reference; the soak test is a tripwire, not extra coverage, and its adaptive cases run on a call budget, so a transposed Jacobian ends it in about 14 s with `soak robertson x10: passed 0/10` instead of stalling it; no line pins Newton's Armijo constant, nor the driver's rejection of a step that is below the resolution of `t` but would still move it.
+- **Learning?** [docs/README.md](docs/README.md) indexes the documents, which explain ODEs,
+  numerical methods and OCaml from the start, and says what to know before you begin. Start with
+  [ODEs and stiffness](docs/numerics/01-odes-and-stiffness.md) and the [glossary](docs/glossary.md),
+  or follow the ten-working-day plan in [docs/onboarding.md](docs/onboarding.md).
+- **Reading or changing the code?** Every library module has an `.mli` that documents it.
+  [docs/architecture.md](docs/architecture.md) maps the modules, and
+  [docs/testing.md](docs/testing.md) explains the tests. Contributions are welcome:
+  [AGENTS.md](AGENTS.md) has the rules every change follows, and starter contributions end
+  [docs/exercises.md](docs/exercises.md). To propose a change, fork the repository, branch from
+  `main` and open a pull request against it; questions and bug reports go in the
+  [issue tracker](https://github.com/vjaganat90/vstiff/issues).
 
 ## License
 
-GNU General Public License, version 3 only (SPDX license identifier `GPL-3.0-only`). The full text is in [LICENSE](LICENSE).
+GNU General Public License, version 3 only (`GPL-3.0-only`); the text is in [LICENSE](LICENSE).
