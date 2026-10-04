@@ -1,10 +1,8 @@
 # 4. BDF methods
 
-Chapter 4 of 6 in the numerical-methods track. Previous: [3. Jacobians and floating point](03-jacobians-and-floating-point.md). Next: [5. Error estimates and step-size control](05-step-control.md). Index: [docs/README.md](../README.md). Terms and symbols: [glossary](../glossary.md).
+Chapter 4 of 6 in the numerical-methods track. Previous: [3. Jacobians and floating point](03-jacobians-and-floating-point.md). Next: [5. Error estimates and step-size control](05-step-control.md). Index and reading order: [docs/README.md](../README.md). Terms and symbols: [glossary](../glossary.md).
 
 **Summary.** A backward differentiation formula (BDF) turns the ODE into one implicit equation per step by differentiating a polynomial through the newest points. BDF1 is backward Euler. BDF2 uses three points on a grid whose steps may differ in size; its three weights depend only on the step ratio `ω = h / h_prev`, and the code computes them in `Bdf2.coeffs`. This chapter derives the conditions that fix the weights (without writing the weights down: the code is their single source of truth), explains why the order is two, why the first step is a backward Euler step and what the method remembers between steps, how every step reduces to the same stage equation for Newton's method, and the stability facts that limit `ω`.
-
-Prerequisites: [chapter 1](01-odes-and-stiffness.md) (backward Euler, order, stability) and a first look at [chapter 2](02-newton.md) (Newton's method). The probes use the probe project (set up on day 1 from Setup in [exercises.md](../exercises.md), or "Running the snippets" in chapter 1).
 
 ## 1. The idea
 
@@ -62,7 +60,7 @@ y = s²:   0 = a1 + a0 r²                  (here y'(0) = 0, so beta drops out)
 
 Three linear equations in three unknowns; `ω` enters only through `r`. This page stops here, on purpose: `Bdf2.coeffs` is the single source of truth for the numbers, and a copy of its formulas or output in a document could go stale. Finish the algebra yourself (exercise 1) or ask the code.
 
-**Probe: check the code against the conditions.** The residual of the formula on exact data is the exact `y(t_{n+1})` minus the formula's right-hand side. It must vanish for `1`, `t` and `t²` (so for every quadratic) and need not for `t³`. `Bdf2.coeffs` supplies the weights:
+**Probe: check the code against the conditions.** The residual of the formula on exact data is the exact `y(t_{n+1})` minus the formula's right-hand side. It must vanish for `1`, `t` and `t²` (so for every quadratic) and need not for `t³`. `Bdf2.coeffs` supplies the weights. The probes of this chapter run in the probe project of [chapter 1](01-odes-and-stiffness.md) ("Running the snippets"):
 
 ```ocaml
 open Vstiff

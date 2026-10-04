@@ -4,9 +4,9 @@ Chapter 1 of 6 in the numerical-methods track. Next: [2. Newton's method](02-new
 
 **Summary.** An initial value problem is a rule for how a state changes plus a starting point. A computer follows its solution one small step at a time, and explicit Euler is the simplest way to do that. This chapter measures the error of such a method (local versus global error, the order), shows what a too-long step does (instability) and introduces stiff problems, where explicit methods are forced to take absurdly short steps. Backward Euler escapes that limit but charges a price: a nonlinear equation to solve at every step. That price is why the library needs Newton's method, a Jacobian and a linear solver.
 
-You need first-year calculus (derivatives, Taylor series). The little linear algebra that appears, eigenvalues and the Jacobian, is explained where it first shows up. OCaml is needed only for the optional snippets: "Running the snippets" near the end says how to run them, and [docs/ocaml.md](../ocaml.md) teaches the language.
-
 Notation (the glossary has the full list): `t` is time, `y` the state, `f` the right-hand side, so `y' = f(t, y)`; the code calls `f` by the name `rhs`. `h` is a step taken, `t_{n+1} = t_n + h`, and `y_n` is our approximation of the exact `y(t_n)`. `dt` is a step *requested* by the caller, as in `Stepper.fixed ~dt`.
+
+The OCaml programs of this chapter are optional; they are collected in "Running the snippets" near the end.
 
 ## 1. The problem: an initial value problem
 
@@ -93,7 +93,7 @@ By hand on `y' = -y` up to `T = 1`: Euler gives `y_n = (1 - h)^n`, and `e^(-1) =
 | 0.1 | 10 | 0.9^10 = 0.3486784 | 0.0192010 |
 | 0.05 | 20 | 0.95^20 = 0.3584859 | 0.0093935 |
 
-The ratio is 0.0192010 / 0.0093935 = 2.04, close to `2^1`. A ratio near 4 would indicate order 2; chapter 4 uses exactly this kind of ratio to test BDF2. Order describes the limit `h → 0` (at a given `h` the constant in front matters too), and "local errors add up" assumes errors are not amplified from step to step, which is a stability question, the next topic.
+The ratio is 0.0192010 / 0.0093935 = 2.04, close to `2^1`. A ratio near 4 would indicate order 2; chapter 4 uses exactly this kind of ratio to test BDF2. Order describes the limit `h → 0` (at a given `h` the constant in front matters too), and "local errors add up" needs errors not to be amplified from step to step, which is a stability question, the next topic.
 
 ## 4. Stability: when a step is too long
 
@@ -294,4 +294,4 @@ Read it as: solve the stage equation at the new time `t + h`, with `psi = y_n` (
 9. **What is the residual `G` for a backward Euler step, and what is its Jacobian?**
    `G(x) = x - y_n - h f(t_{n+1}, x)` with Jacobian `I - h J`. See `Stage.solve` in [`src/stage.ml`](../../src/stage.ml).
 
-Next: [2. Newton's method](02-newton.md), how the implicit equation of each step is solved. (On the onboarding plan you have read chapters 2 and 3 already: continue with [4. BDF methods](04-bdf.md).)
+Next: [2. Newton's method](02-newton.md), how the implicit equation of each step is solved.
