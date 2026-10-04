@@ -10,7 +10,7 @@ What you need before reading these pages or the code is stated here, once, for e
 
 **What to know.** You program in some language (Python or JavaScript, say), remember first-year calculus (derivatives and Taylor series) and a little linear algebra (matrices, and solving $A x = b$). The pages teach everything else from the start: ODEs and stiffness, floating point, Newton's method, finite differences, BDF methods, step-size control, OCaml and dune, and how the tests work. Eigenvalues and Jacobians are explained where they first appear.
 
-**What to install.** Only the snippets, the exercises and the code need a toolchain; the numerics chapters can be read without one. The toolchain is OCaml 5.5 and dune 3, usually installed through opam; the libraries and the tests use only the OCaml standard library, so no other OCaml package is needed. [ocaml.md](ocaml.md) shows how to install opam, OCaml and dune. The shell recipes in these pages also use `git`, `ln`, `tar` and `perl`, and run on macOS, Linux or WSL (Windows Subsystem for Linux).
+**What to install.** Only the snippets, the exercises and the code need a toolchain; the numerics chapters can be read without one. The toolchain is OCaml 5.5 and dune 3, usually installed through opam; the libraries and the tests use only the OCaml standard library, so no other OCaml package is needed. [ocaml.md](ocaml.md) shows how to install opam, OCaml and dune. The shell recipes in these pages also use `git`, `ln`, `tar` and `perl`, and run on macOS, Linux or WSL (Windows Subsystem for Linux). The scipy scripts of the bench, in [bench/compare/](../bench/compare/), are outside the build and need Python 3.13 with the packages that [bench/compare/requirements.txt](../bench/compare/requirements.txt) pins; only a reader who recomputes the bench's references or scipy rows installs them.
 
 **How to get the code.**
 
@@ -21,7 +21,7 @@ dune build
 dune runtest
 ```
 
-`dune build` compiles both libraries and the tests and also runs the two test programs to record their output, so it takes a little while. `dune runtest` compares that output with [test/corpus.expected](../test/corpus.expected) and [test/soak.expected](../test/soak.expected): silence means it matches, otherwise dune prints a diff ("Reading a failure" in [testing.md](testing.md) explains it).
+`dune build` compiles the libraries, the tests and the bench and also runs the test programs to record their output, so it takes a little while. `dune runtest` compares that output with [test/corpus.expected](../test/corpus.expected), [test/soak.expected](../test/soak.expected) and [bench/test/check.expected](../bench/test/check.expected): silence means it matches, otherwise dune prints a diff ("Reading a failure" in [testing.md](testing.md) explains it).
 
 **Which document needs which.**
 
@@ -35,7 +35,7 @@ dune runtest
 | Document | What it is |
 |---|---|
 | [README.md](../README.md) (repository root) | The front page: what vstiff is, a first program, quick start, status and known limits, layout. |
-| [AGENTS.md](../AGENTS.md) (repository root) | The rules for every change: the hard rules H1 to H17, the design defaults, the build and test commands, how to add a corpus case, a soak case, a method or a controller, the effects map, commits, pull requests and the checklist for a finished change. [CONTRIBUTING.md](../CONTRIBUTING.md) points to it. |
+| [AGENTS.md](../AGENTS.md) (repository root) | The rules for every change: the hard rules H1 to H17, the design defaults, the build, test and bench commands, how to add a corpus case, a soak case, a method or a controller, the effects map, commits, pull requests and the checklist for a finished change. [CONTRIBUTING.md](../CONTRIBUTING.md) points to it. |
 | [docs/README.md](README.md) | This page: what to know before you start, the index, reading orders and a one-hour path. |
 | [onboarding.md](onboarding.md) | A ten-working-day plan from zero to a first contribution, with readings, exercises, self-checks and a done-when line for each day. |
 | [glossary.md](glossary.md) | Terms and symbols, each with a short definition and where it is explained. |

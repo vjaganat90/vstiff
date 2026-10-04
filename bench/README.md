@@ -1,6 +1,6 @@
 # bench
 
-The work-precision bench of the [roadmap](../docs/plans/roadmap.md) (4.3 and milestone M1): vstiff's adaptive driver on Robertson, HIRES, van der Pol (mu = 1000, t = 2000) and the Brusselator on 40 cells (n = 80), at the tolerances of its Appendix B. Around it sit the references computed with scipy, the scipy rows of the same tables, and a check that the OCaml and the Python problems are the same. Everything runs from the repository root. `dune build @runtest` does not run the bench; it runs `bench/test`, which checks the pure modules in a fraction of a second.
+The work-precision bench of the [roadmap](../docs/plans/roadmap.md) (4.3 and milestone M1): vstiff's adaptive driver on Robertson, HIRES, van der Pol (mu = 1000, t = 2000) and the Brusselator on 40 cells (n = 80), at the tolerances of its Appendix B. Around it sit the references computed with scipy, the scipy rows of the same tables, and a check that the OCaml and the Python problems are the same. Everything runs from the repository root. `dune runtest` does not run the bench; it runs `bench/test`, which checks the pure modules in a fraction of a second.
 
 ## Run vstiff
 
@@ -23,7 +23,7 @@ Each row is one problem and tolerance (`rtol = atol = tol`), run with `Adaptive.
 
 `bench/golden.ml` pins the figures of one run, and every later run is judged against it as the roadmap's gate has it: the scd must not be lower, and the cost, the right-hand-side calls, not more than 10 % higher. Both are bands, so they hold from one platform to the next: the scd may lose 0.05 digits (the pin is rounded), and a count may move with the platform's rounding (arm64 fuses a multiplication into the addition after it, x86_64 does not: with the fusion compiled away in a scratch copy, two of the ten rows moved, by 3 and 10 calls). The exit status is 1 unless every verdict is `ok`; a row the table does not have is `UNPINNED`, and a run that fails is a regression. Steps, rejections and the error are printed for the reader and not compared.
 
-A deliberate change of behaviour re-pins the table in the same commit, with the old and the new figures in its message (CONTRIBUTING, "Expect files are the contract"):
+A deliberate change of behaviour re-pins the table in the same commit, with the old and the new figures in its message (H2 in [AGENTS.md](../AGENTS.md)):
 
 ```sh
 dune build ./bench/bench.exe
@@ -62,7 +62,7 @@ The script requires 1e-15, relative to the magnitude of the terms of each compon
 
 ## Python
 
-Python 3.13 with the two packages of `bench/compare/requirements.txt`, which pins exact versions. Dune ignores `bench/compare/`.
+The scripts in `bench/compare/` are outside the build; what they need is listed in [docs/README.md](../docs/README.md), "Before you start". Install the pinned packages into a virtual environment, then run any script with it:
 
 ```sh
 python3 -m venv bench/compare/.venv

@@ -62,6 +62,8 @@ vstiff is a stiff ODE solver in OCaml that puts correctness first.
   - The value goes into a new module next to the code that uses it (for the corpus,
     `test/refs_<problem>.ml`). Record the solvers, their versions, the tolerances and the
     agreement next to the value.
+  - The bench's references are generated: [bench/compare/references.py](bench/compare/references.py)
+    writes [bench/reference.ml](bench/reference.ml), and that file is never edited by hand.
 - **H5. Numerical failures are values; invalid arguments raise; every run ends.**
   - A solve or a step that cannot succeed returns `Error` of `Fail.t`. Nothing returns `Ok` with a
     non-finite value.
@@ -71,13 +73,13 @@ vstiff is a stiff ODE solver in OCaml that puts correctness first.
     of `Adaptive.integrate` rests on it ([docs/numerics/05-step-control.md](docs/numerics/05-step-control.md)).
 - **H6. Effects live in named modules, and nothing shared is written.**
   - In the library, only `Check` raises on purpose and only `Instrument` has mutable state. In the
-    tests, only `Guard` raises or catches and only `Report` prints. The effects map below has the
-    details.
+    tests, only `Guard` raises or catches and only `Report` prints. In the bench, only `Console`
+    prints, reads the clock and exits. The effects map below has the details.
   - A new effect goes into one of these modules, or into a new module that exists for it.
   - No function writes an argument, or an array it returned earlier. A function may write only the
     arrays it allocated during the same call, before it returns them.
 - **H7. The corpus exercises the solver the way users will.**
-  - No integrator is given an analytic Jacobian: the problems in `test/problems.ml` supply none,
+  - No integrator is given an analytic Jacobian: the problems in `test/problems/problems.ml` supply none,
     the solver works from function values alone, and the corpus keeps exercising `Jac`.
   - The `newton` cases hand `Newton.solve` their own Jacobians, and the `jacobian` cases compare
     `Jac.forward` with analytic ones. Neither runs an integrator.
@@ -94,13 +96,16 @@ vstiff is a stiff ODE solver in OCaml that puts correctness first.
   - A tool, meaning an executable that reads the sources (a mutation tester, a tripwire), may also
     use `compiler-libs`, which ships with the compiler.
   - A program outside the dune build may run another solver as an oracle, to compute a reference
-    or a comparison. What it produces enters the repository as data, under H4.
+    or a comparison. Oracle programs live in `bench/compare/`. What one produces enters the
+    repository as data, under H4.
   - Any other dependency needs a reason stated in its pull request, and a maintainer's agreement.
 - **H10. Two libraries, one public API.**
   - The kernel in `src/numerics/` depends on the standard library alone, and calls no solver
     module.
   - The solver's public API is exactly what [src/vstiff.ml](src/vstiff.ml) and
     [src/vstiff.mli](src/vstiff.mli) list.
+  - `problems` (`test/problems/`) and `benchlib` (`bench/`) are support libraries that depend on
+    `vstiff`; nothing in `src/` names them.
   - Public signatures write vectors as `float array`, never `Vec.t`. The one kernel type they
     name is `Fail.t`, which the solver re-exports as `Vstiff.Fail`.
 - **H17. Code is written for vstiff.**
@@ -222,11 +227,12 @@ start".
 | `dune build` | Compile everything, and run the test programs to record their output |
 | `dune runtest` | Diff that output against the `.expected` files; silent when green |
 | `dune exec ./test/corpus.exe` | Run the corpus and print its output unfiltered |
+| `dune exec ./bench/bench.exe` | Run the bench by hand and print a verdict per row against its golden table |
 | `dune promote` | Record a new case, a re-pin or a reformatted line (H2); never a failure |
 
 - **Warnings.** The dev profile turns warnings into errors. Fix the code, never the flags.
-- **Runs that may not finish.** `dune build` and `dune runtest` run both test programs with no
-  time limit, and stopping dune can leave a program running. After an edit to `Newton`, `Jac`,
+- **Runs that may not finish.** `dune build` and `dune runtest` run the corpus and the soak test
+  with no time limit, and stopping dune can leave a program running. After an edit to `Newton`, `Jac`,
   `Halving`, `Adaptive` or anything they call, build the programs alone, then run each under a
   limit:
 
@@ -235,25 +241,40 @@ start".
   perl -e 'alarm 120; exec @ARGV' ./_build/default/test/corpus.exe
   perl -e 'alarm 120; exec @ARGV' ./_build/default/test/soak.exe
   ```
+- **The bench.** `dune runtest` runs only `bench/test/check.ml`, which checks the bench's pure
+  modules. The bench is run by hand, from the repository root:
+
+  ```sh
+  dune build ./bench/bench.exe
+  ./_build/default/bench/bench.exe
+  ```
+
+  - It exits with status 1 unless every row is `ok` against `bench/golden.ml`: the scd may not fall
+    below the pin, and the right-hand-side calls may not exceed it by more than 10 %.
+  - A deliberate change of behaviour re-pins the table in its own commit, with the old and the new
+    figures in the message (H2): `./_build/default/bench/bench.exe --pin > bench/golden.ml`, then
+    rebuild.
+  - [bench/README.md](bench/README.md) has the flags, the references and the scipy rows.
 - **Trying things out.** Experiment outside the repository, in the probe project or in a scratch
   copy of the working tree ([docs/exercises.md](docs/exercises.md), "Setup"). Nothing stray then
   reaches a branch.
 
 ## Tests
 
-[docs/testing.md](docs/testing.md) explains the test programs.
+[docs/testing.md](docs/testing.md) explains the test programs; the bench's third one, `check`, is
+explained in [bench/README.md](bench/README.md).
 [docs/numerics/06-the-corpus.md](docs/numerics/06-the-corpus.md) explains what each corpus line
 proves.
 
-- **Expect tests.** `test/corpus.ml` and `test/soak.ml` print one line per case, and dune diffs
-  each output against its `.expected` file.
+- **Expect tests.** `test/corpus.ml`, `test/soak.ml` and `bench/test/check.ml` print one line per
+  case, and dune diffs each output against its `.expected` file.
   - A line says what it checks, as in `max error 3.68e-07 < 1e-06: true`.
   - It prints only what its check needs, so the same files pass on every platform (H1).
 - **Adding a corpus case.**
   1. Write the comment above the new group first. In one sentence, it says which defect the case
      catches that no existing line catches. If you cannot write that sentence, do not add the
      case.
-  2. Put a new problem in `test/problems.ml`, with `exact` when the solution is known. H7 says
+  2. Put a new problem in `test/problems/problems.ml`, with `exact` when the solution is known. H7 says
      what a problem may carry. A new reference goes in a new module (H4).
   3. Append the case as a new group at the end of the list in `test/corpus.ml`: the documents
      cite line numbers.
@@ -278,6 +299,7 @@ proves.
 | `Instrument` (library) | A mutable counter of right-hand-side calls |
 | `Guard` (tests) | Raises `Exhausted` past its call budget. Turns `Exhausted` and `Invalid_argument` into text (`run`), or `Exhausted` into `None` (`bounded`) |
 | `Report` (tests) | Prints one line per case |
+| `Console` (bench) | Reads the command line, prints, reads the CPU clock and exits |
 | Everything else | Pure. A standard-library function that raises on misuse, such as an out-of-bounds index, signals a bug in the caller |
 
 ## Commits
@@ -303,7 +325,8 @@ The format is `type(scope): imperative summary`.
 | `chore` | Anything else: tooling, housekeeping |
 
 - **Scope.** The scope names a module or an area: `newton`, `adaptive`, `corpus`, `soak`,
-  `docs`, `agents`. For example, `fix(halving): stop when a halved step falls below the floor`.
+  `bench`, `docs`, `agents`. For example,
+  `fix(halving): stop when a halved step falls below the floor`.
 - **One change per commit.** Do not mix a refactor with a behaviour change.
 - **Branch names** are `<type>/<short-slug>`, for example `fix/halving-floor`.
 - **Rewording a pushed commit.**
