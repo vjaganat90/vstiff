@@ -328,7 +328,7 @@ let () =
 | Test effects | `Guard.budget`, `Guard.run` and `Guard.bounded` in [`test/guard.ml`](../../test/guard.ml); `Report.lines` in [`test/report.ml`](../../test/report.ml) |
 | The expected output | [`test/corpus.expected`](../../test/corpus.expected) (47 lines), [`test/soak.expected`](../../test/soak.expected) (4 lines) |
 | The soak | [`test/soak.ml`](../../test/soak.ml): the module type `Case`, `repeat`, `soak`, `on_budget` and four case modules |
-| How both run | [`test/dune`](../../test/dune): `(tests (names corpus soak) (libraries vstiff numerics))`; `corpus.ml` and `soak.ml` start with `open Vstiff` and `open Numerics` |
+| How both run | [`test/dune`](../../test/dune) lists them with the property suite, `(names corpus soak props)`, linked against `vstiff` and `numerics`; `corpus.ml` and `soak.ml` start with `open Vstiff` and `open Numerics` |
 
 ## Check yourself
 

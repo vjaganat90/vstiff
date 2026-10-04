@@ -2,12 +2,12 @@
 
 vstiff solves ordinary differential equations $y' = f(t, y)$: the state $y$ (a vector of numbers) changes with time $t$ at the rate $f(t, y)$, and the library computes $y$ at later times from $y$ at the start. It aims at *stiff* problems, where fast and slow changes are mixed ([numerics/01-odes-and-stiffness.md](numerics/01-odes-and-stiffness.md)). This page is the map of the code: the layers, the two libraries and the public API, the contracts the modules meet, what depends on what, what happens during one step, where effects live, which properties the code relies on, and where to edit. The mathematics is in the chapters under `numerics/`, the OCaml in [ocaml.md](ocaml.md), the tests in [testing.md](testing.md), terms and symbols in [glossary.md](glossary.md).
 
-In one paragraph: an **implicit** step cannot compute the new state directly, because the new state appears on both sides of the *stage equation* $x = \psi + \gamma\thinspace f(t_{n+1}, x)$. `Stage` solves it with damped Newton's method ([numerics/02-newton.md](numerics/02-newton.md)), which needs a Jacobian (the matrix of partial derivatives of $f$). `Jac` builds it from differences of $f$, so the caller supplies only $f$, and the linear systems inside Newton are solved by Gaussian elimination. Newton, `Jac`, `Linalg` and `Vec` form a numerical kernel, a library of its own that knows nothing about ODEs. A *method* (`Bdf1`, `Bdf2`: backward differentiation formulas, [numerics/04-bdf.md](numerics/04-bdf.md)) turns a point into the next one, a *controller* (`Halving`) chooses step sizes, and two *drivers* (`Stepper.fixed`, `Adaptive.integrate`) repeat steps until the end time. Everything is pure except four small modules (see "Effects").
+In one paragraph: an **implicit** step cannot compute the new state directly, because the new state appears on both sides of the *stage equation* $x = \psi + \gamma\thinspace f(t_{n+1}, x)$. `Stage` solves it with damped Newton's method ([numerics/02-newton.md](numerics/02-newton.md)), which needs a Jacobian (the matrix of partial derivatives of $f$). `Jac` builds it from differences of $f$, so the caller supplies only $f$, and the linear systems inside Newton are solved by Gaussian elimination. Newton, `Jac`, `Linalg` and `Vec` form a numerical kernel, a library of its own that knows nothing about ODEs. A *method* (`Bdf1`, `Bdf2`: backward differentiation formulas, [numerics/04-bdf.md](numerics/04-bdf.md)) turns a point into the next one, a *controller* (`Halving`) chooses step sizes, and two *drivers* (`Stepper.fixed`, `Adaptive.integrate`) repeat steps until the end time. Everything is pure except a few small modules (see "Effects").
 
 ## Layers
 
 ```text
- tests       Corpus  Soak   shared: Problems  Refs   effects: Guard  Report
+ tests       Corpus  Soak  Props   shared: Problems  Refs  Gen  Prop  Dd   effects: Guard  Report
  ------------------------------------------------------------------------------
  vstiff      the solver library; Vstiff (src/vstiff.ml) lists the public modules
    drivers     Stepper.fixed (any Method)       Adaptive.integrate (Embedded + Controller)
@@ -192,14 +192,16 @@ The same Newton failure means different things at different levels. In a fixed-s
 
 ## Effects
 
-OCaml does not record effects in types (a function's type does not say whether it raises, mutates or prints), so the discipline is by module ([AGENTS.md](../AGENTS.md), H6): a function outside these four modules neither raises on purpose, nor mutates, nor prints, and a new effect goes into one of them or into a new module that exists for it.
+OCaml does not record effects in types (a function's type does not say whether it raises, mutates or prints), so the discipline is by module ([AGENTS.md](../AGENTS.md), H6): a function outside these modules neither raises on purpose, nor mutates, nor prints, and a new effect goes into one of them or into a new module that exists for it.
 
 | Module | Effect | Why there |
 |---|---|---|
 | `Check` (library, internal) | raises `Invalid_argument` | a bad argument is a programming error, not a numerical failure; every deliberate raise is in one place, called at the start of a driver, before it takes a step |
 | `Instrument` (library) | one `ref`: a call counter | counting needs state; wrapping the `rhs` a method receives keeps the methods pure. Nothing in the library calls it: `Guard.budget`, the `too_small` and `adaptive_canary` cases of the corpus and probes do |
-| `Guard` (tests) | raises `Exhausted`, catches it and `Invalid_argument` | turns a runaway loop or a bad argument into a printed line (`run`), or an exhausted budget into `None` (`bounded`), so that the soak test can count the round as not passed |
+| `Guard` (tests) | raises `Exhausted`, catches it and `Invalid_argument`, and catches whatever a property case raises | turns a runaway loop or a bad argument into a printed line (`run`), an exhausted budget into `None` (`bounded`), so that the soak test can count the round as not passed, and a raising property case into a failing one (`verdict`) |
 | `Report` (tests) | prints | the only module that writes to standard output |
+| `Gen` (tests) | advances the `Random.State.t` it is given | drawing a case moves the generator; `Prop.check` makes a fresh state for each property, so the cases do not depend on the order the properties run in |
+| `props.ml` main (tests) | reads `VSTIFF_PROP_SEED` and `VSTIFF_PROP_SCALE` | once, before the suite runs: a nightly run sets another seed or more cases |
 
 Everything else is pure: methods, controllers, the whole kernel (`Newton`, `Jac`, `Linalg`, `Vec`, `Fail`: `Fail.to_string` formats a string and prints nothing), and the drivers, which raise on purpose only by calling `Check`. Why:
 

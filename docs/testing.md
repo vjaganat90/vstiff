@@ -80,11 +80,11 @@ diff --git a/_build/default/test/corpus.expected b/_build/default/test/corpus.ex
 
 The header names the two files compared: the expected file and what the program printed. Lines starting with `-` are in the expected file but were not printed, lines starting with `+` were printed but are not in the file, and unmarked lines are context. Ask first which lines changed and what they have in common: here the three lines about Jacobians, the stiff step that needs a good one and, far below, the adaptive canary. Two printed errors moved although their criteria still hold ($3.68 \times 10^{-7}$ to $3.83 \times 10^{-7}$, and $4.66 \times 10^{-7}$ to $4.86 \times 10^{-8}$ on the adaptive canary): a root of the stage equation does not depend on the Jacobian, only the speed of Newton's iteration does, so the iteration stopped at a slightly different point, and the adaptive canary shows the speed itself in its count of right-hand-side calls (106445 to 634048). A number printed with three digits is a tight check, a boolean a loose one. The corpus runs from the lowest layer (Newton) to the highest (the adaptive integrator), so the first changed line usually points at the real problem.
 
-A crash looks different: dune names the program in `test/dune`, where the caret marks `corpus` in the `names` field (the line number is wherever the field sits in `test/dune`), and prints the exception, here an array index out of bounds. A mistake deep in the library often crashes both programs, and dune then prints one such block for each:
+A crash looks different: dune names the program in `test/dune`, where the caret marks `corpus` in the `names` field (the line number is wherever the field sits in `test/dune`), and prints the exception, here an array index out of bounds. A mistake deep in the library often crashes several programs, and dune then prints one such block for each:
 
 ```text
 File "test/dune", line 5, characters 8-14:
-5 |  (names corpus soak)
+5 |  (names corpus soak props)
             ^^^^^^
 Fatal error: exception Invalid_argument("index out of bounds")
 ```

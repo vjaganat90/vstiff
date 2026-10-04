@@ -71,7 +71,8 @@ vstiff is a stiff ODE solver in OCaml that puts correctness first.
     of `Adaptive.integrate` rests on it ([docs/numerics/05-step-control.md](docs/numerics/05-step-control.md)).
 - **H6. Effects live in named modules, and nothing shared is written.**
   - In the library, only `Check` raises on purpose and only `Instrument` has mutable state. In the
-    tests, only `Guard` raises or catches and only `Report` prints. The effects map below has the
+    tests, only `Guard` raises or catches, only `Report` prints, and only `Gen` advances a random
+    state. The effects map below has the
     details.
   - A new effect goes into one of these modules, or into a new module that exists for it.
   - No function writes an argument, or an array it returned earlier. A function may write only the
@@ -287,6 +288,8 @@ proves.
 | `Instrument` (library) | A mutable counter of right-hand-side calls |
 | `Guard` (tests) | Raises `Exhausted` past its call budget. Turns `Exhausted` and `Invalid_argument` into text (`run`), `Exhausted` into `None` (`bounded`), or any exception a property case raises into a failing case (`verdict`) |
 | `Report` (tests) | Prints one line per case |
+| `Gen` (tests) | Advances the `Random.State.t` it is given; `Prop.check` makes a fresh one for each property |
+| `props.ml` main (tests) | Reads `VSTIFF_PROP_SEED` and `VSTIFF_PROP_SCALE` once, before the suite runs |
 | Everything else | Pure. A standard-library function that raises on misuse, such as an out-of-bounds index, signals a bug in the caller |
 
 ## Commits

@@ -44,11 +44,12 @@ src/dune           (library
                     (private_modules stage check)
                     (modules_without_implementation ode))
 test/dune          (tests
-                    (names corpus soak)
+                    (names corpus soak props)
+                    (deps (env_var VSTIFF_PROP_SEED) (env_var VSTIFF_PROP_SCALE))
                     (libraries vstiff numerics))
 ```
 
-`(lang dune 3.0)` has to be the first line of `dune-project`: dune rejects the file if a comment comes before it. Every `.ml` and `.mli` in `src/` becomes a module of one library called `vstiff`; there is no list of files, and dune orders the compilation from the module names each file mentions. The subdirectory `src/numerics/` has a `dune` file of its own, so its files form a second library, `numerics`, and are not modules of `vstiff`; `(libraries numerics)` lets the solver name them. `test/dune` declares two test programs, `corpus` and `soak` (their main modules are `test/corpus.ml` and `test/soak.ml`), linked against both libraries because they name modules of both; the other `.ml` files in `test/` are ordinary modules both can use. Each program has an `.expected` file next to it. "Libraries, main modules, aliases and re-exports" below explains `(libraries ...)`, `private_modules` and how the two libraries meet.
+`(lang dune 3.0)` has to be the first line of `dune-project`: dune rejects the file if a comment comes before it. Every `.ml` and `.mli` in `src/` becomes a module of one library called `vstiff`; there is no list of files, and dune orders the compilation from the module names each file mentions. The subdirectory `src/numerics/` has a `dune` file of its own, so its files form a second library, `numerics`, and are not modules of `vstiff`; `(libraries numerics)` lets the solver name them. `test/dune` declares three test programs, `corpus`, `soak` and `props` (their main modules are `test/corpus.ml`, `test/soak.ml` and `test/props.ml`), linked against both libraries because they name modules of both, and reruns `props` when one of its two environment variables changes; the other `.ml` files in `test/` are ordinary modules all three can use. Each program has an `.expected` file next to it. "Libraries, main modules, aliases and re-exports" below explains `(libraries ...)`, `private_modules` and how the two libraries meet.
 
 ### Everyday commands
 
