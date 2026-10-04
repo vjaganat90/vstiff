@@ -1,16 +1,42 @@
 # vstiff documentation
 
-These pages explain vstiff to someone who has never seen the code, has never used OCaml and has not studied numerical analysis. They assume you program in another language (Python or JavaScript, say), remember first-year calculus (derivatives, Taylor series) and a little linear algebra (matrices, solving `A x = b`). Everything else is explained from the start: ODEs and stiffness, floating point, Newton's method, finite differences, BDF methods, step-size control, OCaml and dune, and how the tests work.
+These pages explain vstiff to someone who has never seen the code, has never used OCaml and has not studied numerical analysis.
 
 Throughout, `t` is time, `y` the state vector, `f` the right-hand side (called `rhs` in code), `h` a step taken or attempted and `dt` a step size someone asked for. The [glossary](glossary.md) lists every term and symbol.
+
+## Before you start
+
+What you need before reading these pages or the code is stated here, once, for every document.
+
+**What to know.** You program in some language (Python or JavaScript, say), remember first-year calculus (derivatives and Taylor series) and a little linear algebra (matrices, and solving `A x = b`). The pages teach everything else from the start: ODEs and stiffness, floating point, Newton's method, finite differences, BDF methods, step-size control, OCaml and dune, and how the tests work. Eigenvalues and Jacobians are explained where they first appear.
+
+**What to install.** Only the snippets, the exercises and the code need a toolchain; the numerics chapters can be read without one. The toolchain is OCaml 5.5 and dune 3, usually installed through opam; the libraries and the tests use only the OCaml standard library, so no other OCaml package is needed. [ocaml.md](ocaml.md) shows how to install opam, OCaml and dune. The shell recipes in these pages also use `git`, `ln`, `tar` and `perl`, and run on macOS, Linux or WSL (Windows Subsystem for Linux).
+
+**How to get the code.**
+
+```sh
+git clone https://github.com/vjaganat90/vstiff
+cd vstiff
+dune build
+dune runtest
+```
+
+`dune build` compiles both libraries and the tests and also runs the two test programs to record their output, so it takes a little while. `dune runtest` compares that output with [test/corpus.expected](../test/corpus.expected) and [test/soak.expected](../test/soak.expected): silence means it matches, otherwise dune prints a diff ("Reading a failure" in [testing.md](testing.md) explains it).
+
+**Which document needs which.**
+
+- **The numerics chapters** build on each other, so read them in order, 1 to 6. Chapter 3 needs chapter 2, chapter 4 needs chapter 1 and a first look at chapter 2, chapter 5 needs chapters 1 and 4, and chapter 6 needs chapters 1 to 5 and [testing.md](testing.md), which says how the tests run. Chapters 1 and 2 do not need each other, except that the last section of chapter 2, on Newton inside the integrator, reads best after chapter 1. The programs in all six chapters are optional; the chapters can be read without running OCaml.
+- **The snippets and the exercises** run in one probe project outside the repository, which you set up once, as "Running the snippets" in [chapter 1](numerics/01-odes-and-stiffness.md) or "Setup" in [exercises.md](exercises.md) shows. The two recipes differ only in `p/dune`: chapter 1 lists the `numerics` library too, which a probe that calls the kernel needs.
+- **The code** is written in OCaml, so [ocaml.md](ocaml.md) comes before it: its first part gets the toolchain running, and its tour of the language is read alongside the first modules.
+- **A first change**, to the code or to a document, comes after [AGENTS.md](../AGENTS.md), which holds the rules for every change.
 
 ## Index
 
 | Document | What it is |
 |---|---|
 | [README.md](../README.md) (repository root) | The front page: what vstiff is, a first program, quick start, layout, known limitations. |
-| [CONTRIBUTING.md](../CONTRIBUTING.md) (repository root) | How to contribute: setup, the build and test loop, the project's rules with their reasons, code and comment style, adding a test, a method or a controller, commits, a review checklist. |
-| [docs/README.md](README.md) | This page: the index, reading orders and a one-hour path. |
+| [AGENTS.md](../AGENTS.md) (repository root) | The rules for every change: the hard rules H1 to H17, the design defaults, the build and test commands, how to add a corpus case, a soak case, a method or a controller, the effects map, commits, pull requests and the checklist for a finished change. [CONTRIBUTING.md](../CONTRIBUTING.md) points to it. |
+| [docs/README.md](README.md) | This page: what to know before you start, the index, reading orders and a one-hour path. |
 | [onboarding.md](onboarding.md) | A ten-working-day plan from zero to a first contribution, with readings, exercises, self-checks and a done-when line for each day. |
 | [glossary.md](glossary.md) | Terms and symbols, each with a short definition and where it is explained. |
 | [exercises.md](exercises.md) | Graded exercises (warm-ups, reading, probes, breaking the code in a scratch copy), a capstone against the contracts, and starter contributions. |
@@ -28,7 +54,7 @@ Throughout, `t` is time, `y` the state vector, `f` the right-hand side (called `
 
 **Following the plan.** [onboarding.md](onboarding.md) interleaves everything below over ten working days. It is the recommended route if you will contribute.
 
-**The numerics track.** Read the six chapters in `numerics/` in order, 1 to 6. Each begins by saying what it assumes from the earlier ones and ends with questions to check yourself. You need calculus, plus the little linear algebra that is explained where it appears. The OCaml snippets are optional but worth running. ([onboarding.md](onboarding.md) visits the chapters in the order 2, 3, 1, 4, 5, 6, which their prerequisites allow, to match the code it asks you to read each day.)
+**The numerics track.** Read the six chapters in `numerics/` in order, 1 to 6; "Before you start" says which needs which. Each ends with questions to check yourself. The OCaml snippets are optional but worth running. ([onboarding.md](onboarding.md) visits the chapters in the order 2, 3, 1, 4, 5, 6, which those dependencies allow, to match the code it asks you to read each day.)
 
 **The code track.** Learn OCaml from [ocaml.md](ocaml.md) while reading the code from the smallest pieces towards the drivers: first the kernel, the library `numerics`, then the solver, the library `vstiff`. For each module read the `.mli` first, which documents the API, then the `.ml`, which has implementation notes:
 
@@ -64,7 +90,7 @@ Then the tests: [test/problems.ml](../test/problems.ml), [test/refs.ml](../test/
 
 ## If you only have an hour
 
-If the toolchain is installed (the [README](../README.md) quick start lists what you need), start `dune build` in a terminal first: it also runs the test programs, so it takes a little while.
+If the toolchain is installed ("Before you start" above says what you need), start `dune build` in a terminal first: it also runs the test programs, so it takes a little while.
 
 1. About 5 minutes: the [README](../README.md), for what the library does and how the repository is laid out.
 2. About 15 minutes: [architecture.md](architecture.md), for the contracts, the modules and how data flows between them. Skim the rest.
@@ -78,14 +104,16 @@ Keep the [glossary](glossary.md) open for the terms you meet. To carry on, start
 
 | You want to | Go to |
 |---|---|
+| Know what to learn and install first | "Before you start", above |
 | Know what a word or symbol means | [glossary.md](glossary.md) |
 | Know what is public API and what is internal | [architecture.md](architecture.md), [src/vstiff.mli](../src/vstiff.mli) |
 | Run a piece of the library and see what it does | the probe project in [exercises.md](exercises.md) |
 | Understand a failing test | [testing.md](testing.md) |
-| Add a test | [testing.md](testing.md) and [CONTRIBUTING.md](../CONTRIBUTING.md) |
-| Add a method or a controller | [CONTRIBUTING.md](../CONTRIBUTING.md) and [architecture.md](architecture.md) |
+| Know the rules for a change | [AGENTS.md](../AGENTS.md) |
+| Add a test | [testing.md](testing.md) and the Tests section of [AGENTS.md](../AGENTS.md) |
+| Add a method or a controller | the Tests section of [AGENTS.md](../AGENTS.md) (Adding a method or a controller) and [architecture.md](architecture.md) |
 | Find something small to work on | the starter contributions in [exercises.md](exercises.md) |
-| Fix or add documentation | the documentation rules in [CONTRIBUTING.md](../CONTRIBUTING.md) |
+| Fix or add documentation | the writing rules, H11 to H13, in [AGENTS.md](../AGENTS.md) |
 | See where the project is meant to go, or how parts of it could be proved correct | [plans/plan.md](plans/plan.md), [plans/roadmap.md](plans/roadmap.md), [plans/formal-verification.md](plans/formal-verification.md) |
 
 ## Plans
