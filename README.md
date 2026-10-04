@@ -135,6 +135,7 @@ src/numerics/   kernel library numerics: Fail, Vec, Linalg, Newton, Jac; knows n
 src/            solver library vstiff: ode.mli holds the contracts, vstiff.mli the public API
 test/           corpus.ml and soak.ml with their .expected files, and their helper modules
 docs/           README.md is the index; numerics/ explains the mathematics
+verif/          Rocq and MathComp proofs about the numerics; a separate dune project
 ```
 
 ## Where to go next

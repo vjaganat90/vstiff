@@ -5,7 +5,7 @@ before your first change, and check every change against it.
 
 There are two kinds of rule:
 
-- **Hard rules** (H1 to H17) are absolute. A change that breaks one is not merged. The sections
+- **Hard rules** (H1 to H18) are absolute. A change that breaks one is not merged. The sections
   after the design defaults say how to meet them, and they bind the same way.
 - **Design defaults** describe how vstiff is built. Depart from one when the result is clearly
   cleaner, and say why in the pull request.
@@ -86,6 +86,11 @@ vstiff is a stiff ODE solver in OCaml that puts correctness first.
     closed form of a weight.
   - The source is the code that computes them, today `Bdf2.coeffs`. A document states the
     equations the coefficients satisfy, and points to that code.
+- **H18. Proofs are complete.**
+  - A theorem in `verif/` is machine-checked, with no `Admitted`, no `admit` and no new axiom.
+    `Print Assumptions` reports it closed under the global context.
+  - A Rocq definition that mirrors OCaml code names the function it mirrors
+    ([verif/README.md](verif/README.md)).
 
 ### Structure
 
@@ -235,6 +240,9 @@ start".
   perl -e 'alarm 120; exec @ARGV' ./_build/default/test/corpus.exe
   perl -e 'alarm 120; exec @ARGV' ./_build/default/test/soak.exe
   ```
+- **Proofs.** `verif/` is a separate dune project with its own toolchain, which
+  [verif/README.md](verif/README.md) lists; build it with `dune build --root verif`. The main build
+  ignores it.
 - **Trying things out.** Experiment outside the repository, in the probe project or in a scratch
   copy of the working tree ([docs/exercises.md](docs/exercises.md), "Setup"). Nothing stray then
   reaches a branch.
@@ -352,6 +360,7 @@ Every hard rule holds. These are the checks most often missed:
 - [ ] No check was weakened. A moved line was re-pinned for a deliberate change, or rewritten to
       print its check, with the old and the new line in the commit message (H2).
 - [ ] Every behaviour change has a test that was seen to fail without the change (H3).
+- [ ] A change under `verif/` builds with no admits and no new axioms (H18).
 - [ ] Effects are still in their modules. Failures are `Fail.t` values, and every run ends (H5,
       H6).
 - [ ] The public API is deliberate. There is no new dependency without agreement, and no copied

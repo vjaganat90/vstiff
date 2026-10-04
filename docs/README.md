@@ -35,7 +35,7 @@ dune runtest
 | Document | What it is |
 |---|---|
 | [README.md](../README.md) (repository root) | The front page: what vstiff is, a first program, quick start, status and known limits, layout. |
-| [AGENTS.md](../AGENTS.md) (repository root) | The rules for every change: the hard rules H1 to H17, the design defaults, the build and test commands, how to add a corpus case, a soak case, a method or a controller, the effects map, commits, pull requests and the checklist for a finished change. [CONTRIBUTING.md](../CONTRIBUTING.md) points to it. |
+| [AGENTS.md](../AGENTS.md) (repository root) | The rules for every change: the hard rules H1 to H18, the design defaults, the build and test commands, how to add a corpus case, a soak case, a method or a controller, the effects map, commits, pull requests and the checklist for a finished change. [CONTRIBUTING.md](../CONTRIBUTING.md) points to it. |
 | [docs/README.md](README.md) | This page: what to know before you start, the index, reading orders and a one-hour path. |
 | [onboarding.md](onboarding.md) | A ten-working-day plan from zero to a first contribution, with readings, exercises, self-checks and a done-when line for each day. |
 | [glossary.md](glossary.md) | Terms and symbols, each with a short definition and where it is explained. |
