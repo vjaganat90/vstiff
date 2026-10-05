@@ -32,7 +32,7 @@ Days 1 to 8 are foundations: setup, then the code from the smallest module to th
 
 - **Goal.** A working toolchain, a green test run, a map of the repository and a program of your own that calls the library.
 - **Read.** The [README](../README.md) at the repository root; [README.md](README.md) of this folder, "Before you start" and the index; the tooling part of [ocaml.md](ocaml.md); the overview of [architecture.md](architecture.md) (skim the rest).
-- **Do.** Install OCaml 5.5 and dune 3 as [ocaml.md](ocaml.md) describes, clone the repository as "Before you start" in [README.md](README.md) shows, and run `dune build` and `dune runtest`. Do A1 and A2, set up the probe project and run the README program. Skim every file of `src/` and `src/numerics/` for a minute, one sentence each, then draw the call chain: `Adaptive.integrate` calls `Bdf2.step_with_error`, which calls `Bdf1.step` and (once there is history) a BDF2 step; both call `Stage.solve`, which hands `Newton.solve` a residual and a Jacobian built on `Jac.forward`; every Newton iteration calls that Jacobian and `Linalg.solve`; `Halving` judges the outcome, and `Clock.resolution` tells `Halving`, `Adaptive` and `Check` how short a step `t` can still resolve.
+- **Do.** Install OCaml 5.5 and dune 3 as [ocaml.md](ocaml.md) describes, clone the repository as "Before you start" in [README.md](README.md) shows, and run `dune build` and `dune runtest`. Do A1 and A2, set up the probe project and run the README program. Skim every file of `src/` and `src/numerics/` for a minute, one sentence each, then draw the call chain: `Adaptive.integrate` calls `Bdf2.step_with_error`, which calls `Bdf1.step` and (once there is history) a BDF2 step; both call `Stage.solve`, which hands `Newton.solve` a residual and a Jacobian built on `Jac.forward`; every Newton iteration calls that Jacobian and `Linalg.solve`; `Halving` judges the outcome, and `Clock.resolution` tells `Halving`, `Adaptive` and `Check` how short a step $t$ can still resolve.
 - **Self-check.**
   1. What does a silent `dune runtest` mean? *Every program's output matched its expected file; a failure prints a diff and exits with status 1.*
   2. What compares the test output with the expected files, `dune build` or `dune runtest`? *Only `dune runtest`. `dune build` runs the two programs, when their output is out of date, to record it and compares nothing.*
@@ -59,12 +59,12 @@ Days 1 to 8 are foundations: setup, then the code from the smallest module to th
 ## Day 3. Linear solves and Newton's method
 
 - **Goal.** Understand `Linalg.solve` and `Newton.solve` and run both by hand.
-- **Read.** [numerics/02-newton.md](numerics/02-newton.md), the whole chapter (its last section, on Newton inside the integrator, previews day 5: skim it now and come back to it then); [src/numerics/linalg.mli](../src/numerics/linalg.mli), [src/numerics/linalg.ml](../src/numerics/linalg.ml), [src/numerics/newton.mli](../src/numerics/newton.mli), [src/numerics/newton.ml](../src/numerics/newton.ml); in [ocaml.md](ocaml.md) the sections on exceptions and mutable cells and on tail recursion. Glossary: partial pivoting, damping, Armijo condition, residual, inf-norm.
+- **Read.** [numerics/02-newton.md](numerics/02-newton.md), the whole chapter (its last section, on Newton inside the integrator, previews day 5: skim it now and come back to it then); [src/numerics/linalg.mli](../src/numerics/linalg.mli), [src/numerics/linalg.ml](../src/numerics/linalg.ml), [src/numerics/newton.mli](../src/numerics/newton.mli), [src/numerics/newton.ml](../src/numerics/newton.ml); in [ocaml.md](ocaml.md) the sections on exceptions and mutable cells and on tail recursion. Glossary: partial pivoting, damping, Armijo condition, residual, $\infty$-norm.
 - **Do.** A3 and A4. Read `Newton.solve` case by case (every `if` branch and `match` case) and write down which result each produces and why.
 - **Self-check.**
-  1. Newton on `x^2 - 2` from `x = 1`: the first two iterates? *1.5 and 1.4166666666666667.*
-  2. Why does it return `Error Diverged` from `x = 0`? *The derivative is 0, so the 1x1 Jacobian is singular, `Linalg.solve` returns `None`, and `Newton.solve` turns that into `Diverged`.*
-  3. Which damping factors does `Newton.solve` try, and what if none passes? *1, 1/2, 1/4, down to 1/1024, accepting the first that makes the residual fall enough (the Armijo test); if none does, `Error Diverged`.*
+  1. Newton on $x^2 - 2$ from $x = 1$: the first two iterates? *1.5 and 1.4166666666666667.*
+  2. Why does it return `Error Diverged` from $x = 0$? *The derivative is 0, so the* $1 \times 1$ *Jacobian is singular, `Linalg.solve` returns `None`, and `Newton.solve` turns that into `Diverged`.*
+  3. Which damping factors $\lambda$ does `Newton.solve` try, and what if none passes? $1$, $1/2$, $1/4$, *down to* $1/1024$, *accepting the first that makes the residual fall enough (the Armijo test); if none does, `Error Diverged`.*
   4. When does `Linalg.solve` return `None`, and does `Some` guarantee a good answer? *Only when the best pivot is exactly zero. No: a singular matrix can survive rounding, which is why Newton checks that its step is finite and judges it with the line search.*
   5. How are rows exchanged without mutation? *`pivot` picks the row, `swapped` says which original row sits where after the exchange, and the recursion works on a new, smaller array of rows.*
 - **Done when.** Your hand iterates agree with the probe and you can explain every case of `Newton.solve`.
@@ -72,57 +72,57 @@ Days 1 to 8 are foundations: setup, then the code from the smallest module to th
 ## Day 4. Floating point and Jacobians
 
 - **Goal.** Know why a computer cannot differentiate exactly, how `Jac.forward` approximates the Jacobian and where its error comes from.
-- **Read.** [numerics/03-jacobians-and-floating-point.md](numerics/03-jacobians-and-floating-point.md); [src/numerics/jac.mli](../src/numerics/jac.mli), [src/numerics/jac.ml](../src/numerics/jac.ml); the `jacobian` cases in [test/corpus.ml](../test/corpus.ml) and the comment above them. Glossary: eps, ulp, round-off, cancellation, forward difference, Jacobian, NaN.
+- **Read.** [numerics/03-jacobians-and-floating-point.md](numerics/03-jacobians-and-floating-point.md); [src/numerics/jac.mli](../src/numerics/jac.mli), [src/numerics/jac.ml](../src/numerics/jac.ml); the `jacobian` cases in [test/corpus.ml](../test/corpus.ml) and the comment above them. Glossary: $\varepsilon$, ulp, round-off, cancellation, forward difference, Jacobian, NaN.
 - **Do.** A5 and C2.
 - **Self-check.**
-  1. What are the two errors of a forward difference? *Truncation error, which shrinks with the perturbation, and round-off, which grows like `eps |f| / perturbation`.*
-  2. What does `J.(i).(j)` mean, and how many `rhs` calls does `Jac.forward` make? *The derivative of output `i` with respect to input `j`; `n + 1`.*
-  3. At `y0 = (1, 1, 1)` how far is the canary's `1e4` entry from exact, and why? *About 3.0e-5: round-off on values near `1e4`; half an ulp of `1e4` divided by the perturbation `2e-8` bounds it near 4.5e-5.*
-  4. Why is the corpus bound absolute at the origin and relative at `y0`? *At the origin nothing cancels, so entries are essentially exact; at `y0` the rounding error scales with the entry.*
-  5. Why does `Jac.forward` divide by `yp.(j) -. y.(j)` and not by the nominal perturbation? *The sum is rounded; the quotient must match the points where `f` was actually evaluated.*
+  1. What are the two errors of a forward difference? *Truncation error, which shrinks with the perturbation* $\delta_j$, *and round-off, which grows like* $\varepsilon \lvert f \rvert / \delta_j$.
+  2. What does `J.(i).(j)` mean, and how many `rhs` calls does `Jac.forward` make? *The derivative of output* $i$ *with respect to input* $j$, $J_{ij} = \partial f_i / \partial y_j$; $n + 1$.
+  3. At $y_0 = (1, 1, 1)$ how far is the canary's $10^4$ entry from exact, and why? *About* $3.0 \times 10^{-5}$: *round-off on values near* $10^4$; *half an ulp of* $10^4$ *divided by the perturbation* $\delta_j = 2 \times 10^{-8}$ *bounds it near* $4.5 \times 10^{-5}$.
+  4. Why is the corpus bound absolute at the origin and relative at $y_0$? *At the origin nothing cancels, so entries are essentially exact; at* $y_0$ *the rounding error scales with the entry.*
+  5. Why does `Jac.forward` divide by `yp.(j) -. y.(j)` and not by the nominal perturbation? *The sum is rounded; the quotient must match the points where* $f$ *was actually evaluated.*
   6. What does `Vec.norm_inf` return when an entry is NaN, and what follows? *NaN. `Newton.solve` checks `Vec.finite` at the start of every iteration and on a converged `x + dx`, and returns `Error Nan`; `Halving.acceptable` rejects a NaN estimate because `nan <= tol` is false.*
-- **Done when.** Your C2 probe prints an error near 3.0e-5 and the matrix `[[5, 2], [1, 3]]`, and you can explain the first with half an ulp.
+- **Done when.** Your C2 probe prints an error near $3.0 \times 10^{-5}$ and the matrix with rows $(5, 2)$ and $(1, 3)$, and you can explain the first with half an ulp.
 
 ## Day 5. ODEs, stiffness, backward Euler and the contracts
 
 - **Goal.** Know what an ODE is, why stiffness defeats explicit methods, how backward Euler escapes, how one step is built, and what a contract is.
 - **Read.** [numerics/01-odes-and-stiffness.md](numerics/01-odes-and-stiffness.md), the whole chapter; [src/ode.mli](../src/ode.mli), [src/stage.mli](../src/stage.mli), [src/stage.ml](../src/stage.ml), [src/bdf1.mli](../src/bdf1.mli), [src/bdf1.ml](../src/bdf1.ml), [src/stepper.mli](../src/stepper.mli), [src/stepper.ml](../src/stepper.ml), [src/check.ml](../src/check.ml); in [ocaml.md](ocaml.md) the sections on module types, on libraries and main modules, and on modular explicits. Glossary: stiffness, stage equation, A-stability, contract, module type, modular explicit, history, public API.
-- **Do.** Run the explicit Euler snippet of chapter 1. B3 and C3. Derive the Jacobian of `G(x) = x - psi - gamma f(t, x)` on paper and find the lines of `Stage.solve` that build it.
+- **Do.** Run the explicit Euler snippet of chapter 1. B3 and C3. Derive the Jacobian of $G(x) = x - \psi - \gamma\thinspace f(t_{n+1}, x)$ on paper and find the lines of `Stage.solve` that build it.
 - **Self-check.**
-  1. What is the stage equation of a backward Euler step? *`x = psi + gamma f(t_{n+1}, x)` with `psi = y_n`, `gamma = h`; its residual has Jacobian `I - gamma J`.*
-  2. What is the largest stable step of explicit Euler on `y' = -1e4 y`? *`2e-4`: the factor `1 - 1e4 h` must stay at most 1 in magnitude.*
-  3. Why does the corpus take 500,000 backward Euler steps although the method is stable for any step? *Accuracy: the error at `t = 1` is about `0.184 h`, and the line demands less than 1e-6.*
+  1. What is the stage equation of a backward Euler step? $x = \psi + \gamma\thinspace f(t_{n+1}, x)$ *with* $\psi = y_n$, $\gamma = h$; *its residual has Jacobian* $I - \gamma J$.
+  2. What is the largest stable step of explicit Euler on $y' = -10^4 y$? $2 \times 10^{-4}$: *the factor* $1 - 10^4 h$ *must stay at most 1 in magnitude.*
+  3. Why does the corpus take 500,000 backward Euler steps although the method is stable for any step? *Accuracy: the error at* $t = 1$ *is about* $0.184 h$, *and the line demands less than* $10^{-6}$.
   4. What must a module provide to be an `Ode.Method`? *`type history`, `start` and `step`. `Bdf1.history` is abstract outside `Bdf1`, which is how callers are kept from depending on it.*
   5. Why does `Stepper.fixed` take a module? *So one loop drives any method; the module is passed as a modular explicit.*
-- **Done when.** You can derive the explicit and backward Euler factors on `y' = -lambda y` and explain `Stage.solve` and `Bdf1.step` line by line.
+- **Done when.** You can derive the explicit and backward Euler factors on $y' = -\lambda y$ and explain `Stage.solve` and `Bdf1.step` line by line.
 
 ## Day 6. BDF2, history and order
 
 - **Goal.** Understand how BDF2 is derived, what order two means, and how the code handles the first step and variable steps.
-- **Read.** [numerics/04-bdf.md](numerics/04-bdf.md); [src/bdf2.mli](../src/bdf2.mli), [src/bdf2.ml](../src/bdf2.ml). Glossary: BDF, multistep method, order, variable step, zero-stability, embedded method, history, ω.
-- **Do.** The probes of chapter 4 (they evaluate `Bdf2.coeffs`; never copy its numbers into a comment or a document). C1. Trace the first two calls of `Bdf2.step` by hand: which stage solve each makes and what the history holds afterwards. Derive `a1`, `a0` and `beta` on paper from the conditions in chapter 4 and compare with `Vstiff.Bdf2.coeffs`.
+- **Read.** [numerics/04-bdf.md](numerics/04-bdf.md); [src/bdf2.mli](../src/bdf2.mli), [src/bdf2.ml](../src/bdf2.ml). Glossary: BDF, multistep method, order, variable step, zero-stability, embedded method, history, $\omega$.
+- **Do.** The probes of chapter 4 (they evaluate `Bdf2.coeffs`; never copy its numbers into a comment or a document). C1. Trace the first two calls of `Bdf2.step` by hand: which stage solve each makes and what the history holds afterwards. Derive $a_1$, $a_0$ and $\beta$ on paper from the conditions in chapter 4 and compare with `Vstiff.Bdf2.coeffs`.
 - **Self-check.**
-  1. Which polynomial does BDF2 differentiate, and what does it enforce? *The quadratic through `(t_{n-1}, y_{n-1})`, `(t_n, y_n)` and the unknown `(t_{n+1}, y_{n+1})`; its slope at `t_{n+1}` must equal `f(t_{n+1}, y_{n+1})`.*
-  2. Why is ω = h / h_prev the only input of `Bdf2.coeffs`? *The exactness conditions involve the time differences only as ratios.*
+  1. Which polynomial does BDF2 differentiate, and what does it enforce? *The quadratic through* $(t_{n-1}, y_{n-1})$, $(t_n, y_n)$ *and the unknown* $(t_{n+1}, y_{n+1})$; *its slope at* $t_{n+1}$ *must equal* $f(t_{n+1}, y_{n+1})$.
+  2. Why is $\omega = h / h_{\mathrm{prev}}$ the only input of `Bdf2.coeffs`? *The exactness conditions involve the time differences only as ratios.*
   3. What does the history hold, and why is the first step backward Euler? *`Start` or `After { h_prev; y_prev }`; with `Start` there is no previous point. Chapter 4 explains why order two survives.*
   4. What does the corpus ratio 3.99 show? *Halving `dt` divided the error by about 4: second order.*
-  5. Where are the values of `a1`, `a0` and `beta`? *In `Bdf2.coeffs`, the single source of truth: evaluate it or derive them.*
+  5. Where are the values of $a_1$, $a_0$ and $\beta$? *In `Bdf2.coeffs`, the single source of truth: evaluate it or derive them.*
 - **Done when.** Your C1 orders are near 1 and 2 and your derivation agrees with `Bdf2.coeffs`.
 
 ## Day 7. Step control and the adaptive loop
 
 - **Goal.** Narrate `Adaptive.integrate` from start to finish: choose and snap the step, error estimate, accept, reject, grow, give up.
-- **Read.** [numerics/05-step-control.md](numerics/05-step-control.md); [src/halving.mli](../src/halving.mli), [src/halving.ml](../src/halving.ml), [src/clock.mli](../src/clock.mli), [src/clock.ml](../src/clock.ml), [src/adaptive.mli](../src/adaptive.mli), [src/adaptive.ml](../src/adaptive.ml); the data-flow and error-flow parts of [architecture.md](architecture.md). Glossary: local truncation error, scaled error, rejection, step floor, snapping, `tol`, controller.
+- **Read.** [numerics/05-step-control.md](numerics/05-step-control.md); [src/halving.mli](../src/halving.mli), [src/halving.ml](../src/halving.ml), [src/clock.mli](../src/clock.mli), [src/clock.ml](../src/clock.ml), [src/adaptive.mli](../src/adaptive.mli), [src/adaptive.ml](../src/adaptive.ml); the data-flow and error-flow parts of [architecture.md](architecture.md). Glossary: local truncation error, scaled error, rejection, step floor, snapping, $\mathrm{tol}$, controller.
 - **Do.** B4, B1, B2, C4 and C5. Close `adaptive.ml` and write `go` from memory in plain words, then fix your version against the file.
 - **Self-check.**
-  1. What does `Halving` compare with `tol`? *`max_i |err_i| / (1 + |y_i|)`.*
+  1. What does `Halving` compare with $\mathrm{tol}$? $\max_i \lvert \mathrm{err}_i \rvert / (1 + \lvert y_i \rvert)$.
   2. What does the error estimate measure on the first step, and later? *First step: half the gap between backward Euler and explicit Euler. Later: the gap between BDF2 and backward Euler.*
   3. When does the step double, and what does a rejection do? *After three accepts in a row, up to `dt_max`. A rejection, for any reason, halves the step that failed and restarts the count.*
   4. Which failures can `Adaptive.integrate` return with `Halving`? *`Nan` before the first step, from `Adaptive`; `StepRejected n` from `Halving`. A failed Newton solve is just a rejection.*
-  5. Why does the NaN-wall corpus line say `StepRejected 46` when `max_rejects` is 50? *The floor `16 eps |t|` ends the run before the count does (C4).*
-  6. What are the three reasons for a rejection? *`Too_large`, the estimate exceeded `tol`; `Solver e`, the method could not take the step (Newton failed); and `Too_small`, the step was below the resolution of `t` (it might not move `t` at all), so the driver did not call the method. The controller sees which, and `Halving` treats them alike.*
-  7. What does the driver do with a step shorter than half an ulp of `t`? *It snaps the step to `h = (t + dt) - t = 0` and rejects it as `Too_small`; `Halving` halves 0, which is below the floor, so the run ends with `StepRejected 1`.*
-  8. And with a step that would still move `t` but is below `Clock.resolution t`? *Unless it is the last step, it is rejected as `Too_small` too, without calling the method, and `Halving` halves it below the floor: `StepRejected 1`. Above the resolution snapping changes a step by at most 1/32 of its length, which keeps BDF2's step ratio near 2.*
+  5. Why does the NaN-wall corpus line say `StepRejected 46` when `max_rejects` is 50? *The floor* $16\thinspace\varepsilon\thinspace\lvert t \rvert$ *ends the run before the count does (C4).*
+  6. What are the three reasons for a rejection? *`Too_large`, the estimate exceeded* $\mathrm{tol}$; *`Solver e`, the method could not take the step (Newton failed); and `Too_small`, the step was below the resolution of* $t$ *(it might not move* $t$ *at all), so the driver did not call the method. The controller sees which, and `Halving` treats them alike.*
+  7. What does the driver do with a step shorter than half an ulp of $t$? *It snaps the step to* $h = (t + \mathtt{dt}) - t = 0$ *and rejects it as `Too_small`; `Halving` halves 0, which is below the floor, so the run ends with `StepRejected 1`.*
+  8. And with a step that would still move $t$ but is below `Clock.resolution t`? *Unless it is the last step, it is rejected as `Too_small` too, without calling the method, and `Halving` halves it below the floor: `StepRejected 1`. Above the resolution snapping changes a step by at most* $1/32$ *of its length, which keeps BDF2's step ratio* $\omega$ *near 2.*
 - **Done when.** Your B4 table matches, you have measured counts for three tolerances, and you can retell `go` without looking.
 
 ## Day 8. The corpus, the effect quarantine and the test policy
@@ -148,7 +148,7 @@ Days 1 to 8 are foundations: setup, then the code from the smallest module to th
   1. After breaking pivoting, which lines changed? *Two `linalg` lines; nothing else depends on the pivot choice.*
   2. How do you check that a new test can fail? *Break the thing it protects in a scratch copy and see the line change.*
   3. Why a scratch copy rather than `git stash`? *There is nothing to undo, your tree stays untouched, and builds cannot interfere.*
-  4. After D4, which Robertson line failed and which did not? *The line with bound `1e-5` failed; the other one, with bound `1e-3`, passed. That is why the tighter line exists.*
+  4. After D4, which Robertson line failed and which did not? *The line with bound* $10^{-5}$ *failed; the other one, with bound* $10^{-3}$, *passed. That is why the tighter line exists.*
 - **Done when.** You have written up four experiments, and your `Trapezoid` method builds and passes its order check in a probe.
 
 ## Day 10. Picking and preparing a starter contribution

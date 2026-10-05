@@ -2,13 +2,13 @@
 
 These pages explain vstiff to someone who has never seen the code, has never used OCaml and has not studied numerical analysis.
 
-Throughout, `t` is time, `y` the state vector, `f` the right-hand side (called `rhs` in code), `h` a step taken or attempted and `dt` a step size someone asked for. The [glossary](glossary.md) lists every term and symbol.
+Throughout, $t$ is time, $y$ the state vector, $f$ the right-hand side of $y' = f(t, y)$ (called `rhs` in code), $h$ a step taken or attempted and `dt` a step size someone asked for. The [glossary](glossary.md) lists every term and symbol.
 
 ## Before you start
 
 What you need before reading these pages or the code is stated here, once, for every document.
 
-**What to know.** You program in some language (Python or JavaScript, say), remember first-year calculus (derivatives and Taylor series) and a little linear algebra (matrices, and solving `A x = b`). The pages teach everything else from the start: ODEs and stiffness, floating point, Newton's method, finite differences, BDF methods, step-size control, OCaml and dune, and how the tests work. Eigenvalues and Jacobians are explained where they first appear.
+**What to know.** You program in some language (Python or JavaScript, say), remember first-year calculus (derivatives and Taylor series) and a little linear algebra (matrices, and solving $A x = b$). The pages teach everything else from the start: ODEs and stiffness, floating point, Newton's method, finite differences, BDF methods, step-size control, OCaml and dune, and how the tests work. Eigenvalues and Jacobians are explained where they first appear.
 
 **What to install.** Only the snippets, the exercises and the code need a toolchain; the numerics chapters can be read without one. The toolchain is OCaml 5.5 and dune 3, usually installed through opam; the libraries and the tests use only the OCaml standard library, so no other OCaml package is needed. [ocaml.md](ocaml.md) shows how to install opam, OCaml and dune. The shell recipes in these pages also use `git`, `ln`, `tar` and `perl`, and run on macOS, Linux or WSL (Windows Subsystem for Linux).
 
