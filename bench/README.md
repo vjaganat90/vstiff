@@ -9,7 +9,7 @@ dune build ./bench/bench.exe
 ./_build/default/bench/bench.exe
 ```
 
-Each row is one problem and tolerance (`rtol = atol = tol`), run with `Adaptive.integrate (module Bdf2) (module Halving)` and the other arguments at their defaults. It prints the accepted and rejected steps, the right-hand-side calls (every call, the finite-difference Jacobians included, counted through an `Instrument`-wrapped rhs), the mixed error $\max_i \lvert y_i - y_i^{\mathrm{ref}} \rvert / (1 + \lvert y_i^{\mathrm{ref}} \rvert)$, and $\mathrm{scd} = -\log_{10} \max_i \lvert y_i - y_i^{\mathrm{ref}} \rvert / \lvert y_i^{\mathrm{ref}} \rvert$, the correct digits as in the IVP Test Set, against the stored reference, then a verdict against the golden table. The whole run takes about 4 s of CPU on an idle Apple M5; more on a slower or busier machine.
+Each row is one problem and tolerance ($\mathrm{rtol} = \mathrm{atol} = \mathrm{tol}$), run with `Adaptive.integrate (module Bdf2) (module Halving)` and the other arguments at their defaults. It prints the accepted and rejected steps, the right-hand-side calls (every call, the finite-difference Jacobians included, counted through an `Instrument`-wrapped rhs), the mixed error $\max_i \lvert y_i - y_i^{\mathrm{ref}} \rvert / (1 + \lvert y_i^{\mathrm{ref}} \rvert)$, and $\mathrm{scd} = -\log_{10} \max_i \lvert y_i - y_i^{\mathrm{ref}} \rvert / \lvert y_i^{\mathrm{ref}} \rvert$, the correct digits as in the IVP Test Set, against the stored reference, then a verdict against the golden table. The whole run takes about 4 s of CPU on an idle Apple M5; more on a slower or busier machine.
 
 | Flag | Effect |
 |---|---|
@@ -34,7 +34,7 @@ Rebuild afterwards: until `dune build ./bench/bench.exe` runs again the executab
 
 ## References
 
-`bench/reference.ml` holds the state of each problem at `t_end`, computed outside vstiff with scipy's Radau (rtol $10^{-13}$), BDF and LSODA (rtol $10^{-12}$), atol $10^{-20}$ and finite-difference Jacobians, keeping only the digits on which all the solvers that succeeded agree. The module says, next to every value, the solvers, versions and tolerances, how many digits agree and the largest difference between the solvers. scipy's BDF fails on van der Pol at that tolerance, so Radau and LSODA cross-check each other there. `bench/compare/references.json` keeps every solver's raw values. Both files are generated; never edit them by hand:
+`bench/reference.ml` holds the state of each problem at $t_{\mathrm{end}}$, computed outside vstiff with scipy's Radau ($\mathrm{rtol} = 10^{-13}$), BDF and LSODA ($\mathrm{rtol} = 10^{-12}$), $\mathrm{atol} = 10^{-20}$ and finite-difference Jacobians, keeping only the digits on which all the solvers that succeeded agree. The module says, next to every value, the solvers, versions and tolerances, how many digits agree and the largest difference between the solvers. scipy's BDF fails on van der Pol at that tolerance, so Radau and LSODA cross-check each other there. `bench/compare/references.json` keeps every solver's raw values. Both files are generated; never edit them by hand:
 
 ```sh
 python3 bench/compare/references.py            # recompute, rewrite both files
@@ -47,7 +47,7 @@ python3 bench/compare/references.py --check    # recompute, verify the stored fi
 python3 bench/compare/scipy_rows.py > bench/results/scipy.csv
 ```
 
-scipy's BDF, Radau and LSODA on the same problems and tolerances, with `rtol = atol` and finite-difference Jacobians. `rhs` counts every call of the right-hand side through a wrapper, the finite-difference Jacobian included, as vstiff's counter does; `nfev` is what scipy reports, which for BDF and Radau leaves the Jacobian out. Columns: `problem, solver, rtol, steps, rejected, rhs, nfev, njev, error, scd`; `rejected` stays empty, scipy does not report it. The counts are those of macOS on arm64: scipy's BDF and LSODA pick their steps from the last bits of the right-hand side, so another libm can move a row by a step or more (`bench/compare/problems.py` says where).
+scipy's BDF, Radau and LSODA on the same problems and tolerances, with $\mathrm{rtol} = \mathrm{atol}$ and finite-difference Jacobians. `rhs` counts every call of the right-hand side through a wrapper, the finite-difference Jacobian included, as vstiff's counter does; `nfev` is what scipy reports, which for BDF and Radau leaves the Jacobian out. Columns: `problem, solver, rtol, steps, rejected, rhs, nfev, njev, error, scd`; `rejected` stays empty, scipy does not report it. The counts are those of macOS on arm64: scipy's BDF and LSODA pick their steps from the last bits of the right-hand side, so another libm can move a row by a step or more (`bench/compare/problems.py` says where).
 
 ## The transcription check
 
