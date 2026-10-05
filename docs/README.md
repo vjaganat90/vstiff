@@ -113,5 +113,5 @@ Keep the [glossary](glossary.md) open for the terms you meet. To carry on, start
 | Add a test | [testing.md](testing.md) and the Tests section of [AGENTS.md](../AGENTS.md) |
 | Add a method or a controller | the Tests section of [AGENTS.md](../AGENTS.md) (Adding a method or a controller) and [architecture.md](architecture.md) |
 | Find something small to work on | the starter contributions in [exercises.md](exercises.md) |
-| Fix or add documentation | the writing rules, H11 to H13, in [AGENTS.md](../AGENTS.md) |
+| Fix or add documentation | the writing rules, H11 to H13, and the Style defaults, in [AGENTS.md](../AGENTS.md) |
 | See what works today, what is missing and what is planned | "Status and known limits" in the [README](../README.md) |

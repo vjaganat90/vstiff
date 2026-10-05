@@ -185,8 +185,10 @@ request.
   - Depth belongs in `docs/`. A module's comment lines should not outnumber its code lines.
 - **Style.**
   - Match the surrounding code: indentation, naming, and lines near 120 columns.
-  - Math in code comments is ASCII (`y_{n+1}`, `|x|_inf`). Markdown uses plain text or Unicode,
-    never LaTeX.
+  - Math in code comments is ASCII (`y_{n+1}`, `|x|_inf`). Math you add to Markdown uses GitHub's
+    syntax, which renders it: inline as ``$`y_{n+1}`$``, displayed in a fenced block whose info
+    string is `math`. Code identifiers stay in code spans. In a table cell write the absolute value
+    as `\lvert x \rvert`: a bare `|` splits the cell.
 - **Comment pitfalls.** OCaml comments nest, and string literals are lexed inside them, so:
   - keep `(*`, `*)` and double quotes out of comment text;
   - inside a function body, use `(* *)`: a documentation comment there is warning 50, which the
