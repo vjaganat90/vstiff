@@ -1,10 +1,8 @@
 # verif: proofs about vstiff in Rocq and MathComp
 
-This directory holds the formal-verification work planned in
-[docs/plans/formal-verification.md](../docs/plans/formal-verification.md): theorems about a Rocq
-mirror of vstiff's numerics, proved with the Mathematical Components libraries. The main build
-ignores it (the root `dune` file says `data_only_dirs verif`), so the library and its tests never
-need Rocq.
+This directory holds machine-checked theorems about a Rocq mirror of vstiff's numerics, proved with
+the Mathematical Components libraries. The main build ignores it (the root `dune` file says
+`data_only_dirs verif`), so the library and its tests never need Rocq.
 
 ## The proof switch
 
@@ -39,6 +37,5 @@ MathComp parts); MathComp 2.6 also renamed `all_ssreflect` to `boot` and `order`
 |---|---|---|
 | [theories/Bdf2_weights.v](theories/Bdf2_weights.v) | `weights_sum_to_one`: over any field, `a1 w + a0 w = 1` whenever `1 + 2 w <> 0` | `Bdf2.coeffs` in [src/bdf2.ml](../src/bdf2.ml) |
 
-The next steps are the pilot of the plan: T1 (the formula is exact on quadratics), then T2 and
-T3 (zero-stability of variable-step BDF2, and the controller never producing a step ratio above
-the bound).
+Next come the proofs that the formula is exact on quadratics and that variable-step BDF2 is
+zero-stable.

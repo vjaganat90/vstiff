@@ -1,6 +1,5 @@
 (* The weights of variable-step BDF2, as Bdf2.coeffs computes them for the
-   step ratio w = h / h_prev, over any field. See
-   docs/plans/formal-verification.md for the plan this starts. *)
+   step ratio w = h / h_prev, over any field. *)
 From mathcomp Require Import boot order algebra.
 
 Set Implicit Arguments.
