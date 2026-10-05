@@ -109,7 +109,7 @@ Jacobians, the order of BDF2, the stiff problems above, step control, the named 
 reads like `max error 3.68e-07 < 1e-06: true`. The soak test ([test/soak.ml](test/soak.ml)) runs
 four of the cases ten times; every round must pass and equal the first. The properties
 ([test/props.ml](test/props.ml)) run claims such as "the backward error of `Linalg.solve` stays
-below $`n\varepsilon`$" on thousands of generated cases, and shrink a failing case. A check is a
+below $n\varepsilon$" on thousands of generated cases, and shrink a failing case. A check is a
 bound, a typed outcome, a value printed to the digits its bound needs, or a pin (a count or a digit
 string that fixes one rule of the algorithm), so that a compiler or a platform changing the last
 bits of a result fails no test (rule H1 in [AGENTS.md](AGENTS.md)).
