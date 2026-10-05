@@ -1,17 +1,17 @@
 #!/usr/bin/env python3
-"""Regenerate the scipy rows of the work-precision table (docs/plans/roadmap.md, Appendix B) as CSV.
+"""Regenerate the scipy rows of the work-precision table as CSV.
 
 One row per problem, solver (scipy's BDF, Radau and LSODA through solve_ivp) and tolerance, with rtol = atol and the
 default finite-difference Jacobian. The right-hand side is wrapped to count its calls: scipy's reported nfev for BDF and
 Radau leaves out the evaluations of the finite-difference Jacobian (n per Jacobian and a few more), LSODA's includes
-them, and vstiff's Instrument counter includes them all (roadmap, 2.0), so `rhs` here counts every call and `nfev` is
+them, and vstiff's Instrument counter includes them all, so `rhs` here counts every call and `nfev` is
 what scipy reports. The error is measured against bench/compare/references.json. The counts are those of one platform,
 macOS on arm64: scipy's BDF and LSODA pick their steps from the last bits of the right-hand side, so another libm can
 move a row by a step or more (problems.py says where).
 
     python3 scipy_rows.py [--out FILE]
 
-Columns: problem, solver, rtol, steps, rejected, rhs, nfev, njev, error, scd. `error` is the roadmap's mixed error
+Columns: problem, solver, rtol, steps, rejected, rhs, nfev, njev, error, scd. `error` is the mixed error
 max_i |y_i - ref_i| / (1 + |ref_i|) and `scd` is -log10 max_i |y_i - ref_i| / |ref_i|, both at t_end. `rejected` stays
 empty: scipy does not report rejections. The bench prints the same columns for vstiff, with nfev and njev empty.
 """

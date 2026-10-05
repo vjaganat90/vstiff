@@ -1,4 +1,4 @@
-(** The gate of the roadmap (4.3): a run is judged against the golden table, which pins the figures of an earlier one.
+(** The gate of the bench: a run is judged against the golden table, which pins the figures of an earlier one.
     Its scd must not be lower and its cost, the right-hand-side calls, not more than 10 % higher. Both are bands, not
     equalities, so they hold from one platform to the next. *)
 

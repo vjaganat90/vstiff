@@ -1,4 +1,4 @@
-(* The bench: vstiff's adaptive driver on the problems of Appendix B, one printed row per problem and tolerance. All the
+(* The bench: vstiff's adaptive driver on the problems of the bench, one printed row per problem and tolerance. All the
    effects are Console's; this file only composes the pure modules of benchlib. bench/README.md says how to run it. *)
 open Benchlib
 

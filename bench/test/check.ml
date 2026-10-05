@@ -9,7 +9,7 @@ let failed fail = { Measure.problem = "p"; tol = 1e-6; outcome = Failed fail }
 let pinned = [ row ~rhs:1000 ~scd:4.0 ]
 let verdict run = Gate.describe (Gate.verdict pinned run)
 
-(* error and scd are the two measures of Appendix B and roadmap 4.2; each line has a hand-computable answer. *)
+(* error and scd are the two measures of the bench; each line has a hand-computable answer. *)
 let accuracy =
   let reference = [| 1.; 100. |] in
   [

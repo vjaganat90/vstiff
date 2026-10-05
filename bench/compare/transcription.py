@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Check that the OCaml and the Python right-hand sides are the same function (docs/plans/plan.md, section 7).
+"""Check that the OCaml and the Python right-hand sides are the same function.
 
 bench.exe --transcription prints, for each problem, f(t, y) at 100 seeded points as CSV lines
 `problem,t,y_1,...,y_n,f_1,...,f_n`, every number at 17 digits. This script evaluates the right-hand side of

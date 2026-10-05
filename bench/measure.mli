@@ -5,8 +5,8 @@ type figures = {
   steps : int;  (** accepted steps *)
   rejected : int;  (** rejected steps, whatever the reason *)
   rhs_calls : int;  (** every call of the right-hand side, counted through [Vstiff.Instrument] *)
-  error : float;  (** [max_i |y_i - ref_i| / (1 + |ref_i|)] at [t_end]: the mixed error of the roadmap's Appendix B *)
-  scd : float;  (** [-log10 max_i |y_i - ref_i| / |ref_i|]: the correct digits, as in the IVP Test Set (roadmap 4.2) *)
+  error : float;  (** [max_i |y_i - ref_i| / (1 + |ref_i|)] at [t_end]: the mixed error *)
+  scd : float;  (** [-log10 max_i |y_i - ref_i| / |ref_i|]: the correct digits, as in the IVP Test Set *)
 }
 
 (** A run finishes with its figures, or fails with the error the driver returns. *)

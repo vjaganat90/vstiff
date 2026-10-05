@@ -5,7 +5,7 @@ bench/brusselator.ml), so the two agree to a rounding or two, and transcription.
 apart on purpose: a typo on one side must show as a difference, not hide in a copy.
 
 The step counts of scipy's BDF and LSODA follow the last bits of the right-hand side, so two spellings are the ones that
-reproduce the roadmap's Appendix B on the machine that measured it, macOS on arm64: a product in `robertson` and a
+reproduce bench/results/scipy.csv on the machine that measured it, macOS on arm64: a product in `robertson` and a
 power in `van_der_pol` (the second differs from its OCaml twin's product). Where numpy's power is libm's `pow`, as
 there, it differs from the product in the last bit for some arguments; a libm whose `pow` is correctly rounded gives
 the product, and another row.
@@ -23,12 +23,12 @@ class Problem:
     rhs: Callable[[float, np.ndarray], np.ndarray]
     y0: np.ndarray
     t_end: float
-    rtols: tuple  # the tolerances of the work-precision table (roadmap, Appendix B); rtol = atol
+    rtols: tuple  # the tolerances of the work-precision table; rtol = atol
 
 
 def robertson(t, y):
     # y2 * y2, not y2 ** 2: with the power scipy's LSODA takes 241 and 443 steps at rtol 1e-6 and 1e-8 instead of the
-    # 245 and 467 of Appendix B (the two spellings differ in the last bit for some y2).
+    # 245 and 467 of bench/results/scipy.csv (the two spellings differ in the last bit for some y2).
     a = 0.04 * y[0]
     b = 1e4 * y[1] * y[2]
     c = 3e7 * y[1] * y[1]
@@ -52,7 +52,7 @@ def hires(t, y):
 
 
 def van_der_pol(t, y):
-    # y1 ** 2, not y1 * y1: with the product scipy's BDF takes 1819 steps at rtol 1e-8, not the 1846 of Appendix B.
+    # y1 ** 2, not y1 * y1: with the product scipy's BDF takes 1819 steps at rtol 1e-8, not the 1846 of bench/results/scipy.csv.
     # The twin in test/problems/problems.ml multiplies; it belongs to the corpus and stays as it is.
     mu = 1000.0
     return np.array([y[1], mu * (1.0 - y[0] ** 2) * y[1] - y[0]])

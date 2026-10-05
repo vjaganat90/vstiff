@@ -6,8 +6,7 @@ type case = {
   box : (float * float) array;
 }
 
-(* The tolerances are Appendix B's. Its vstiff row for Brusselator-80 stops at 1e-4, as this one does: 1e-6 takes some
-   24 s of CPU and 4.3 million calls. The boxes are where the transcription check draws states: generic ones, positive
+(* Brusselator-80 stops at 1e-4: 1e-6 takes some 24 s of CPU and 4.3 million calls. The boxes are where the transcription check draws states: generic ones, positive
    where a problem needs it. *)
 let cases =
   [
