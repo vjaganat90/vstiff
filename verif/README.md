@@ -35,7 +35,7 @@ MathComp parts); MathComp 2.6 also renamed `all_ssreflect` to `boot` and `order`
 
 | File | Statement | Mirrors |
 |---|---|---|
-| [theories/Bdf2_weights.v](theories/Bdf2_weights.v) | `weights_sum_to_one`: over any field, `a1 w + a0 w = 1` whenever `1 + 2 w <> 0` | `Bdf2.coeffs` in [src/bdf2.ml](../src/bdf2.ml) |
+| [theories/Bdf2_weights.v](theories/Bdf2_weights.v) | `weights_sum_to_one`: over any field, $a_1(\omega) + a_0(\omega) = 1$ whenever $1 + 2\omega \ne 0$ | `Bdf2.coeffs` in [src/bdf2.ml](../src/bdf2.ml) |
 
 Next come the proofs that the formula is exact on quadratics and that variable-step BDF2 is
 zero-stable.
