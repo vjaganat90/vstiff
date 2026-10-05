@@ -52,7 +52,7 @@ polynomial $p$, and `q w`, the parasitic root $q(\omega) = -a_0(\omega)$.
 ## What is proved
 
 $\omega = h / h_{\mathrm{prev}}$ is the step ratio, $h_{\mathrm{prev}}$ the previous step and
-$h = \omega\,h_{\mathrm{prev}}$ the new one. $a_1(\omega)$, $a_0(\omega)$ and $\beta(\omega)$ are the
+$h = \omega\thinspace h_{\mathrm{prev}}$ the new one. $a_1(\omega)$, $a_0(\omega)$ and $\beta(\omega)$ are the
 coefficients that `Bdf2.coeffs` returns and the mirror (`a1`, `a0`, `beta`) transcribes;
 $\operatorname{den}(\omega)$ (`den`) is their shared denominator.
 
@@ -61,34 +61,34 @@ $\operatorname{den}(\omega) \ne 0$:
 
 - `weights_sum_to_one`: $a_1(\omega) + a_0(\omega) = 1$.
 - `bdf2_exact_on_quadratics`: every polynomial $p$ of degree at most 2 satisfies the step
-  exactly, $p(t_n + h) = a_1(\omega)\,p(t_n) + a_0(\omega)\,p(t_n - h_{\mathrm{prev}}) + \beta(\omega)\,h\,p'(t_n + h)$.
+  exactly, $p(t_n + h) = a_1(\omega)\thinspace p(t_n) + a_0(\omega)\thinspace p(t_n - h_{\mathrm{prev}}) + \beta(\omega)\thinspace h\thinspace p'(t_n + h)$.
 - `bdf2_residual_on_cubics`: on a polynomial of degree at most 3, the residual (left side minus
-  right side) is $-p_3\,\beta(\omega)\,h^2\,(h + h_{\mathrm{prev}})$, where $p_3$ is its coefficient of $t^3$.
-- `bdf2_cubic_residual`: the residual on $t^3$ is $-\beta(\omega)\,h^2\,(h + h_{\mathrm{prev}})$.
-- `bdf2_cubic_residual_shifted`: $a_1(\omega)\,h^3 + a_0(\omega)\,(h + h_{\mathrm{prev}})^3 = -\beta(\omega)\,h^2\,(h + h_{\mathrm{prev}})$,
+  right side) is $-p_3\thinspace \beta(\omega)\thinspace h^2\thinspace (h + h_{\mathrm{prev}})$, where $p_3$ is its coefficient of $t^3$.
+- `bdf2_cubic_residual`: the residual on $t^3$ is $-\beta(\omega)\thinspace h^2\thinspace (h + h_{\mathrm{prev}})$.
+- `bdf2_cubic_residual_shifted`: $a_1(\omega)\thinspace h^3 + a_0(\omega)\thinspace (h + h_{\mathrm{prev}})^3 = -\beta(\omega)\thinspace h^2\thinspace (h + h_{\mathrm{prev}})$,
   the residual on $(t - (t_n + h))^3$, the cubic with its origin at the new time point.
 
 **T2**, in [theories/Bdf2_zero_stability.v](theories/Bdf2_zero_stability.v), for the recurrence
-$y_{n+2} = a_1(\omega_n)\,y_{n+1} + a_0(\omega_n)\,y_n + d_n$ with ratios $\omega_n$ and perturbations
+$y_{n+2} = a_1(\omega_n)\thinspace y_{n+1} + a_0(\omega_n)\thinspace y_n + d_n$ with ratios $\omega_n$ and perturbations
 $d_n$ (rounding, the stage residual, or the $f$-term); $d = 0$ is the homogeneous recurrence.
 $q(\omega) = -a_0(\omega)$ is the factor a step applies to the step difference:
 
 - `qE`, over any field: $q$ in the closed form the other lemmas use.
 - `bdf2_increment`, over any field, when $\operatorname{den}(\omega) \ne 0$:
-  $a_1(\omega)\,y_1 + a_0(\omega)\,y_0 - y_1 = q(\omega)\,(y_1 - y_0)$.
+  $a_1(\omega)\thinspace y_1 + a_0(\omega)\thinspace y_0 - y_1 = q(\omega)\thinspace (y_1 - y_0)$.
 - `q_le`, over an ordered field: $0 \le \omega \le \omega_{\mathrm{s}}$ implies $q(\omega) \le q(\omega_{\mathrm{s}})$.
 - `bdf2_contraction`, over an ordered field: if every $\omega_n$ lies in $[0, \omega_{\mathrm{s}}]$, the
-  homogeneous recurrence has $\lvert y_{n+1} - y_n \rvert \le q(\omega_{\mathrm{s}})^n\,\lvert y_1 - y_0 \rvert$.
-- `bdf2_bounded`, over an ordered field: if moreover $q(\omega_{\mathrm{s}}) < 1$, it has
+  homogeneous recurrence has $\lvert y_{n+1} - y_n \rvert \le q(\omega_{\mathrm{s}})^n\thinspace \lvert y_1 - y_0 \rvert$.
+- `bdf2_bounded`, over an ordered field: if moreover $q(\omega_{\mathrm{s}}) \lt  1$, it has
   $\lvert y_n \rvert \le \lvert y_0 \rvert + \lvert y_1 - y_0 \rvert / (1 - q(\omega_{\mathrm{s}}))$.
 - `bdf2_stable`, over an ordered field: under the same hypotheses the perturbed recurrence has
-  $\lvert y_n \rvert \le \lvert y_0 \rvert + \bigl(\lvert y_1 - y_0 \rvert + \sum_{k<n} \lvert d_k \rvert\bigr) / (1 - q(\omega_{\mathrm{s}}))$.
-- `q_lt1`, over a real closed field: for $\omega \ge 0$, $q(\omega) < 1$ exactly when $\omega < 1 + \sqrt{2}$.
+  $\lvert y_n \rvert \le \lvert y_0 \rvert + \bigl(\lvert y_1 - y_0 \rvert + \sum_{k\lt n} \lvert d_k \rvert\bigr) / (1 - q(\omega_{\mathrm{s}}))$.
+- `q_lt1`, over a real closed field: for $\omega \ge 0$, $q(\omega) \lt  1$ exactly when $\omega \lt  1 + \sqrt{2}$.
 - `q_threshold`, over a real closed field: $q(1 + \sqrt{2}) = 1$.
-- `bdf2_zero_stable`, over a real closed field: if $\omega_{\mathrm{s}} < 1 + \sqrt{2}$ and every $\omega_n$ lies
-  in $[0, \omega_{\mathrm{s}}]$, then $q(\omega_{\mathrm{s}}) < 1$ and the bound of `bdf2_stable` holds.
+- `bdf2_zero_stable`, over a real closed field: if $\omega_{\mathrm{s}} \lt  1 + \sqrt{2}$ and every $\omega_n$ lies
+  in $[0, \omega_{\mathrm{s}}]$, then $q(\omega_{\mathrm{s}}) \lt  1$ and the bound of `bdf2_stable` holds.
 - `bdf2_sharp`, over a real closed field: for a constant ratio $\omega \ge 1 + \sqrt{2}$,
-  $q(\omega) \ge 1$ and every homogeneous solution has $\lvert y_n - y_0 \rvert \ge n\,\lvert y_1 - y_0 \rvert$,
+  $q(\omega) \ge 1$ and every homogeneous solution has $\lvert y_n - y_0 \rvert \ge n\thinspace \lvert y_1 - y_0 \rvert$,
   unbounded unless $y_1 = y_0$.
 
 The bounds hold componentwise, hence in the max norm. Zero-stability is the $h \to 0$ notion:
