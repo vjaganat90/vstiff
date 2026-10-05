@@ -51,40 +51,44 @@ mirror yet; the tripwire watches it already, for a future proof about the contro
 
 ## What is proved
 
-`w` is the step ratio `h / h_prev`, `hp` the previous step and `h = w hp` the new one.
+$`w = h / h_p`$ is the step ratio, $`h_p`$ the previous step and $`h = w\,h_p`$ the new one.
+$`a_1(w)`$, $`a_0(w)`$ and $`\beta(w)`$ are the coefficients that `Bdf2.coeffs` returns and the
+mirror (`a1`, `a0`, `beta`) transcribes; `den` is their shared denominator.
 
 **T1**, in [theories/Bdf2_weights.v](theories/Bdf2_weights.v), over any field, whenever
-`den w != 0`:
+$`\mathrm{den}(w) \ne 0`$:
 
-- `weights_sum_to_one`: `a1 w + a0 w = 1`.
-- `bdf2_exact_on_quadratics`: every polynomial `p` of degree at most 2 satisfies the step exactly,
-  `p(tn + h) = a1 w p(tn) + a0 w p(tn - hp) + beta w h p'(tn + h)`.
+- `weights_sum_to_one`: $`a_1(w) + a_0(w) = 1`$.
+- `bdf2_exact_on_quadratics`: every polynomial $`p`$ of degree at most 2 satisfies the step
+  exactly, $`p(t_n + h) = a_1(w)\,p(t_n) + a_0(w)\,p(t_n - h_p) + \beta(w)\,h\,p'(t_n + h)`$.
 - `bdf2_residual_on_cubics`: on a polynomial of degree at most 3, the residual (left side minus
-  right side) is `- p3 beta w h^2 (h + hp)`, where `p3` is its coefficient of `t^3`.
-- `bdf2_cubic_residual`: the residual on `t^3` is `- beta w h^2 (h + hp)`.
-- `bdf2_cubic_residual_shifted`: `a1 w h^3 + a0 w (h + hp)^3 = - beta w h^2 (h + hp)`, the
-  residual on $`(t - (t_n + h))^3`$, the cubic with its origin at the new time point.
+  right side) is $`-p_3\,\beta(w)\,h^2\,(h + h_p)`$, where $`p_3`$ is its coefficient of $`t^3`$.
+- `bdf2_cubic_residual`: the residual on $`t^3`$ is $`-\beta(w)\,h^2\,(h + h_p)`$.
+- `bdf2_cubic_residual_shifted`: $`a_1(w)\,h^3 + a_0(w)\,(h + h_p)^3 = -\beta(w)\,h^2\,(h + h_p)`$,
+  the residual on $`(t - (t_n + h))^3`$, the cubic with its origin at the new time point.
 
 **T2**, in [theories/Bdf2_zero_stability.v](theories/Bdf2_zero_stability.v), for the recurrence
-`y (n+2) = a1 (w n) y (n+1) + a0 (w n) y n + d n` with ratios `w n` and perturbations `d n`
-(rounding, the stage residual, or the f-term); `d = 0` is the homogeneous recurrence:
+$`y_{n+2} = a_1(w_n)\,y_{n+1} + a_0(w_n)\,y_n + d_n`$ with ratios $`w_n`$ and perturbations
+$`d_n`$ (rounding, the stage residual, or the f-term); $`d = 0`$ is the homogeneous recurrence.
+$`q(w) = -a_0(w)`$ is the factor a step applies to the step difference:
 
-- `qE`, over any field: `q w = w^2 / (1 + 2 w)`.
-- `bdf2_increment`, over any field, when `den w != 0`: `a1 w y1 + a0 w y0 - y1 = q w (y1 - y0)`,
-  so a step multiplies the step difference by `q w`.
-- `q_le`, over an ordered field: `0 <= w <= ws` implies `q w <= q ws`.
-- `bdf2_contraction`, over an ordered field: if every `w n` lies in `[0, ws]`, the homogeneous
-  recurrence has `|y (n+1) - y n| <= q ws ^ n |y 1 - y 0|`.
-- `bdf2_bounded`, over an ordered field: if moreover `q ws < 1`, it has
-  `|y n| <= |y 0| + |y 1 - y 0| / (1 - q ws)`.
+- `qE`, over any field: $`q`$ in the closed form the other lemmas use.
+- `bdf2_increment`, over any field, when $`\mathrm{den}(w) \ne 0`$:
+  $`a_1(w)\,y_1 + a_0(w)\,y_0 - y_1 = q(w)\,(y_1 - y_0)`$.
+- `q_le`, over an ordered field: $`0 \le w \le w_s`$ implies $`q(w) \le q(w_s)`$.
+- `bdf2_contraction`, over an ordered field: if every $`w_n`$ lies in $`[0, w_s]`$, the
+  homogeneous recurrence has $`\lvert y_{n+1} - y_n \rvert \le q(w_s)^n\,\lvert y_1 - y_0 \rvert`$.
+- `bdf2_bounded`, over an ordered field: if moreover $`q(w_s) < 1`$, it has
+  $`\lvert y_n \rvert \le \lvert y_0 \rvert + \lvert y_1 - y_0 \rvert / (1 - q(w_s))`$.
 - `bdf2_stable`, over an ordered field: under the same hypotheses the perturbed recurrence has
-  `|y n| <= |y 0| + (|y 1 - y 0| + sum over k < n of |d k|) / (1 - q ws)`.
-- `q_lt1`, over a real closed field: for `w >= 0`, `q w < 1` exactly when `w < 1 + sqrt 2`.
-- `q_threshold`, over a real closed field: `q (1 + sqrt 2) = 1`.
-- `bdf2_zero_stable`, over a real closed field: if `ws < 1 + sqrt 2` and every `w n` lies in
-  `[0, ws]`, then `q ws < 1` and the bound of `bdf2_stable` holds.
-- `bdf2_sharp`, over a real closed field: for a constant ratio `w >= 1 + sqrt 2`, `q w >= 1` and
-  every homogeneous solution has `|y n - y 0| >= n |y 1 - y 0|`, unbounded unless `y 1 = y 0`.
+  $`\lvert y_n \rvert \le \lvert y_0 \rvert + \bigl(\lvert y_1 - y_0 \rvert + \sum_{k<n} \lvert d_k \rvert\bigr) / (1 - q(w_s))`$.
+- `q_lt1`, over a real closed field: for $`w \ge 0`$, $`q(w) < 1`$ exactly when $`w < 1 + \sqrt{2}`$.
+- `q_threshold`, over a real closed field: $`q(1 + \sqrt{2}) = 1`$.
+- `bdf2_zero_stable`, over a real closed field: if $`w_s < 1 + \sqrt{2}`$ and every $`w_n`$ lies
+  in $`[0, w_s]`$, then $`q(w_s) < 1`$ and the bound of `bdf2_stable` holds.
+- `bdf2_sharp`, over a real closed field: for a constant ratio $`w \ge 1 + \sqrt{2}`$,
+  $`q(w) \ge 1`$ and every homogeneous solution has $`\lvert y_n - y_0 \rvert \ge n\,\lvert y_1 - y_0 \rvert`$,
+  unbounded unless $`y_1 = y_0`$.
 
 The bounds hold componentwise, hence in the max norm. Zero-stability is the $`h \to 0`$ notion:
 it says nothing about stiff stability at a step ratio of 2.
@@ -117,5 +121,7 @@ can make every `.canon` differ: promote them once the diffs show layout only.
 
 ## Next
 
-A proof that the controller never proposes a step ratio at or above the bound of `q_lt1` waits for
-a controller that enforces one. No CI job builds the proofs yet.
+`Halving` at most doubles a step, and the driver's snapping moves a step by at most 1/32 of its
+length, so the step ratios of a run stay at or below
+$`2 \cdot \tfrac{33}{32} / \tfrac{31}{32} = 66/31`$, inside the bound of `q_lt1`. A proof of
+that, on a mirror of `Halving` and the driver, comes next. No CI job builds the proofs yet.
