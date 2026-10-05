@@ -1,6 +1,6 @@
 (* The property suite: each line runs one property on generated cases and prints ok with the count, or the seed and
-   the shrunk case that failed. The kernel properties of docs/plans/plan.md (section 3.3), then shadows of theorems
-   T1 and T2 of docs/plans/formal-verification.md. Each bound is derived in the comment above its property; u is
+   the shrunk case that failed. The kernel properties, then shadows of two theorems about Bdf2.coeffs: T1, the
+   formula is exact on quadratics, and T2, the differences of the homogeneous recurrence contract. Each bound is derived in the comment above its property; u is
    the unit roundoff, the largest relative error of one rounding. docs/testing.md, Properties. *)
 open Vstiff
 open Numerics

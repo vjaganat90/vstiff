@@ -1,6 +1,6 @@
 (* Knuth's two-sum and the exact error of a product from one fma, combined as in the QD library of Hida, Li and
-   Bailey. The compiler may fuse a product into a sum on arm64 (docs/plans/formal-verification.md, section 2.0);
-   only the low-order terms of mul have such a product, where fusing can only help. *)
+   Bailey. The compiler may fuse a product into a sum on arm64; only the low-order
+   terms of mul have such a product, where fusing can only help. *)
 
 type t = { hi : float; lo : float }
 
