@@ -18,7 +18,7 @@
  (action
   (diff bdf2.ml.canon bdf2.ml.out)))
 
-; Clock.resolution is the floor under every step, which the controller theorem (T3) will mirror.
+; Clock.resolution is the floor under every step, which a future proof about the controller will mirror.
 (rule
  (with-stdout-to
   clock.ml.out

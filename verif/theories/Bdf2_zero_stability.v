@@ -1,4 +1,4 @@
-(* T2 of docs/plans/formal-verification.md: variable-step BDF2 is zero-stable
+(* T2: variable-step BDF2 is zero-stable
    on every grid whose step ratios stay at most some ws < 1 + sqrt 2, with an
    explicit bound in terms of the start and the perturbations, and no constant
    ratio at or above 1 + sqrt 2 is. *)

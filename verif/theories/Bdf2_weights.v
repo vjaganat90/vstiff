@@ -72,8 +72,8 @@ move=> nz /=; rewrite (bdf2_residual_on_cubics hp tn nz) ?size_polyXn //.
 by rewrite coefXn mul1r.
 Qed.
 
-(* The same value on the cubic (t - (tn + h))^3, the form the FV report
-   writes it in. *)
+(* The same value on the cubic (t - (tn + h))^3, with the origin at the
+   new time point. *)
 Lemma bdf2_cubic_residual_shifted (w hp : R) : den w != 0 ->
   let h := w * hp in
   a1 w * h ^+ 3 + a0 w * (h + hp) ^+ 3 = - (beta w * h ^+ 2 * (h + hp)).

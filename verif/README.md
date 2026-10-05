@@ -47,7 +47,7 @@ the OCaml it mirrors.
 
 The other definitions are built on the mirror: `residual w hp tn p`, the residual of one step on a
 polynomial `p`, and `q w = - a0 w`, the parasitic root. [`Clock.resolution`](../src/clock.ml) has no
-mirror yet; the tripwire watches it already, for T3.
+mirror yet; the tripwire watches it already, for a future proof about the controller.
 
 ## What is proved
 
@@ -63,7 +63,7 @@ mirror yet; the tripwire watches it already, for T3.
   right side) is `- p3 beta w h^2 (h + hp)`, where `p3` is its coefficient of `t^3`.
 - `bdf2_cubic_residual`: the residual on `t^3` is `- beta w h^2 (h + hp)`.
 - `bdf2_cubic_residual_shifted`: `a1 w h^3 + a0 w (h + hp)^3 = - beta w h^2 (h + hp)`, the
-  residual on `(t - (tn + h))^3`, the form the FV report writes it in.
+  residual on $`(t - (t_n + h))^3`$, the cubic with its origin at the new time point.
 
 **T2**, in [theories/Bdf2_zero_stability.v](theories/Bdf2_zero_stability.v), for the recurrence
 `y (n+2) = a1 (w n) y (n+1) + a0 (w n) y n + d n` with ratios `w n` and perturbations `d n`
@@ -86,14 +86,14 @@ mirror yet; the tripwire watches it already, for T3.
 - `bdf2_sharp`, over a real closed field: for a constant ratio `w >= 1 + sqrt 2`, `q w >= 1` and
   every homogeneous solution has `|y n - y 0| >= n |y 1 - y 0|`, unbounded unless `y 1 = y 0`.
 
-The bounds hold componentwise, hence in the max norm. Zero-stability is the h -> 0 notion: it
-says nothing about stiff stability at ratio 2 (T12 of the FV report).
+The bounds hold componentwise, hence in the max norm. Zero-stability is the $`h \to 0`$ notion:
+it says nothing about stiff stability at a step ratio of 2.
 
 ## The tripwire
 
 The theorems are about the mirror, not the compiled OCaml. The tripwire stops the code from
-drifting away from the mirror unnoticed (FV report, sections 2.1 and 4.5). It is in the main
-build because a separate dune root cannot read `../src`:
+drifting away from the mirror unnoticed. It is in the main build because a separate dune root
+cannot read `../src`:
 
 - [sync/canon.ml](../sync/canon.ml), an executable on compiler-libs: `canon.exe file.ml` prints the
   canonical form of `file.ml`, its parse tree without comments or doc comments, laid out by the
@@ -117,5 +117,5 @@ can make every `.canon` differ: promote them once the diffs show layout only.
 
 ## Next
 
-T3 waits for the controller of roadmap M2 ([plan](../docs/plans/plan.md), section 6); the CI job
-of the FV report (section 4.6) is not set up yet.
+A proof that the controller never proposes a step ratio at or above the bound of `q_lt1` waits for
+a controller that enforces one. No CI job builds the proofs yet.
