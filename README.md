@@ -11,11 +11,12 @@ vstiff uses implicit methods, which solve an equation for each new state and sta
 steps, and it estimates the derivative matrices that equation needs (Jacobians) from `f` alone, so
 `f` is the only code you write.
 
-vstiff is early work: the API will change, it returns only the final state, and at equal accuracy it
-needs far more right-hand-side calls than SciPy's BDF (section 0 of
-[docs/plans/roadmap.md](docs/plans/roadmap.md) has prototype measurements). It suits small
-systems and learning how a stiff solver works; for speed or large systems use a mature solver such
-as SciPy (`solve_ivp`) or SUNDIALS. The status table below says what is missing and what is planned.
+vstiff is early work: the API will change, it returns only the final state, and it is slow.
+Newton's method rebuilds the Jacobian at every iteration, at a cost of `n + 1` calls of `f` for a
+state of `n` components, and the controller only halves and doubles the step instead of sizing it
+from the error estimate. It suits small systems and learning how a stiff solver works; for speed or
+large systems use a mature solver such as SciPy (`solve_ivp`) or SUNDIALS. The status table below
+says what is missing and what is planned.
 
 ## What it does today
 
@@ -112,15 +113,15 @@ result fails no test (rule H1 in [AGENTS.md](AGENTS.md)).
 
 ## Status and known limits
 
-The Planned column is the plan in [docs/plans/plan.md](docs/plans/plan.md), not the code.
+The Planned column says what is intended, not what exists.
 
 | Area | Today | Planned |
 |---|---|---|
-| Method, step size | variable-step BDF2; halve a rejected step, double after three accepts | variable-order BDF (orders 1 to 5), Radau IIA (an implicit Runge-Kutta method); a controller that sets each step from the size of the error estimate instead of halving and doubling |
-| Tolerance | one `~tol` on each step's error estimate (absolute for small components, relative for large), not the final error | separate `rtol` and `atol`; an optional global error estimate |
+| Method, step size | variable-step BDF2; halve a rejected step, double after three accepts | variable-order BDF (orders 1 to 5); Radau IIA (an implicit Runge-Kutta method); steps sized from the error estimate |
+| Tolerance | one `~tol` on each step's error estimate (absolute for small components, relative for large), not the final error | separate relative and absolute tolerances, `rtol` and `atol`; an optional global error estimate |
 | Jacobian, linear algebra | forward differences rebuilt at every Newton iteration; dense Gaussian elimination | reuse; a Jacobian you supply; banded and sparse |
 | Problems, result | `y' = f(t, y)` forward in time; the final state only | index-1 differential-algebraic equations (DAEs); backward in time; dense output; events |
-| Assurance | the expect tests above | property tests, mutation testing, proofs in Rocq (a theorem prover), a scorecard against SciPy and SUNDIALS |
+| Assurance | the expect tests above | property tests, mutation testing, proofs in Rocq (a theorem prover), comparisons with SciPy and SUNDIALS |
 
 Two gaps in the tests are known: van der Pol's accuracy is not checked against a reference, and no
 line pins the constant of Newton's line search. There is no opam package yet, so use vstiff from a
@@ -132,7 +133,7 @@ clone.
 src/numerics/   kernel library numerics: Fail, Vec, Linalg, Newton, Jac; knows nothing about ODEs
 src/            solver library vstiff: ode.mli holds the contracts, vstiff.mli the public API
 test/           corpus.ml and soak.ml with their .expected files, and their helper modules
-docs/           README.md is the index; numerics/ explains the mathematics; plans/ looks ahead
+docs/           README.md is the index; numerics/ explains the mathematics
 ```
 
 ## Where to go next

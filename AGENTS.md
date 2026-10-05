@@ -17,9 +17,8 @@ Never work around it.
 
 vstiff is a stiff ODE solver in OCaml that puts correctness first.
 
-- [README.md](README.md) says what vstiff does today, and its "Layout" section maps the
-  repository.
-- [docs/plans/plan.md](docs/plans/plan.md) says where the project is going, and in what order.
+- [README.md](README.md) says what vstiff does today and what is planned, and its "Layout" section
+  maps the repository.
 - [docs/README.md](docs/README.md) lists, once, what to know and to install before reading the
   code or the documents.
 
@@ -129,7 +128,7 @@ vstiff is a stiff ODE solver in OCaml that puts correctness first.
     - a probe the reader can run;
     - a publication the text cites.
 
-    A figure with none of these is marked as unverified, as the plans mark theirs.
+    A figure with none of these is marked as unverified.
   - Links between project files are relative paths to files, never `#anchors`. An external source
     is linked by its full URL.
   - Every OCaml snippet in an `ocaml` block compiles. A sketch that does not compile goes in a
@@ -301,7 +300,7 @@ The title is `Area: Sentence-case summary`. The area is one of these words, neve
 |---|---|
 | `Core` | Solver and kernel behaviour |
 | `Design` | Interfaces, architecture, refactors |
-| `Spec` | Plans and decision records |
+| `Spec` | Specifications and written proposals |
 | `Proof` | Formal verification |
 | `Harness` | Tests, properties, mutation testing, tripwires, corpus references |
 | `Bench` | Benchmarks, their references, comparisons with other solvers |

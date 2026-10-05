@@ -34,7 +34,7 @@ dune runtest
 
 | Document | What it is |
 |---|---|
-| [README.md](../README.md) (repository root) | The front page: what vstiff is, a first program, quick start, layout, known limitations. |
+| [README.md](../README.md) (repository root) | The front page: what vstiff is, a first program, quick start, status and known limits, layout. |
 | [AGENTS.md](../AGENTS.md) (repository root) | The rules for every change: the hard rules H1 to H17, the design defaults, the build and test commands, how to add a corpus case, a soak case, a method or a controller, the effects map, commits, pull requests and the checklist for a finished change. [CONTRIBUTING.md](../CONTRIBUTING.md) points to it. |
 | [docs/README.md](README.md) | This page: what to know before you start, the index, reading orders and a one-hour path. |
 | [onboarding.md](onboarding.md) | A ten-working-day plan from zero to a first contribution, with readings, exercises, self-checks and a done-when line for each day. |
@@ -52,7 +52,7 @@ dune runtest
 
 ## Reading orders
 
-**Following the plan.** [onboarding.md](onboarding.md) interleaves everything below over ten working days. It is the recommended route if you will contribute.
+**Following the onboarding plan.** [onboarding.md](onboarding.md) interleaves everything below over ten working days. It is the recommended route if you will contribute.
 
 **The numerics track.** Read the six chapters in `numerics/` in order, 1 to 6; "Before you start" says which needs which. Each ends with questions to check yourself. The OCaml snippets are optional but worth running. ([onboarding.md](onboarding.md) visits the chapters in the order 2, 3, 1, 4, 5, 6, which those dependencies allow, to match the code it asks you to read each day.)
 
@@ -114,14 +114,4 @@ Keep the [glossary](glossary.md) open for the terms you meet. To carry on, start
 | Add a method or a controller | the Tests section of [AGENTS.md](../AGENTS.md) (Adding a method or a controller) and [architecture.md](architecture.md) |
 | Find something small to work on | the starter contributions in [exercises.md](exercises.md) |
 | Fix or add documentation | the writing rules, H11 to H13, in [AGENTS.md](../AGENTS.md) |
-| See where the project is meant to go, or how parts of it could be proved correct | [plans/plan.md](plans/plan.md), [plans/roadmap.md](plans/roadmap.md), [plans/formal-verification.md](plans/formal-verification.md) |
-
-## Plans
-
-Three documents look ahead instead of describing the code as it is:
-
-| Document | What it is |
-|---|---|
-| [plans/plan.md](plans/plan.md) | The top-level plan: what done means, and the order of the solver, property-testing, proof and benchmark work. |
-| [plans/roadmap.md](plans/roadmap.md) | The roadmap from today's small BDF2 integrator to a general stiff solver, with milestones and decisions. |
-| [plans/formal-verification.md](plans/formal-verification.md) | How parts of vstiff could be verified in Rocq with MathComp, with a ranked list of theorems and a pilot plan. |
+| See what works today, what is missing and what is planned | "Status and known limits" in the [README](../README.md) |
