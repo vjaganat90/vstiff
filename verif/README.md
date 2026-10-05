@@ -70,7 +70,7 @@ $\operatorname{den}(\omega) \ne 0$:
 
 **T2**, in [theories/Bdf2_zero_stability.v](theories/Bdf2_zero_stability.v), for the recurrence
 $y_{n+2} = a_1(\omega_n)\,y_{n+1} + a_0(\omega_n)\,y_n + d_n$ with ratios $\omega_n$ and perturbations
-$d_n$ (rounding, the stage residual, or the f-term); $d = 0$ is the homogeneous recurrence.
+$d_n$ (rounding, the stage residual, or the $f$-term); $d = 0$ is the homogeneous recurrence.
 $q(\omega) = -a_0(\omega)$ is the factor a step applies to the step difference:
 
 - `qE`, over any field: $q$ in the closed form the other lemmas use.
