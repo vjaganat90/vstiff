@@ -21,7 +21,7 @@ Each row is one problem and tolerance ($\mathrm{rtol} = \mathrm{atol} = \mathrm{
 
 ## The golden table
 
-`bench/golden.ml` pins the figures of one run, and every later run is judged against it: the $\mathrm{scd}$ must not be lower, and the cost, the right-hand-side calls, not more than $10\,\%$ higher. Both are bands, so they hold from one platform to the next: the $\mathrm{scd}$ may lose $0.05$ digits (the pin is rounded), and a count may move with the platform's rounding (arm64 fuses a multiplication into the addition after it, x86_64 does not: with the fusion compiled away in a scratch copy, two of the ten rows moved, by 3 and 10 calls). The exit status is 1 unless every verdict is `ok`; a row the table does not have is `UNPINNED`, and a run that fails is a regression. Steps, rejections and the error are printed for the reader and not compared.
+`bench/golden.ml` pins the figures of one run, and every later run is judged against it: the $\mathrm{scd}$ must not be lower, and the cost, the right-hand-side calls, not more than 10% higher. Both are bands, so they hold from one platform to the next: the $\mathrm{scd}$ may lose $0.05$ digits (the pin is rounded), and a count may move with the platform's rounding (arm64 fuses a multiplication into the addition after it, x86_64 does not: with the fusion compiled away in a scratch copy, two of the ten rows moved, by 3 and 10 calls). The exit status is 1 unless every verdict is `ok`; a row the table does not have is `UNPINNED`, and a run that fails is a regression. Steps, rejections and the error are printed for the reader and not compared.
 
 A deliberate change of behaviour re-pins the table in the same commit, with the old and the new figures in its message (H2 in [AGENTS.md](../AGENTS.md)):
 

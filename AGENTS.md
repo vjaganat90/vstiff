@@ -250,7 +250,7 @@ start".
   ```
 
   - It exits with status 1 unless every row is `ok` against `bench/golden.ml`: the $\mathrm{scd}$ may not fall
-    below the pin, and the right-hand-side calls may not exceed it by more than $10\,\%$.
+    below the pin, and the right-hand-side calls may not exceed it by more than 10%.
   - A deliberate change of behaviour re-pins the table in its own commit, with the old and the new
     figures in the message (H2): `./_build/default/bench/bench.exe --pin > bench/golden.ml`, then
     rebuild.
