@@ -62,7 +62,7 @@ Of the 383 killed mutants, 50 were killed by the timeout.
 - `src/adaptive.ml:37:12:le_to_lt`: `h <= 0.` -> `h < 0.`
   Equivalent: h is 0 only for a non-final step at a t other than 0 (a final step has h = remaining > 0, and at t = 0 a step is dt > 0), and there the second operand of the `||`, `(not last) && h < Clock.resolution t`, is true for 0 as well.
 - `src/adaptive.ml:37:18:or_to_and`: `(h <= 0.) || ((not last) && (h < (Cl...` -> `(h <= 0.) && ((not last) && (h < (Cl...`
-  Not equivalent: this rejects a step only when h <= 0, so a step below the resolution of t that still moves t is taken: a known gap (docs/numerics/06-the-corpus.md, section 10), `y' = 1` from t = 1e15 over 100 with `dt0 = dt_max = 0.19` ends `Ok` instead of `Error StepRejected 1`.
+  Not equivalent: this rejects a step only when $`h \le 0`$, so a step below the resolution of $`t`$ that still moves $`t`$ is taken: a known gap (docs/numerics/06-the-corpus.md, section 10), $`y' = 1`$ from $`t = 10^{15}`$ over 100 with `dt0 = dt_max = 0.19` ends `Ok` instead of `Error StepRejected 1`.
 - `src/adaptive.ml:37:38:lt_to_le`: `h < (Clock.resolution at.t)` -> `h <= (Clock.resolution at.t)`
   Not equivalent: a step of exactly the resolution of t is taken by the original and rejected with `<=`: `y' = 1` from t = 1 over two resolutions with `dt0 = dt_max = Clock.resolution 1` is `Ok` (2 steps), and `Error StepRejected 1` with this.
 - `src/adaptive.ml:42:11:arm_body_from_2`: `retry (Ode.Solver e)` -> `retry Ode.Too_large`
@@ -91,7 +91,7 @@ Of the 383 killed mutants, 50 were killed by the timeout.
 ### src/numerics/linalg.ml
 
 - `src/numerics/linalg.ml:10:68:gt_to_ge`: `...oat.abs ((a.(j)).(0))) > (Float.abs ((a.(i)).(0)...` -> `...oat.abs ((a.(j)).(0))) >= (Float.abs ((a.(i)).(0)...`
-  Looks equivalent: on a tie in |a_i0| either row is a valid pivot. On 3000 random integer systems it changes the answer of 1069: the 1064 nonsingular ones by at most 1.1e-13 relative, below every printed digit, and 5 singular ones, where `linalg.mli` leaves the answer open (`None` or a huge vector).
+  Looks equivalent: on a tie in $`\lvert a_{i0} \rvert`$ either row is a valid pivot. On 3000 random integer systems it changes the answer of 1069: the 1064 nonsingular ones by at most 1.1e-13 relative, below every printed digit, and 5 singular ones, where `linalg.mli` leaves the answer open (`None` or a huge vector).
 - `src/numerics/linalg.ml:12:10:int_minus1`: `1` -> `0`
   Equivalent: `best 0 0` first compares row 0 with itself, which never replaces it, so it is `best 0 1` with one more step (bit-identical on 3000 random integer systems).
 - `src/numerics/linalg.ml:15:26:int_minus1`: `0` -> `(-1)`
@@ -148,11 +148,11 @@ Of the 383 killed mutants, 50 were killed by the timeout.
 - `src/numerics/newton.ml:36:23:lt_to_le`: `lambda < min_damping` -> `lambda <= min_damping`
   Not equivalent: `lambda <= min_damping` rejects the factor 1/1024 itself, so the depth is 1/512; `x^2 - 2` from 5e-4 needs 1/1024: `Ok` with the original, `Error Diverged` with this.
 - `src/numerics/newton.ml:40:53:le_to_lt`: `(Vec.norm_inf fx') <= ((1. -. (armijo *. lamb...` -> `(Vec.norm_inf fx') < ((1. -. (armijo *. lamb...`
-  Looks equivalent: it differs only when |f(x')| equals (1 - armijo lambda) |f(x)| exactly, which only a crafted case reaches: `x` with a Jacobian of 1e4 from 1 ends `Error Diverged` after 12 evaluations of f instead of 51.
+  Looks equivalent: it differs only when $`\lvert f(x') \rvert = (1 - \mathrm{armijo}\,\lambda)\,\lvert f(x) \rvert`$ exactly, which only a crafted case reaches: `x` with a Jacobian of 1e4 from 1 ends `Error Diverged` after 12 evaluations of f instead of 51.
 - `src/numerics/newton.ml:40:60:fsub_to_fadd`: `1. -. (armijo *. lambda)` -> `1. +. (armijo *. lambda)`
   Not equivalent: the Armijo gap again: `(1 + armijo lambda) r` accepts a step that leaves $`|f|`$ unchanged, and `x^2 - 5` from 1 takes 6 evaluations of f instead of 7.
 - `src/numerics/newton.ml:40:71:fmul_to_fdiv`: `armijo *. lambda` -> `armijo /. lambda`
-  Not equivalent: `armijo / lambda` is the same constant at lambda = 1 and 0.1 at 1/1024; `x^2 - 2` from 5e-4 needs 1/1024, and ends `Error Diverged` instead of `Ok`.
+  Not equivalent: `armijo / lambda` is the same constant at $`\lambda = 1`$ and 0.1 at $`\lambda = 1/1024`$; $`x^2 - 2`$ from $`5 \times 10^{-4}`$ needs $`\lambda = 1/1024`$, and ends `Error Diverged` instead of `Ok`.
 - `src/numerics/newton.ml:40:106:int_plus1`: `1` -> `2`
   Not equivalent: counting each step twice halves the limit to 25: `x^3 = 0` from 0.05 or 0.1 ends `Error Diverged` after 26 evaluations of f, where the original prints `Ok`.
 - `src/numerics/newton.ml:41:36:float_x2`: `2.` -> `4.`
