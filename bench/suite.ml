@@ -6,8 +6,8 @@ type case = {
   box : (float * float) array;
 }
 
-(* Brusselator-80 stops at 1e-4: 1e-6 takes some 24 s of CPU and 4.3 million calls. The boxes are where the transcription check draws states: generic ones, positive
-   where a problem needs it. *)
+(* Brusselator-80 stops at 1e-4: 1e-6 takes some 24 s of CPU and 4.3 million calls. The boxes are where the
+   transcription check draws states: generic ones, positive where a problem needs it. *)
 let cases =
   [
     {
