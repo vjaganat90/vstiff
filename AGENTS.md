@@ -185,10 +185,27 @@ request.
   - Depth belongs in `docs/`. A module's comment lines should not outnumber its code lines.
 - **Style.**
   - Match the surrounding code: indentation, naming, and lines near 120 columns.
-  - Math in code comments is ASCII (`y_{n+1}`, `|x|_inf`). Math you add to Markdown uses GitHub's
-    syntax, which renders it: inline as ``$`y_{n+1}`$``, displayed in a fenced block whose info
-    string is `math`. Code identifiers stay in code spans. In a table cell write the absolute value
-    as `\lvert x \rvert`: a bare `|` splits the cell.
+  - Mathematics in Markdown looks as it does in a numerical analysis book, so that an applied
+    mathematician reads it at once: every symbol, subscript, power, norm, absolute value, formula
+    and number such as $10^{-6}$ is typeset in LaTeX, with upright operators ($\operatorname{diag}$,
+    $\max_i$, $\mathrm{tol}$), never left as plain text or in a code span. The step ratio, for
+    one, is $\omega = h / h_{\mathrm{prev}}$ and a norm is $\lVert x \rVert_\infty$.
+  - The delimiters are standard LaTeX, which editors, GitHub and pandoc all render: inline math
+    between single dollar signs, with no space just inside them, and displayed math between double
+    dollar signs on lines of their own, with a blank line before and after. Never the GitHub-only
+    form with backticks inside the dollars, and never a `math` fence. In a table cell write
+    $\lvert x \rvert$, never a bare `|`, which splits the cell.
+  - Write the TeX that GitHub passes on intact: `\lt` and `\gt` for the two inequality signs (a
+    bare one reaches the renderer as `&lt;`), `\lbrace` and `\rbrace` for braces, and
+    `\thinspace` for a thin space, because `\,`, `\;` and `\{` lose their backslash. A row break
+    `\\` survives only at the end of a line of a display that spans several lines; anywhere else
+    write `\cr`.
+    `\lt` and `\gt` are MathJax and KaTeX macros, not LaTeX, so a PDF build through LaTeX must
+    define them: `\newcommand{\lt}{<}\newcommand{\gt}{>}`.
+  - Code stays code: identifiers and expressions (`Bdf2.coeffs`, `~tol:1e-6`), commands, file
+    names, and program or expected-file lines quoted verbatim. A sentence about the mathematical
+    quantity is math; a sentence that names the code is code. Math in code comments stays plain
+    ASCII, since no renderer reads a comment.
 - **Comment pitfalls.** OCaml comments nest, and string literals are lexed inside them, so:
   - keep `(*`, `*)` and double quotes out of comment text;
   - inside a function body, use `(* *)`: a documentation comment there is warning 50, which the
