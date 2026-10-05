@@ -118,6 +118,8 @@ vstiff is a stiff ODE solver in OCaml that puts correctness first.
   - They never describe how a change was requested or produced: no conversations, no "as
     discussed", no session or tool notes, no credit to an agent, an assistant or a tool, and no
     instructions to whoever writes the text.
+  - No commit hash or other raw commit reference appears in a document, a comment or code. Name
+    the change by what it did, or point to the test line that pins it.
 - **H12. Every statement is checked, and every number has a source.**
   - A statement about the code was checked against the code. A statement about behaviour was
     seen in a run.
