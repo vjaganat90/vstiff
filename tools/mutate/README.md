@@ -1,6 +1,6 @@
 # mutate
 
-Mutation testing for vstiff ([plan](../../docs/plans/plan.md), section 3.4). `mutate` parses a module with the compiler's own parser and lists its mutants: copies of the module with one small edit, such as `+.` turned into `-.`, a comparison flipped or a constant moved a decade. `mutate run` builds each mutant in a scratch copy of the repository and runs `dune build @runtest`. A mutant that a test notices is killed; one that no test notices survives, and then either a test is missing or the mutant behaves like the original (it is equivalent). [baseline.md](baseline.md) is a run on the kernel and the solver, with a verdict on every survivor.
+Mutation testing for vstiff. `mutate` parses a module with the compiler's own parser and lists its mutants: copies of the module with one small edit, such as `+.` turned into `-.`, a comparison flipped or a constant moved a decade. `mutate run` builds each mutant in a scratch copy of the repository and runs `dune build @runtest`. A mutant that a test notices is killed; one that no test notices survives, and then either a test is missing or the mutant behaves like the original (it is equivalent). [baseline.md](baseline.md) is a run on the kernel and the solver, with a verdict on every survivor.
 
 ## Run it
 
@@ -51,7 +51,7 @@ Every mutant has an id, `file:line:col:operator`, which stays valid while the fi
 ./_build/default/tools/mutate/mutate.exe apply src/halving.ml:36:10:if_swap
 ```
 
-`mutant.mli` names the operators. Swapping two arguments of one type, which plan 3.4 also lists, is not among them: it needs types, and `mutate` reads only the syntax.
+`mutant.mli` names the operators. Swapping two arguments of one type is not among them: it needs types, and `mutate` reads only the syntax.
 
 ## Resolving a survivor
 

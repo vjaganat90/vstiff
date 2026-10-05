@@ -122,21 +122,21 @@ Of the 383 killed mutants, 50 were killed by the timeout.
 - `src/numerics/newton.ml:10:25:float_x2`: `1024.` -> `2048.`
   Not equivalent: the damping floor is pinned from above only (no corpus case needs 1/1024); with a Jacobian of the wrong sign the search takes 13 evaluations of f instead of 12.
 - `src/numerics/newton.ml:14:14:float_div10`: `1e-4` -> `1e-5`
-  Looks equivalent: a constant of `1e-5` accepts a different step only when it cuts |f| by a fraction between `1e-5 lambda` and `1e-4 lambda`, a band that none of the corpus, `x^2 - 5`, `x^2 - 2`, `x^3` or a wrong-sign Jacobian lands in; only a crafted case with a badly scaled Jacobian would.
+  Looks equivalent: a constant of `1e-5` accepts a different step only when it cuts $`|f|`$ by a fraction between `1e-5 lambda` and `1e-4 lambda`, a band that none of the corpus, `x^2 - 5`, `x^2 - 2`, `x^3` or a wrong-sign Jacobian lands in; only a crafted case with a badly scaled Jacobian would.
 - `src/numerics/newton.ml:14:14:float_div2`: `1e-4` -> `5e-5`
-  Looks equivalent: a constant of `5e-5` differs from `1e-4` only for a step that cuts |f| by a fraction between the two (about 0.005% of lambda), a band no natural case lands in.
+  Looks equivalent: a constant of `5e-5` differs from `1e-4` only for a step that cuts $`|f|`$ by a fraction between the two (about 0.005% of lambda), a band no natural case lands in.
 - `src/numerics/newton.ml:14:14:float_x10`: `1e-4` -> `1e-3`
-  Looks equivalent: a constant of `1e-3` differs from `1e-4` only for a step that cuts |f| by a fraction between the two, a band no natural case lands in.
+  Looks equivalent: a constant of `1e-3` differs from `1e-4` only for a step that cuts $`|f|`$ by a fraction between the two, a band no natural case lands in.
 - `src/numerics/newton.ml:14:14:float_x2`: `1e-4` -> `2e-4`
-  Looks equivalent: a constant of `2e-4` differs from `1e-4` only for a step that cuts |f| by a fraction between the two, a band no natural case lands in; `x` with a Jacobian of 1e4 from 1, where every step cuts |f| by exactly `1e-4 lambda`, ends `Error Diverged` after 12 evaluations of f instead of 51.
+  Looks equivalent: a constant of `2e-4` differs from `1e-4` only for a step that cuts $`|f|`$ by a fraction between the two, a band no natural case lands in; `x` with a Jacobian of 1e4 from 1, where every step cuts $`|f|`$ by exactly `1e-4 lambda`, ends `Error Diverged` after 12 evaluations of f instead of 51.
 - `src/numerics/newton.ml:14:14:float_zero`: `1e-4` -> `0.`
-  Not equivalent: the Armijo constant is a known gap (docs/numerics/06-the-corpus.md, section 10). With 0 a step that leaves |f| unchanged is accepted: `x^2 - 5` from 1 takes 6 evaluations of f instead of 7.
+  Not equivalent: the Armijo constant is a known gap (docs/numerics/06-the-corpus.md, section 10). With 0 a step that leaves $`|f|`$ unchanged is accepted: `x^2 - 5` from 1 takes 6 evaluations of f instead of 7.
 - `src/numerics/newton.ml:22:15:ge_to_gt`: `k >= max_iter` -> `k > max_iter`
   Not equivalent: the same boundary as the limit itself: `x^3 = 0` from 0.15 needs 50 steps and ends `Error Diverged` with the original, `Ok` with this.
 - `src/numerics/newton.ml:26:9:arm_body_from_4`: `Error Fail.Diverged` -> `let rec damp lambda = if lambda < min_damping then Error Fail.Diverged e...`
   Not equivalent: for the test's f every trial point is infinite and the search ends in the same `Error Diverged`, after eleven evaluations at infinity. For an f that is finite there, such as `1 / (1 + x^2)` with a Jacobian of 1e-320, it is `Error Nan`.
 - `src/numerics/newton.ml:29:38:le_to_lt`: `(Vec.norm_inf dx) <= (tol *. (1. +. (Vec.nor...` -> `(Vec.norm_inf dx) < (tol *. (1. +. (Vec.nor...`
-  Looks equivalent: it differs only when |dx| equals tol (1 + |x|) exactly, which only a crafted case reaches: `x - 1e-10` from 0 takes 2 evaluations of f instead of 1, with the same answer.
+  Looks equivalent: it differs only when $`|dx|`$ equals $`tol (1 + |x|)`$ exactly, which only a crafted case reaches: `x - 1e-10` from 0 takes 2 evaluations of f instead of 1, with the same answer.
 - `src/numerics/newton.ml:29:49:float_div10`: `1.` -> `0.1`
   Not equivalent: the absolute part of the stopping test is unpinned: `x^3 = 0` from 0.05 ends `Error Diverged` after 50 steps with `0.1 + |x|`, and `Ok 1.76e-10` with `1 + |x|`.
 - `src/numerics/newton.ml:29:49:float_div2`: `1.` -> `0.5`
@@ -150,7 +150,7 @@ Of the 383 killed mutants, 50 were killed by the timeout.
 - `src/numerics/newton.ml:40:53:le_to_lt`: `(Vec.norm_inf fx') <= ((1. -. (armijo *. lamb...` -> `(Vec.norm_inf fx') < ((1. -. (armijo *. lamb...`
   Looks equivalent: it differs only when |f(x')| equals (1 - armijo lambda) |f(x)| exactly, which only a crafted case reaches: `x` with a Jacobian of 1e4 from 1 ends `Error Diverged` after 12 evaluations of f instead of 51.
 - `src/numerics/newton.ml:40:60:fsub_to_fadd`: `1. -. (armijo *. lambda)` -> `1. +. (armijo *. lambda)`
-  Not equivalent: the Armijo gap again: `(1 + armijo lambda) r` accepts a step that leaves |f| unchanged, and `x^2 - 5` from 1 takes 6 evaluations of f instead of 7.
+  Not equivalent: the Armijo gap again: `(1 + armijo lambda) r` accepts a step that leaves $`|f|`$ unchanged, and `x^2 - 5` from 1 takes 6 evaluations of f instead of 7.
 - `src/numerics/newton.ml:40:71:fmul_to_fdiv`: `armijo *. lambda` -> `armijo /. lambda`
   Not equivalent: `armijo / lambda` is the same constant at lambda = 1 and 0.1 at 1/1024; `x^2 - 2` from 5e-4 needs 1/1024, and ends `Error Diverged` instead of `Ok`.
 - `src/numerics/newton.ml:40:106:int_plus1`: `1` -> `2`

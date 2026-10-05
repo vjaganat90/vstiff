@@ -1,4 +1,4 @@
-; The mutation-testing tool of docs/plans/plan.md, section 3.4. compiler-libs ships with the compiler and unix with the
+; The mutation-testing tool. compiler-libs ships with the compiler and unix with the
 ; standard distribution, so the project still depends on nothing outside it; neither is linked into src/ or test/.
 ; Effects are in Files (file system), Child (processes, the clock) and the main modules; the rest is pure.
 (executables
