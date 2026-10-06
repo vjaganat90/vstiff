@@ -77,6 +77,9 @@ vstiff is a stiff ODE solver in OCaml that puts correctness first.
   - Mutation inside a call is allowed: `ref`s, loops, writes to arrays the call allocated, work on
     a private copy. It must not be visible outside: no function writes an argument, an array it
     returned earlier, or anything its caller can see, and a result never changes once returned.
+  - Mutate only when it pays: a pure version is replaced by a mutating one only if the mutating one
+    is at least 5% faster, averaged over 3 runs of each. Anything under 5% is run noise. The pull
+    request gives both averages.
 - **H7. The corpus exercises the solver the way users will.**
   - No integrator is given an analytic Jacobian: the problems in `test/problems.ml` supply none,
     the solver works from function values alone, and the corpus keeps exercising `Jac`.
@@ -162,7 +165,8 @@ request.
 - **Arrays and speed.** Vectors are `float array`, which OCaml stores as one flat block of
   unboxed doubles. Where it is faster, use the mutation H6 allows: fill a freshly allocated result
   in a loop rather than through `Array.init` or `Array.map` with a closure, and factor a matrix in
-  place on a private copy. Measure before and after, and keep every output within its checks (H1).
+  place on a private copy, when the gain clears H6's 5% bar. Keep every output within its checks
+  (H1).
 - **Contracts and implementations.**
   - Contracts are module types; implementations are modules.
   - Methods and controllers implement `Ode.Method`, `Ode.Embedded` and `Ode.Controller`. They are
