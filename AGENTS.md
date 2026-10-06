@@ -69,13 +69,14 @@ vstiff is a stiff ODE solver in OCaml that puts correctness first.
     does not check: its `.mli` files state each precondition.
   - Every run ends. A controller ends every run of rejections with an `Error`, and the termination
     of `Adaptive.integrate` rests on it ([docs/numerics/05-step-control.md](docs/numerics/05-step-control.md)).
-- **H6. Effects live in named modules, and nothing shared is written.**
-  - In the library, only `Check` raises on purpose and only `Instrument` has mutable state. In the
-    tests, only `Guard` raises or catches and only `Report` prints. The effects map below has the
-    details.
+- **H6. Effects live in named modules; mutation stays inside the call.**
+  - In the library, only `Check` raises on purpose and only `Instrument` keeps state from one call
+    to the next. In the tests, only `Guard` raises or catches and only `Report` prints. The effects
+    map below has the details.
   - A new effect goes into one of these modules, or into a new module that exists for it.
-  - No function writes an argument, or an array it returned earlier. A function may write only the
-    arrays it allocated during the same call, before it returns them.
+  - Mutation inside a call is allowed: `ref`s, loops, writes to arrays the call allocated, work on
+    a private copy. It must not be visible outside: no function writes an argument, an array it
+    returned earlier, or anything its caller can see, and a result never changes once returned.
 - **H7. The corpus exercises the solver the way users will.**
   - No integrator is given an analytic Jacobian: the problems in `test/problems.ml` supply none,
     the solver works from function values alone, and the corpus keeps exercising `Jac`.
@@ -158,6 +159,10 @@ The goal is clean, powerful modularity, and every tool OCaml offers is available
 are the defaults. Break one when the alternative is clearly cleaner, and say why in the pull
 request.
 
+- **Arrays and speed.** Vectors are `float array`, which OCaml stores as one flat block of
+  unboxed doubles. Where it is faster, use the mutation H6 allows: fill a freshly allocated result
+  in a loop rather than through `Array.init` or `Array.map` with a closure, and factor a matrix in
+  place on a private copy. Measure before and after, and keep every output within its checks (H1).
 - **Contracts and implementations.**
   - Contracts are module types; implementations are modules.
   - Methods and controllers implement `Ode.Method`, `Ode.Embedded` and `Ode.Controller`. They are
