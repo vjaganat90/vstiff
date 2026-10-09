@@ -54,10 +54,10 @@ polynomial $p$, and `q w`, the parasitic root $q(\omega) = -a_0(\omega)$.
 $\omega = h / h_{\mathrm{prev}}$ is the step ratio, $h_{\mathrm{prev}}$ the previous step and
 $h = \omega\thinspace h_{\mathrm{prev}}$ the new one. $a_1(\omega)$, $a_0(\omega)$ and $\beta(\omega)$ are the
 coefficients that `Bdf2.coeffs` returns and the mirror (`a1`, `a0`, `beta`) transcribes;
-$\operatorname{den}(\omega)$ (`den`) is their shared denominator.
+$\mathrm{den}(\omega)$ (`den`) is their shared denominator.
 
 **T1**, in [theories/Bdf2_weights.v](theories/Bdf2_weights.v), over any field, whenever
-$\operatorname{den}(\omega) \ne 0$:
+$\mathrm{den}(\omega) \ne 0$:
 
 - `weights_sum_to_one`: $a_1(\omega) + a_0(\omega) = 1$.
 - `bdf2_exact_on_quadratics`: every polynomial $p$ of degree at most 2 satisfies the step
@@ -74,7 +74,7 @@ $d_n$ (rounding, the stage residual, or the $f$-term); $d = 0$ is the homogeneou
 $q(\omega) = -a_0(\omega)$ is the factor a step applies to the step difference:
 
 - `qE`, over any field: $q$ in the closed form the other lemmas use.
-- `bdf2_increment`, over any field, when $\operatorname{den}(\omega) \ne 0$:
+- `bdf2_increment`, over any field, when $\mathrm{den}(\omega) \ne 0$:
   $a_1(\omega)\thinspace y_1 + a_0(\omega)\thinspace y_0 - y_1 = q(\omega)\thinspace (y_1 - y_0)$.
 - `q_le`, over an ordered field: $0 \le \omega \le \omega_{\mathrm{s}}$ implies $q(\omega) \le q(\omega_{\mathrm{s}})$.
 - `bdf2_contraction`, over an ordered field: if every $\omega_n$ lies in $[0, \omega_{\mathrm{s}}]$, the
