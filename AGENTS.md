@@ -187,7 +187,7 @@ request.
   - Match the surrounding code: indentation, naming, and lines near 120 columns.
   - Mathematics in Markdown looks as it does in a numerical analysis book, so that an applied
     mathematician reads it at once: every symbol, subscript, power, norm, absolute value, formula
-    and number such as $10^{-6}$ is typeset in LaTeX, with upright operators ($\operatorname{diag}$,
+    and number such as $10^{-6}$ is typeset in LaTeX, with upright operators ($\mathrm{diag}$,
     $\max_i$, $\mathrm{tol}$), never left as plain text or in a code span. The step ratio, for
     one, is $\omega = h / h_{\mathrm{prev}}$ and a norm is $\lVert x \rVert_\infty$.
   - The delimiters are standard LaTeX, which editors, GitHub and pandoc all render: inline math
@@ -197,7 +197,8 @@ request.
     $\lvert x \rvert$, never a bare `|`, which splits the cell.
   - Write the TeX that GitHub passes on intact: `\lt` and `\gt` for the two inequality signs (a
     bare one reaches the renderer as `&lt;`), `\lbrace` and `\rbrace` for braces, and
-    `\thinspace` for a thin space, because `\,`, `\;` and `\{` lose their backslash. A row break
+    `\thinspace` for a thin space, because `\,`, `\;` and `\{` lose their backslash. Set
+    operator names upright with `\mathrm` (`\mathrm{diag}`): GitHub refuses `\operatorname`. A row break
     `\\` survives only at the end of a line of a display that spans several lines; anywhere else
     write `\cr`.
     `\lt` and `\gt` are MathJax and KaTeX macros, not LaTeX, so a PDF build through LaTeX must

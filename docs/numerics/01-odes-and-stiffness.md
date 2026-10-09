@@ -120,7 +120,7 @@ For a nonlinear $f$ nothing is exactly linear, but small disturbances of a state
 
 ## 5. Stiffness
 
-Return to the canary, $y' = -\Lambda y$, where $\Lambda = \operatorname{diag}(1, 100, 10^4)$ is the diagonal matrix with those entries. Its Jacobian is $-\Lambda$, so its eigenvalues are minus the three rates, and explicit Euler is stable only if all three limits hold:
+Return to the canary, $y' = -\Lambda y$, where $\Lambda = \mathrm{diag}(1, 100, 10^4)$ is the diagonal matrix with those entries. Its Jacobian is $-\Lambda$, so its eigenvalues are minus the three rates, and explicit Euler is stable only if all three limits hold:
 
 $$
 \begin{aligned}
@@ -260,7 +260,7 @@ All three components stay finite. The slow one is off by about $0.184 h \approx 
 | State, right-hand side, problem | `Ode.rhs`, `Ode.problem` and `Ode.point` in [`src/ode.mli`](../../src/ode.mli), all `float array`; `Vec.t` is the same type ([`src/numerics/vec.mli`](../../src/numerics/vec.mli)) |
 | Corpus ODEs with their exact solutions | `Canary` and `Logistic` in [`test/problems.ml`](../../test/problems.ml): `rhs`, `y0`, `exact` and a `problem` record |
 | What a method must provide | `Ode.Method` in [`src/ode.mli`](../../src/ode.mli): `history`, `start` and `step rhs h history at`, which returns the new state and the next history, or a `Fail.t` |
-| Time stepping with a constant step | `Stepper.fixed (module M) ~dt problem` in [`src/stepper.ml`](../../src/stepper.ml): $n = \operatorname{round}\bigl((t_{\mathrm{end}} - t_0)/\mathtt{dt}\bigr)$ steps (at least one for a non-empty span) of $h = (t_{\mathrm{end}} - t_0)/n$, which equals `dt` only when `dt` divides the span: step $k$ ends at $t_0 + k h$, the last at $t_{\mathrm{end}}$, and the method is given the difference of the end times; it returns the final state or the first failure |
+| Time stepping with a constant step | `Stepper.fixed (module M) ~dt problem` in [`src/stepper.ml`](../../src/stepper.ml): $n = \mathrm{round}\bigl((t_{\mathrm{end}} - t_0)/\mathtt{dt}\bigr)$ steps (at least one for a non-empty span) of $h = (t_{\mathrm{end}} - t_0)/n$, which equals `dt` only when `dt` divides the span: step $k$ ends at $t_0 + k h$, the last at $t_{\mathrm{end}}$, and the method is given the difference of the end times; it returns the final state or the first failure |
 | One backward Euler step | `Bdf1.step` in [`src/bdf1.ml`](../../src/bdf1.ml), a `Method` whose history is `unit` inside the module (the interface keeps it abstract) |
 | The implicit equation $G(x) = 0$ and its Jacobian $I - h J$ | `Stage.solve` in [`src/stage.ml`](../../src/stage.ml), which hands both to `Newton.solve` ([`src/numerics/newton.ml`](../../src/numerics/newton.ml)) |
 | Failure of the implicit solve | `Fail.t` in [`src/numerics/fail.mli`](../../src/numerics/fail.mli), as `Error Diverged` or `Error Nan`; `Vstiff.Fail` re-exports it ([`src/fail.mli`](../../src/fail.mli)) |
