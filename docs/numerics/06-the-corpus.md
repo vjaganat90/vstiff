@@ -87,7 +87,7 @@ is not symmetric. It also has a curved term, so a coarse step ($10^{-2}$) shows 
 
 ## 4. The canary: lines 6, 10 and 43
 
-The canary is the decoupled linear system $y' = -\Lambda y$, $\Lambda = \operatorname{diag}(1, 100, 10^4)$, $y(0) = (1, 1, 1)$, exact $y_i(t) = \exp(-\lambda_i t)$ ([chapter 1](01-odes-and-stiffness.md)). The three rates are far apart so that a mixed-up row or column puts a fast rate on a slow component. By $t = 1$ the second component is $3.7 \times 10^{-44}$ and the third underflows to $0$, so only $y_1(1) = e^{-1}$ matters: for the lines below the largest error is the first component's.
+The canary is the decoupled linear system $y' = -\Lambda y$, $\Lambda = \mathrm{diag}(1, 100, 10^4)$, $y(0) = (1, 1, 1)$, exact $y_i(t) = \exp(-\lambda_i t)$ ([chapter 1](01-odes-and-stiffness.md)). The three rates are far apart so that a mixed-up row or column puts a fast rate on a slow component. By $t = 1$ the second component is $3.7 \times 10^{-44}$ and the third underflows to $0$, so only $y_1(1) = e^{-1}$ matters: for the lines below the largest error is the first component's.
 
 ```
 bdf1 canary t=1 dt=2e-6: max error 3.68e-07 < 1e-06: true

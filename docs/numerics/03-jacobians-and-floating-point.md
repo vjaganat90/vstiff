@@ -163,7 +163,7 @@ Dividing by the nominal step would put those relative errors into the Jacobian. 
 
 ## 5. Worked example: the canary and its rounding floor
 
-The corpus' canary is $y' = -\Lambda y$ with $\Lambda = \operatorname{diag}(1, 100, 10^4)$ ([chapter 6](06-the-corpus.md)), so the true Jacobian is $\operatorname{diag}(-1, -100, -10^4)$. Take $y_0 = (1, 1, 1)$ and the entry `J.(2).(2)` in code, $J_{33}$ in the text (the text numbers components from 1, the code from 0):
+The corpus' canary is $y' = -\Lambda y$ with $\Lambda = \mathrm{diag}(1, 100, 10^4)$ ([chapter 6](06-the-corpus.md)), so the true Jacobian is $\mathrm{diag}(-1, -100, -10^4)$. Take $y_0 = (1, 1, 1)$ and the entry `J.(2).(2)` in code, $J_{33}$ in the text (the text numbers components from 1, the code from 0):
 
 1. The nominal step is $\delta_3 = 10^{-8}(1 + 1) = 2 \times 10^{-8}$. Floats just above 1 are $2^{-52}$ apart and $2 \times 10^{-8} / 2^{-52} = 90071992.5\ldots$, so the nearest float to $1 + 2 \times 10^{-8}$ is $1 + 90071993 \times 2^{-52}$ and the perturbation actually applied is $2.0000000100495186 \times 10^{-8}$, five parts in a billion above the nominal one.
 2. $f_3 = -10^4 y_3$ is linear, so the quotient has no truncation error at all. The exact product is $-10^4 \times (1 + 2.0000000100495186 \times 10^{-8})$, about $-10000.000200000001$. Floats near $10^4$ are $1.8 \times 10^{-12}$ apart, so the product is rounded, with an error of $6.0 \times 10^{-13}$.

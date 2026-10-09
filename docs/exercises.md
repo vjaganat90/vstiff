@@ -83,7 +83,7 @@ let run (t0, t_end, dt) =
 let () = List.iter run [ (0., 1., 0.45); (0., 1., 0.12); (0., 1., 2.); (1., 1., 0.1) ]
 ```
 
-**Look in.** [src/stepper.ml](../src/stepper.ml), [src/check.ml](../src/check.ml). **Done when.** You predicted $n = \operatorname{round}\bigl((t_{\mathrm{end}} - t_0) / \mathtt{dt}\bigr)$ (at least one step for a non-empty span) with $h = (t_{\mathrm{end}} - t_0) / n$: two steps of 0.5, eight of 0.125, one of 1, none for the empty span, and `Invalid_argument` for `dt = 0`.
+**Look in.** [src/stepper.ml](../src/stepper.ml), [src/check.ml](../src/check.ml). **Done when.** You predicted $n = \mathrm{round}\bigl((t_{\mathrm{end}} - t_0) / \mathtt{dt}\bigr)$ (at least one step for a non-empty span) with $h = (t_{\mathrm{end}} - t_0) / n$: two steps of 0.5, eight of 0.125, one of 1, none for the empty span, and `Invalid_argument` for `dt = 0`.
 
 ### B4. Run `Halving` by hand
 **Goal.** Say what the controller proposes next after any run of accepts and rejects. **Hints.** From `dt0 = 0.08` with a large `dt_max`, predict the step tried and the next proposal for the outcomes A A A A R R A A A (A accepted, R rejected). The probe drives the controller directly through the `Ode.Controller` interface.
